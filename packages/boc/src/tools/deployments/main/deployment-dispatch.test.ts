@@ -1,0 +1,359 @@
+import { describe, expect, test } from "bun:test"
+import type { DeploymentCommand, DeploymentCommandResult, DeploymentCommandRunner } from "./command-runner"
+import { createDeploymentService } from "./deployment-service"
+import { memoryDeploymentStore } from "./store"
+import { deploymentShopWorkflowYaml, deploymentUnsupportedWorkflowYaml } from "../fixtures/github"
+
+const help = "--core --kube-context string --output string --prompts-enabled --selector string"
+
+describe("deployment preflight and dispatch", () => {
+  test("prepares a normalized single-use plan and rejects expiry, replay, and draft replacement", async () => {
+    let now = 1_000
+    let ids = 0
+    const commands: DeploymentCommand[] = []
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      now: () => now,
+      createId: () => `id-${++ids}`,
+      run: combinedRunner(commands, githubState()),
+    })
+
+    const prepared = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: { perform_tests: false } }],
+    })
+    expect(prepared).toMatchObject({
+      ok: true,
+      plan: {
+        preflightId: "id-1",
+        kind: "deploy",
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [
+          {
+            filename: "app-shop.yml",
+            inputs: { perform_tests: false, force_rebuild: false, run_regression_tests: false },
+          },
+        ],
+      },
+    })
+    if (!prepared.ok) throw new Error("expected plan")
+    expect(prepared.plan.workflows[0]?.inputs).not.toHaveProperty("environment")
+
+    now = 1_000 + 5 * 60 * 1000
+    expect(await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })).toMatchObject({
+      ok: false,
+      category: "timeout",
+    })
+
+    const fresh = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: { perform_tests: true } }],
+    })
+    if (!fresh.ok) throw new Error("expected fresh plan")
+    const dispatched = await service.dispatchPrepared({ preflightId: fresh.plan.preflightId })
+    expect(dispatched).toMatchObject({
+      ok: true,
+      operation: { state: "queued", environment: "02", branch: "SHOP-42" },
+    })
+    expect(await service.dispatchPrepared({ preflightId: fresh.plan.preflightId })).toMatchObject({
+      ok: false,
+      category: "not-found",
+    })
+  })
+
+  test("invalidates prepared plans when settings change and never accepts a renderer-supplied repository", async () => {
+    const commands: DeploymentCommand[] = []
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "linux",
+      createId: () => "plan-1",
+      run: combinedRunner(commands, githubState()),
+    })
+    const prepared = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    expect(prepared.ok).toBe(true)
+    await service.saveSettings({
+      applicationLabelKey: "app",
+      applicationLabelValue: "shop",
+      notificationsEnabled: true,
+    })
+    expect(await service.dispatchPrepared({ preflightId: "plan-1" })).toMatchObject({
+      ok: false,
+      category: "not-found",
+    })
+    expect(commands.some((command) => command.args.includes("bergfreunde/shop"))).toBe(true)
+    expect(commands.some((command) => command.args.includes("auth") && command.args.includes("token"))).toBe(false)
+  })
+
+  test("writes dispatching before invoking gh and never retries a failed workflow", async () => {
+    const commands: DeploymentCommand[] = []
+    let persistCount = 0
+    const store = memoryDeploymentStore()
+    const wrapped = {
+      ...store,
+      writeOperations: (operations: Parameters<typeof store.writeOperations>[0]) => {
+        persistCount += 1
+        store.writeOperations(operations)
+      },
+    }
+    const state = githubState()
+    state.run = { ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "dispatch rejected secret" }
+    const service = createDeploymentService({
+      store: wrapped,
+      platform: "darwin",
+      createId: () => "op-1",
+      run: combinedRunner(commands, state),
+    })
+
+    const prepared = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    if (!prepared.ok) throw new Error("expected plan")
+    const result = await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })
+    expect(result).toMatchObject({ ok: true, operation: { id: "op-1", state: "failure" } })
+    expect(persistCount).toBeGreaterThanOrEqual(2)
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "run")).toHaveLength(1)
+    expect(JSON.stringify(result)).not.toContain("secret")
+    expect(commands.find((command) => command.args[1] === "run")?.stdin).toContain('"environment":"02"')
+  })
+
+  test("rejects missing workflows, required unsupported inputs, unsafe targets, and duplicate active operations", async () => {
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "dup",
+      run: combinedRunner([], githubState()),
+    })
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-missing.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "not-found" })
+
+    const unsupported = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: combinedRunner([], {
+        ...githubState(),
+        yaml: deploymentUnsupportedWorkflowYaml,
+        workflows: [{ name: "Billing", path: ".github/workflows/app-billing.yml", state: "active" }],
+      }),
+    })
+    expect(
+      await unsupported.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-billing.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "invalid-input" })
+
+    const ready = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "active",
+      run: combinedRunner([], githubState()),
+    })
+    const first = await ready.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    if (!first.ok) throw new Error("expected first plan")
+    await ready.dispatchPrepared({ preflightId: first.plan.preflightId })
+    expect(
+      await ready.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "conflict" })
+  })
+
+  test("records partial dispatch without retrying accepted workflows", async () => {
+    let runs = 0
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "linux",
+      createId: () => `partial-${runs}`,
+      run: combinedRunner([], {
+        ...githubState(),
+        workflows: [
+          { name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" },
+          { name: "Admin", path: ".github/workflows/app-admin.yml", state: "active" },
+        ],
+        yamlByFile: {
+          "app-shop.yml": deploymentShopWorkflowYaml,
+          "app-admin.yml": "on: workflow_dispatch\n",
+        },
+        run: () => {
+          runs += 1
+          if (runs === 1) {
+            return success("https://github.com/bergfreunde/shop/actions/runs/11")
+          }
+          return { ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "second rejected" }
+        },
+      }),
+    })
+    const prepared = await service.prepareDeployment({
+      environment: "03",
+      ref: "SHOP-42",
+      workflows: [
+        { filename: "app-shop.yml", inputs: {} },
+        { filename: "app-admin.yml", inputs: {} },
+      ],
+    })
+    if (!prepared.ok) throw new Error("expected plan")
+    const dispatched = await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })
+    expect(dispatched).toMatchObject({ ok: true, operation: { state: "failure" } })
+    if (!dispatched.ok) throw new Error("expected operation")
+    expect(dispatched.operation.workflows).toEqual([
+      {
+        filename: "app-shop.yml",
+        state: "queued",
+        runId: "11",
+        runUrl: "https://github.com/bergfreunde/shop/actions/runs/11",
+      },
+      { filename: "app-admin.yml", state: "failure" },
+    ])
+    expect(runs).toBe(2)
+  })
+
+  test("reset uses master and app-shop on the same prepare/dispatch machinery", async () => {
+    const commands: DeploymentCommand[] = []
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "reset-1",
+      run: combinedRunner(commands, githubState()),
+    })
+    const prepared = await service.prepareReset({ environment: "02" })
+    expect(prepared).toMatchObject({
+      ok: true,
+      plan: {
+        kind: "reset",
+        ref: "master",
+        workflows: [
+          {
+            filename: "app-shop.yml",
+            inputs: { perform_tests: true, force_rebuild: false, run_regression_tests: false },
+          },
+        ],
+      },
+    })
+    if (!prepared.ok) throw new Error("expected reset plan")
+    expect(await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })).toMatchObject({
+      ok: false,
+      category: "invalid-input",
+    })
+    const dispatched = await service.dispatchPreparedReset({ preflightId: prepared.plan.preflightId })
+    expect(dispatched).toMatchObject({ ok: true, operation: { state: "queued", branch: "master" } })
+    const run = commands.find((command) => command.args[1] === "run")
+    expect(run?.args).toContain("master")
+    expect(run?.args).toContain("app-shop.yml")
+  })
+
+  test("rechecks the exact Argo dev target immediately before dispatch", async () => {
+    const commands: DeploymentCommand[] = []
+    let contexts = "dev\n"
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "safe",
+      run: combinedRunner(commands, {
+        ...githubState(),
+        contexts: () => contexts,
+      }),
+    })
+    const prepared = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    if (!prepared.ok) throw new Error("expected plan")
+    contexts = "staging\n"
+    expect(await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })).toMatchObject({
+      ok: false,
+      category: "unsafe-target",
+    })
+    expect(commands.filter((command) => command.executable === "kubectl")).toHaveLength(2)
+    expect(commands.some((command) => command.args[1] === "run")).toBe(false)
+  })
+})
+
+type GithubState = {
+  branches?: string[]
+  workflows?: Array<{ name: string; path: string; state: string }>
+  yaml?: string
+  yamlByFile?: Record<string, string>
+  run?: DeploymentCommandResult | (() => DeploymentCommandResult)
+  contexts?: () => string
+}
+
+function githubState(overrides: GithubState = {}): GithubState {
+  return {
+    branches: ["SHOP-42", "master"],
+    workflows: [{ name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" }],
+    yaml: deploymentShopWorkflowYaml,
+    run: success("https://github.com/bergfreunde/shop/actions/runs/99"),
+    ...overrides,
+  }
+}
+
+function combinedRunner(commands: DeploymentCommand[], github: GithubState): DeploymentCommandRunner {
+  return async (command) => {
+    commands.push(command)
+    if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
+    if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
+    if (command.executable === "kubectl") return success(github.contexts?.() ?? "dev\n")
+    if (command.executable === "argocd") return success(application("02"))
+    if (command.executable !== "gh") throw new Error(`Unexpected command: ${command.executable}`)
+    if (command.args[0] === "--version") return success("gh version 2.100.0")
+    if (command.args[0] === "auth") return success("Logged in to github.com")
+    if (command.args[0] === "api" && command.args[1] === `repos/bergfreunde/shop`) {
+      return success(JSON.stringify({ full_name: "bergfreunde/shop" }))
+    }
+    if (command.args[0] === "api" && command.args[1] === "graphql") {
+      return success(
+        JSON.stringify({
+          data: { repository: { refs: { nodes: (github.branches ?? []).map((name) => ({ name })) } } },
+        }),
+      )
+    }
+    if (command.args[0] === "workflow" && command.args[1] === "list") {
+      return success(JSON.stringify(github.workflows ?? []))
+    }
+    if (command.args[0] === "workflow" && command.args[1] === "view") {
+      const filename = command.args[2] ?? ""
+      return success(github.yamlByFile?.[filename] ?? github.yaml ?? "")
+    }
+    if (command.args[0] === "workflow" && command.args[1] === "run") {
+      return typeof github.run === "function" ? github.run() : (github.run ?? success(""))
+    }
+    throw new Error(`Unexpected gh ${command.args.join(" ")}`)
+  }
+}
+
+function application(environment: string) {
+  return JSON.stringify([
+    {
+      metadata: { name: `shop-dev-${environment}`, labels: { app: "shop", environment } },
+      spec: { destination: { namespace: environment }, source: { targetRevision: "master" } },
+      status: { sync: { status: "Synced" }, health: { status: "Healthy" } },
+    },
+  ])
+}
+
+function success(stdout: string): DeploymentCommandResult {
+  return { ok: true, exitCode: 0, stdout, stderr: "" }
+}

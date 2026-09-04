@@ -6,7 +6,7 @@ import { Menu } from "@opencode-ai/ui/menu"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { For, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
-import type { DeploymentOperationState } from "../domain/operations"
+import { isBlockingDeploymentOperation, type DeploymentOperationState } from "../domain/operations"
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { DeploymentRowDetails } from "./row-details"
 
@@ -15,6 +15,8 @@ export function DeploymentSystemsTable(props: {
   systems: readonly DeploymentSystem[]
   expanded?: string
   onToggleDetails: (environment: string) => void
+  onDeploy?: (system: DeploymentSystem) => void
+  onReset?: (system: DeploymentSystem) => void
 }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-auto">
@@ -102,7 +104,7 @@ export function DeploymentSystemsTable(props: {
                       <SystemState t={props.t} system={system} />
                     </td>
                     <td data-deployment-column="actions" class="border-b border-v2-border-border-muted pl-3 pr-4">
-                      <SystemActions t={props.t} system={system} />
+                      <SystemActions t={props.t} system={system} onDeploy={props.onDeploy} onReset={props.onReset} />
                     </td>
                   </tr>
                   <Show when={expanded()}>
@@ -188,17 +190,36 @@ function SystemState(props: { t: BocTranslator; system: DeploymentSystem }) {
   return <Badge>{props.t(`boc.deployments.availability.${props.system.availability}`)}</Badge>
 }
 
-function SystemActions(props: { t: BocTranslator; system: DeploymentSystem }) {
+function SystemActions(props: {
+  t: BocTranslator
+  system: DeploymentSystem
+  onDeploy?: (system: DeploymentSystem) => void
+  onReset?: (system: DeploymentSystem) => void
+}) {
+  const canDeploy = () => props.system.allowedActions?.includes("deploy") === true
+  const canReset = () => props.system.allowedActions?.includes("reset") === true
+  const blocked = () =>
+    props.system.operation !== undefined && isBlockingDeploymentOperation(props.system.operation.state)
+  const deployReason = () => {
+    if (blocked()) return props.t("boc.deployments.action.reason.active")
+    if (!canDeploy()) return props.t("boc.deployments.action.reason.readiness")
+    return undefined
+  }
+
   return (
     <div class="flex items-center justify-end gap-1">
-      <Tooltip value={props.t("boc.deployments.action.unavailable")} placement="bottom">
+      <Tooltip
+        value={deployReason() ?? props.t("boc.deployments.action.deployTo", { system: props.system.name })}
+        placement="bottom"
+      >
         <span>
           <Button
             type="button"
             size="small"
             variant="outline"
-            disabled
+            disabled={!canDeploy()}
             aria-label={props.t("boc.deployments.action.deployTo", { system: props.system.name })}
+            onClick={() => props.onDeploy?.(props.system)}
           >
             {props.t("boc.deployments.action.deploy")}
           </Button>
@@ -215,8 +236,11 @@ function SystemActions(props: { t: BocTranslator; system: DeploymentSystem }) {
         />
         <Menu.Portal>
           <Menu.Content>
-            <Menu.GroupLabel>{props.t("boc.deployments.action.unavailable")}</Menu.GroupLabel>
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
+            <Menu.Item
+              disabled={!canReset()}
+              badge={canReset() ? undefined : props.t("boc.deployments.action.unavailable.short")}
+              onSelect={() => props.onReset?.(props.system)}
+            >
               {props.t("boc.deployments.action.reset")}
             </Menu.Item>
             <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>

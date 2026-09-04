@@ -22,6 +22,8 @@ const service = createDeploymentService({
   store: {
     readSettings: () => getStore().get("settings"),
     writeSettings: (settings) => getStore().set("settings", settings),
+    readOperations: () => getStore().get("operations"),
+    writeOperations: (operations) => getStore().set("operations", operations),
   },
   // Desktop initialization imports the login-shell environment into process.env before IPC starts.
   run: createDeploymentCommandRunner(() => process.env),
