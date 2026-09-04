@@ -152,7 +152,7 @@ describe("Jira sprint selection", () => {
     const sprints = [active, sprint(30, "future"), sprint(10, "closed")]
     expect(resolveSprintId(30, sprints, active)).toBe(30)
     expect(resolveSprintId(999, sprints, active)).toBe(20)
-    expect(resolveSprintId(undefined, [sprint(30, "future")])).toBeUndefined()
+    expect(resolveSprintId(undefined, [sprint(30, "future")])).toBe(30)
   })
 
   test("orders active and upcoming sprints before newest previous sprints", () => {

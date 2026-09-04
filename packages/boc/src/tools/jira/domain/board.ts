@@ -243,7 +243,7 @@ export function boardIssuesJql(input: { filterId: string; sprintId?: number; sub
   return parts.join(" AND ")
 }
 
-export function groupIssuesByColumn(columns: JiraBoardColumn[], issues: JiraBoardIssue[]): JiraColumnGroup[] {
+export function groupIssuesByColumn(columns: readonly JiraBoardColumn[], issues: readonly JiraBoardIssue[]): JiraColumnGroup[] {
   const statusToColumn = new Map(columns.flatMap((column) => column.statusIds.map((statusId) => [statusId, column.id])))
   const issuesByColumn = new Map(columns.map((column) => [column.id, [] as JiraBoardIssue[]]))
   const unmapped: JiraBoardIssue[] = []
@@ -270,7 +270,7 @@ export function groupIssuesByColumn(columns: JiraBoardColumn[], issues: JiraBoar
   return grouped
 }
 
-export function filterIssues(issues: JiraBoardIssue[], filters: JiraIssueFilters) {
+export function filterIssues(issues: readonly JiraBoardIssue[], filters: JiraIssueFilters) {
   const search = filters.search?.trim().toLocaleLowerCase()
   return issues.filter((issue) => {
     if (
@@ -290,13 +290,16 @@ export function filterIssues(issues: JiraBoardIssue[], filters: JiraIssueFilters
   })
 }
 
-export function uniqueIssueNames(issues: JiraBoardIssue[], field: "assigneeName" | "issueTypeName" | "priorityName") {
+export function uniqueIssueNames(
+  issues: readonly JiraBoardIssue[],
+  field: "assigneeName" | "issueTypeName" | "priorityName",
+) {
   return [...new Set(issues.flatMap((issue) => (issue[field] ? [issue[field]] : [])))].sort((left, right) =>
     left.localeCompare(right),
   )
 }
 
-export function sortSprints(sprints: JiraSprintSummary[]) {
+export function sortSprints(sprints: readonly JiraSprintSummary[]) {
   return [...sprints].sort((left, right) => {
     const state = sprintStateOrder(left.state) - sprintStateOrder(right.state)
     if (state !== 0) return state
@@ -309,20 +312,24 @@ export function sortSprints(sprints: JiraSprintSummary[]) {
 
 export function resolveSprintId(
   requestedSprintId: number | undefined,
-  sprints: JiraSprintSummary[],
+  sprints: readonly JiraSprintSummary[],
   activeSprint?: JiraSprintSummary,
 ) {
   if (requestedSprintId !== undefined && sprints.some((sprint) => sprint.id === requestedSprintId)) {
     return requestedSprintId
   }
-  return activeSprint?.id ?? sprints.find((sprint) => sprint.state === "active")?.id
+  return (
+    activeSprint?.id ??
+    sprints.find((sprint) => sprint.state === "active")?.id ??
+    sprints.find((sprint) => sprint.state === "future")?.id
+  )
 }
 
-export function activeSprintFrom(sprints: JiraSprintSummary[]) {
+export function activeSprintFrom(sprints: readonly JiraSprintSummary[]) {
   return sortSprints(sprints).find((sprint) => sprint.state === "active")
 }
 
-export function selectableSprints(sprints: JiraSprintSummary[]) {
+export function selectableSprints(sprints: readonly JiraSprintSummary[]) {
   return sortSprints(sprints.filter((sprint) => sprint.state === "active" || sprint.state === "future"))
 }
 
@@ -344,7 +351,7 @@ export function normalizeSavedBoards(boards: readonly JiraBoardSummary[], defaul
 export function resolveSelectedBoardId(
   requested: number | undefined,
   preferences: JiraPreferences,
-  available: JiraBoardSummary[],
+  available: readonly JiraBoardSummary[],
 ) {
   const pool = available.length > 0 ? available : preferences.savedBoards
   if (requested !== undefined && pool.some((board) => board.id === requested)) return requested

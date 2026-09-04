@@ -74,6 +74,14 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
         }),
       )({ ok: true, boards: [] })
     }
+    if (tag === "BocJiraGetBoard" || tag === "BocJiraListIssues" || tag === "BocJiraGetIssue") {
+      return Schema.decodeUnknownSync(
+        Schema.Struct({
+          ok: Schema.Literal(false),
+          category: Schema.Literal("auth"),
+        }),
+      )({ ok: false, category: "auth" })
+    }
     return Schema.decodeUnknownSync(
       Schema.Struct({
         ok: Schema.Literal(true),
@@ -119,6 +127,9 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     encryptionAvailable: true,
   })
   await expect(api.jira.listBoards()).resolves.toEqual({ ok: true, boards: [] })
+  await expect(api.jira.getBoard({ boardId: 1 })).resolves.toEqual({ ok: false, category: "auth" })
+  await expect(api.jira.listIssues({ boardId: 1 })).resolves.toEqual({ ok: false, category: "auth" })
+  await expect(api.jira.getIssue({ issueKey: "PLAT-1" })).resolves.toEqual({ ok: false, category: "auth" })
   await expect(api.jira.getPreferences()).resolves.toEqual({ savedBoards: [] })
   await expect(api.jira.savePreferences({ savedBoards: [] })).resolves.toEqual({ savedBoards: [] })
   expect(called).toEqual([
@@ -127,6 +138,9 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     "BocJiraSaveConnection",
     "BocJiraDisconnect",
     "BocJiraListBoards",
+    "BocJiraGetBoard",
+    "BocJiraListIssues",
+    "BocJiraGetIssue",
     "BocJiraGetPreferences",
     "BocJiraSavePreferences",
   ])
