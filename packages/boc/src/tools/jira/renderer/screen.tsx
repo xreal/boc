@@ -24,9 +24,8 @@ import { JiraBoardColumns } from "./columns"
 import { JiraIssueInspector } from "./inspector"
 import { createLatestRequest, type LatestRequest } from "./latest-request"
 import { JiraSettingsDialog } from "./settings"
-import { jiraStatusLabel } from "./status"
 import { jiraBoardMessage, jiraBoardSurface } from "./surface"
-import { JiraBoardToolbar } from "./toolbar"
+import { JiraBoardHeader, JiraBoardToolbar } from "./toolbar"
 
 type BoardLoadOptions = {
   request?: LatestRequest
@@ -71,11 +70,14 @@ export default function JiraScreen(props: BocScreenProps) {
       priority: view.priority,
     })
   const groups = () => groupIssuesByColumn(view.board?.columns ?? [], filtered())
+  const selectedBoard = () => view.boards.find((board) => board.id === view.selectedBoardId)
+  const refreshing = () => view.loading !== false && view.loading !== "issue"
   const surface = () =>
     jiraBoardSurface({
       online: view.online,
       connection: view.connection,
-      loading: view.loading === "workspace" || view.loading === "board" || view.loading === "issues",
+      // A refresh or sprint change keeps the previous columns visible; only an empty board waits on the loader.
+      loading: refreshing() && view.issues.length === 0,
       failure: view.failure,
       boards: view.boards,
       board: view.board,
@@ -153,6 +155,8 @@ export default function JiraScreen(props: BocScreenProps) {
       ...(options.resetView === false
         ? {}
         : {
+            board: undefined,
+            issues: [],
             selectedIssueKey: undefined,
             issue: undefined,
             issueFailure: undefined,
@@ -276,109 +280,111 @@ export default function JiraScreen(props: BocScreenProps) {
   })
 
   return (
-    <main data-boc-screen="jira" class="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 text-v2-text-text-base">
-      <section
-        aria-busy={view.loading !== false}
-        class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg bg-v2-background-bg-raised px-4 py-4"
-      >
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div class="flex flex-col gap-1">
-            <h1 class="text-[16px] font-medium leading-[var(--line-height-base)]">{t("boc.jira.board.title")}</h1>
-            <Show when={view.connection}>
-              {(connection) => (
-                <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-                  {jiraStatusLabel(t, connection())}
-                </p>
-              )}
-            </Show>
-          </div>
-          <Show when={view.connection?.status !== "connected"}>
-            <Button type="button" variant="outline" size="small" onClick={openSettings}>
+    <main
+      data-boc-screen="jira"
+      aria-busy={view.loading !== false}
+      class="mx-2 mb-[var(--shell-bottom-inset,8px)] mt-[var(--shell-top-inset,8px)] flex min-h-0 flex-1 flex-col self-stretch overflow-hidden rounded-[10px] bg-v2-background-bg-base text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
+    >
+      <JiraBoardHeader
+        t={t}
+        connection={view.connection}
+        board={selectedBoard()}
+        preferences={view.preferences}
+        loading={refreshing()}
+        savingBoard={view.savingBoard}
+        onRefresh={() => void bootstrap()}
+        onSaveBoard={() => void saveCurrentBoard()}
+        onOpenSettings={openSettings}
+      />
+
+      <Show when={view.connection?.status === "connected" && view.boards.length > 0}>
+        <JiraBoardToolbar
+          t={t}
+          boards={view.boards}
+          preferences={view.preferences}
+          selectedBoardId={view.selectedBoardId}
+          board={view.board}
+          sprintId={view.sprintId}
+          issues={view.issues}
+          filtered={filtered()}
+          search={view.search}
+          assignee={view.assignee}
+          issueType={view.issueType}
+          priority={view.priority}
+          onSelectBoard={(boardId) => void loadBoard(boardId)}
+          onSelectSprint={(sprintId) => {
+            if (view.selectedBoardId === undefined) return
+            void loadIssues(view.selectedBoardId, sprintId)
+          }}
+          onSearch={(search) => setView("search", search)}
+          onFilter={(field, value) => setView(field, value)}
+          onClearFilters={() => setView({ search: "", assignee: undefined, issueType: undefined, priority: undefined })}
+        />
+      </Show>
+
+      <Show when={surface() === "board"}>
+        <div class="relative flex min-h-0 flex-1 gap-2 px-3 pb-3">
+          <JiraBoardColumns
+            t={t}
+            locale={props.host.locale()}
+            groups={groups()}
+            selectedIssueKey={view.selectedIssueKey}
+            onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
+          />
+          <Show when={view.selectedIssueKey}>
+            <JiraIssueInspector
+              t={t}
+              locale={props.host.locale()}
+              issueKey={view.selectedIssueKey!}
+              issue={view.issue}
+              loading={view.loading === "issue"}
+              overlay={!view.wide}
+              failure={view.issueFailure}
+              onClose={closeInspector}
+              onOpenExternal={(url) => props.host.openExternal(url)}
+            />
+          </Show>
+        </div>
+      </Show>
+
+      <Show when={surface() !== "board"}>
+        <div
+          data-boc-board-surface={surface()}
+          role={surface() === "error" || surface() === "rate-limit" ? "alert" : "status"}
+          aria-live="polite"
+          class="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 pb-12 text-center text-[13px] leading-[var(--line-height-compact)]"
+        >
+          <Show when={surface() === "loading"}>
+            <Loader />
+          </Show>
+          <p
+            class="max-w-md text-v2-text-text-muted"
+            classList={{
+              "text-v2-state-fg-danger": surface() === "error" || surface() === "rate-limit",
+              "text-v2-state-fg-warning": surface() === "encryption-unavailable" || surface() === "offline",
+            }}
+          >
+            {surface() === "not-configured"
+              ? t("boc.jira.placeholder.description")
+              : jiraBoardMessage(t, surface(), view.failure)}
+          </p>
+          <Show when={surface() === "not-configured" || surface() === "encryption-unavailable"}>
+            <Button type="button" variant="neutral" size="small" onClick={openSettings}>
               {t("boc.jira.connection.settings")}
             </Button>
           </Show>
-        </div>
-
-        <Show when={view.connection?.status === "connected"}>
-          <JiraBoardToolbar
-            t={t}
-            boards={view.boards}
-            preferences={view.preferences}
-            selectedBoardId={view.selectedBoardId}
-            board={view.board}
-            sprintId={view.sprintId}
-            issues={view.issues}
-            search={view.search}
-            assignee={view.assignee}
-            issueType={view.issueType}
-            priority={view.priority}
-            savingBoard={view.savingBoard}
-            onSelectBoard={(boardId) => void loadBoard(boardId)}
-            onSelectSprint={(sprintId) => {
-              if (view.selectedBoardId === undefined) return
-              void loadIssues(view.selectedBoardId, sprintId)
-            }}
-            onSearch={(search) => setView("search", search)}
-            onFilter={(field, value) => setView(field, value)}
-            onClearFilters={() => setView({ search: "", assignee: undefined, issueType: undefined, priority: undefined })}
-            onRefresh={() => void bootstrap()}
-            onSaveBoard={() => void saveCurrentBoard()}
-            onOpenSettings={openSettings}
-          />
-        </Show>
-
-        <Show when={surface() === "board"}>
-          <div class="relative flex min-h-0 flex-1 gap-2">
-            <JiraBoardColumns
-              t={t}
-              groups={groups()}
-              selectedIssueKey={view.selectedIssueKey}
-              onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
-            />
-            <Show when={view.selectedIssueKey}>
-              <JiraIssueInspector
-                t={t}
-                issueKey={view.selectedIssueKey!}
-                issue={view.issue}
-                loading={view.loading === "issue"}
-                overlay={!view.wide}
-                failure={view.issueFailure}
-                onClose={closeInspector}
-                onOpenExternal={(url) => props.host.openExternal(url)}
-              />
-            </Show>
-          </div>
-        </Show>
-
-        <Show when={surface() !== "board"}>
-          <div
-            data-boc-board-surface={surface()}
-            role={surface() === "error" || surface() === "rate-limit" ? "alert" : "status"}
-            aria-live="polite"
-            class="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 text-[13px] leading-[var(--line-height-compact)]"
-          >
-            <Show when={view.loading}>
-              <Loader />
-            </Show>
-            <p
-              class="max-w-xl text-v2-text-text-muted"
-              classList={{
-                "text-v2-state-fg-danger": surface() === "error" || surface() === "rate-limit",
-                "text-v2-state-fg-warning": surface() === "encryption-unavailable" || surface() === "offline",
-              }}
+          <Show when={surface() === "no-matches"}>
+            <Button
+              type="button"
+              variant="outline"
+              size="small"
+              onClick={() => setView({ search: "", assignee: undefined, issueType: undefined, priority: undefined })}
             >
-              {surface() === "not-configured"
-                ? t("boc.jira.placeholder.description")
-                : jiraBoardMessage(t, surface(), view.failure)}
-            </p>
-            <Show when={surface() === "not-configured" || surface() === "encryption-unavailable"}>
-              <Button type="button" variant="neutral" size="small" onClick={openSettings}>
-                {t("boc.jira.connection.settings")}
-              </Button>
-            </Show>
-          </div>
-        </Show>
-      </section>
+              {t("boc.jira.board.filters.clear")}
+            </Button>
+          </Show>
+        </div>
+      </Show>
     </main>
   )
 }
