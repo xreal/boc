@@ -16,9 +16,7 @@ test("keeps renderer source free of Electron imports", async () => {
   )
 
   expect(
-    sources.every(
-      (source) => !/from\s+["']electron["']/.test(source) && !/from\s+["']electron-store["']/.test(source),
-    ),
+    sources.every((source) => !/from\s+["']electron["']/.test(source) && !/from\s+["']electron-store["']/.test(source)),
   ).toBe(true)
 })
 
@@ -31,4 +29,23 @@ test("keeps Jira main code silent so raw responses and credentials cannot reach 
   expect(sources.every((source) => !/\b(?:console|logger|log)\.(?:debug|error|info|log|warn)\s*\(/.test(source))).toBe(
     true,
   )
+})
+
+test("keeps the Slice 1 deployment extension free of command execution", async () => {
+  const files = new Glob("src/tools/deployments/**/*.{ts,tsx}").scanSync({
+    cwd: path.resolve(import.meta.dir, "../.."),
+  })
+  const sources = await Promise.all(
+    [...files].filter((file) => !file.endsWith(".test.ts")).map((file) => Bun.file(file).text()),
+  )
+
+  expect(
+    sources.every(
+      (source) =>
+        !/node:child_process/.test(source) &&
+        !/Bun\.spawn/.test(source) &&
+        !/\bexecFile\s*\(/.test(source) &&
+        !/\bspawn\s*\(/.test(source),
+    ),
+  ).toBe(true)
 })

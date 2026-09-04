@@ -6,6 +6,7 @@ import { bocScreenState } from "./screen"
 test("reports desktop-required when no desktop provider is mounted", () => {
   createRoot((dispose) => {
     expect(bocScreenState("jira", useBocDesktop())).toBe("desktop-required")
+    expect(bocScreenState("deployments", useBocDesktop())).toBe("desktop-required")
     dispose()
   })
 })

@@ -4,6 +4,11 @@ import { bocExtensions, type BocExtension } from "./registry"
 import { exampleExtension } from "./tools/__fixtures__/example/extension"
 
 describe("BOC extension registry", () => {
+  test("registers Jira and Deployments through the generic extension seam", () => {
+    expect(bocExtensions.map((extension) => extension.id)).toEqual(["jira", "deployments"])
+    expect(bocExtensions.every((extension) => extension.desktopOnly)).toBe(true)
+  })
+
   test("keeps extension and command ids unique", () => {
     const extensions: readonly BocExtension[] = [...bocExtensions, exampleExtension]
     const extensionIds = extensions.map((extension) => extension.id)
