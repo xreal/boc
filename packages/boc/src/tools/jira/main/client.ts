@@ -11,6 +11,7 @@ export type JiraUser = {
 }
 
 export type JiraMyselfResult = { ok: true; user: JiraUser } | JiraClientFailure
+export type JiraTextResult = { ok: true; text: string } | JiraClientFailure
 
 const JiraMyself = Schema.Struct({
   accountId: Schema.String,
@@ -26,23 +27,54 @@ export async function fetchJiraMyself(input: {
   token: string
   fetch: JiraFetch
 }): Promise<JiraMyselfResult> {
-  const request = new URL("/rest/api/3/myself", input.origin.origin)
-  if (!isAllowedJiraCloudUrl(input.origin, request)) return failJira("invalid-site")
+  const result = await jiraRequest({
+    ...input,
+    path: "/rest/api/3/myself",
+  })
+  if (!result.ok) return result
 
-  const headers = {
+  const user = Option.getOrUndefined(decodeMyself(result.text))
+  if (!user || user.accountId.trim() === "" || user.displayName.trim() === "") return failJira("malformed")
+  return { ok: true, user }
+}
+
+export async function jiraRequest(input: {
+  origin: JiraCloudOrigin
+  email: string
+  token: string
+  fetch: JiraFetch
+  path: string
+  method?: "GET" | "POST"
+  query?: Record<string, string | number | undefined>
+  body?: unknown
+}): Promise<JiraTextResult> {
+  const request = jiraUrl(input.origin, input.path, input.query)
+  if (!request || !isAllowedJiraCloudUrl(input.origin, request)) return failJira("invalid-site")
+
+  const headers: Record<string, string> = {
     Accept: "application/json",
     Authorization: `Basic ${Buffer.from(`${input.email}:${input.token}`, "utf8").toString("base64")}`,
   }
+  if (input.body !== undefined) headers["Content-Type"] = "application/json"
 
-  const response = await input.fetch(request, { method: "GET", headers, redirect: "error" }).then(
-    (value) => value,
-    () => undefined,
-  )
+  const response = await input
+    .fetch(request, {
+      method: input.method ?? "GET",
+      headers,
+      redirect: "error",
+      ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
+    })
+    .then(
+      (value) => value,
+      () => undefined,
+    )
   if (!response) return failJira("network")
-  return readMyselfResponse(response)
+  return readJiraResponse(response)
 }
 
-async function readMyselfResponse(response: Response): Promise<JiraMyselfResult> {
+export const decodeUnknownJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
+
+async function readJiraResponse(response: Response): Promise<JiraTextResult> {
   if (response.headers.get("X-Seraph-LoginReason") === "AUTHENTICATION_DENIED") return failJira("auth")
   if (response.status === 429) return failJira("rate-limit", readRetryAfterSeconds(response.headers.get("Retry-After")))
   if (!response.ok) return failJira(jiraErrorFromHttpStatus(response.status))
@@ -52,8 +84,15 @@ async function readMyselfResponse(response: Response): Promise<JiraMyselfResult>
     () => undefined,
   )
   if (body === undefined) return failJira("malformed")
+  return { ok: true, text: body }
+}
 
-  const user = Option.getOrUndefined(decodeMyself(body))
-  if (!user || user.accountId.trim() === "" || user.displayName.trim() === "") return failJira("malformed")
-  return { ok: true, user }
+function jiraUrl(origin: JiraCloudOrigin, path: string, query?: Record<string, string | number | undefined>) {
+  if (!path.startsWith("/rest/")) return
+  const url = new URL(path, origin.origin)
+  for (const [key, value] of Object.entries(query ?? {})) {
+    if (value === undefined || value === "") continue
+    url.searchParams.set(key, String(value))
+  }
+  return url
 }

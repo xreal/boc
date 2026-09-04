@@ -47,6 +47,33 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
         }),
       )({ status: "not-configured", encryptionAvailable: true })
     }
+    if (tag === "BocJiraGetPreferences" || tag === "BocJiraSavePreferences") {
+      return Schema.decodeUnknownSync(
+        Schema.Struct({
+          savedBoards: Schema.Array(
+            Schema.Struct({
+              id: Schema.Number,
+              name: Schema.String,
+              type: Schema.Literals(["scrum", "kanban"]),
+            }),
+          ),
+        }),
+      )({ savedBoards: [] })
+    }
+    if (tag === "BocJiraListBoards") {
+      return Schema.decodeUnknownSync(
+        Schema.Struct({
+          ok: Schema.Literal(true),
+          boards: Schema.Array(
+            Schema.Struct({
+              id: Schema.Number,
+              name: Schema.String,
+              type: Schema.Literals(["scrum", "kanban"]),
+            }),
+          ),
+        }),
+      )({ ok: true, boards: [] })
+    }
     return Schema.decodeUnknownSync(
       Schema.Struct({
         ok: Schema.Literal(true),
@@ -91,10 +118,16 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     status: "not-configured",
     encryptionAvailable: true,
   })
+  await expect(api.jira.listBoards()).resolves.toEqual({ ok: true, boards: [] })
+  await expect(api.jira.getPreferences()).resolves.toEqual({ savedBoards: [] })
+  await expect(api.jira.savePreferences({ savedBoards: [] })).resolves.toEqual({ savedBoards: [] })
   expect(called).toEqual([
     "BocJiraGetConnectionStatus",
     "BocJiraTestConnection",
     "BocJiraSaveConnection",
     "BocJiraDisconnect",
+    "BocJiraListBoards",
+    "BocJiraGetPreferences",
+    "BocJiraSavePreferences",
   ])
 })

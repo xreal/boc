@@ -1,7 +1,26 @@
 import { describe, expect, test } from "bun:test"
 import { Option, Schema } from "effect"
-import { JiraConnectionAttempt, JiraConnectionStatus, JiraRpcs } from "./rpcs"
+import {
+  JiraBoardResult,
+  JiraBoardsResult,
+  JiraConnectionAttempt,
+  JiraConnectionStatus,
+  JiraIssueResult,
+  JiraIssuesResult,
+  JiraPreferences,
+  JiraRpcs,
+} from "./rpcs"
 import { TOKEN_FIXTURE } from "./fixtures/http"
+
+const schemas = [
+  JiraConnectionStatus,
+  JiraConnectionAttempt,
+  JiraBoardsResult,
+  JiraBoardResult,
+  JiraIssuesResult,
+  JiraIssueResult,
+  JiraPreferences,
+]
 
 describe("Jira RPC success schemas", () => {
   test("do not name or keep an API token", () => {
@@ -34,16 +53,23 @@ describe("Jira RPC success schemas", () => {
       expect(JSON.stringify(attempt)).not.toContain(TOKEN_FIXTURE)
       expect("token" in attempt).toBe(false)
     }
-    expect(JSON.stringify(JiraConnectionStatus.ast)).not.toMatch(/apiToken|"token"/i)
-    expect(JSON.stringify(JiraConnectionAttempt.ast)).not.toMatch(/apiToken|"token"/i)
+    for (const schema of schemas) {
+      expect(JSON.stringify(schema.ast)).not.toMatch(/apiToken|"token"/i)
+    }
   })
 
-  test("registers the four connection operations", () => {
+  test("registers connection and read-only board operations", () => {
     expect([...JiraRpcs.requests.keys()]).toEqual([
       "BocJiraGetConnectionStatus",
       "BocJiraTestConnection",
       "BocJiraSaveConnection",
       "BocJiraDisconnect",
+      "BocJiraListBoards",
+      "BocJiraGetBoard",
+      "BocJiraListIssues",
+      "BocJiraGetIssue",
+      "BocJiraGetPreferences",
+      "BocJiraSavePreferences",
     ])
   })
 })

@@ -19,12 +19,14 @@ export type JiraClientFailure = {
 
 const REDACTED = "[redacted]"
 
-export function jiraErrorFromHttpStatus(status: number): Exclude<JiraErrorCategory, "malformed" | "invalid-site" | "encryption-unavailable"> {
+export function jiraErrorFromHttpStatus(status: number): Exclude<JiraErrorCategory, "invalid-site" | "encryption-unavailable"> {
+  if (status === 400) return "malformed"
   if (status === 401) return "auth"
   if (status === 403) return "permission"
   if (status === 404) return "not-found"
   if (status === 429) return "rate-limit"
-  return "network"
+  if (status >= 500) return "network"
+  return "malformed"
 }
 
 export function readRetryAfterSeconds(value: string | null) {

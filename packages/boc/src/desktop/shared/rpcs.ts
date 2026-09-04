@@ -3,8 +3,14 @@ import { JiraRpcs } from "../../tools/jira/rpcs"
 
 export {
   BocJiraDisconnect,
+  BocJiraGetBoard,
   BocJiraGetConnectionStatus,
+  BocJiraGetIssue,
+  BocJiraGetPreferences,
+  BocJiraListBoards,
+  BocJiraListIssues,
   BocJiraSaveConnection,
+  BocJiraSavePreferences,
   BocJiraTestConnection,
   JiraConnectionAttempt,
   JiraConnectionInput,

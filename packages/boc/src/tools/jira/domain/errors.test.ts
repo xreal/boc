@@ -4,6 +4,7 @@ import { TOKEN_FIXTURE } from "../fixtures/http"
 
 describe("jira error normalization", () => {
   test("maps HTTP statuses to categories", () => {
+    expect(jiraErrorFromHttpStatus(400)).toBe("malformed")
     expect(jiraErrorFromHttpStatus(401)).toBe("auth")
     expect(jiraErrorFromHttpStatus(403)).toBe("permission")
     expect(jiraErrorFromHttpStatus(404)).toBe("not-found")

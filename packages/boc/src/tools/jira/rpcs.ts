@@ -1,5 +1,23 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
+import {
+  JiraBoardIssue,
+  JiraBoardSummary,
+  JiraBoardView,
+  JiraIssueDetail,
+  JiraPreferences,
+} from "./domain/board"
+
+export {
+  JiraBoardColumn,
+  JiraBoardIssue,
+  JiraBoardSummary,
+  JiraBoardType,
+  JiraBoardView,
+  JiraIssueDetail,
+  JiraPreferences,
+  JiraSprintSummary,
+} from "./domain/board"
 
 export const JiraErrorCategory = Schema.Literals([
   "auth",
@@ -66,6 +84,58 @@ export type JiraConnectionFailure = typeof JiraConnectionFailure.Type
 export const JiraConnectionAttempt = Schema.Union([JiraConnectionSuccess, JiraConnectionFailure])
 export type JiraConnectionAttempt = typeof JiraConnectionAttempt.Type
 
+export const JiraBoardIdInput = Schema.Struct({
+  boardId: Schema.Number,
+})
+export type JiraBoardIdInput = typeof JiraBoardIdInput.Type
+
+export const JiraBoardIssuesInput = Schema.Struct({
+  boardId: Schema.Number,
+  sprintId: Schema.optionalKey(Schema.Number),
+})
+export type JiraBoardIssuesInput = typeof JiraBoardIssuesInput.Type
+
+export const JiraIssueKeyInput = Schema.Struct({
+  issueKey: Schema.String,
+})
+export type JiraIssueKeyInput = typeof JiraIssueKeyInput.Type
+
+export const JiraBoardsResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    boards: Schema.Array(JiraBoardSummary),
+  }),
+  JiraConnectionFailure,
+])
+export type JiraBoardsResult = typeof JiraBoardsResult.Type
+
+export const JiraBoardResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    board: JiraBoardView,
+  }),
+  JiraConnectionFailure,
+])
+export type JiraBoardResult = typeof JiraBoardResult.Type
+
+export const JiraIssuesResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    issues: Schema.Array(JiraBoardIssue),
+  }),
+  JiraConnectionFailure,
+])
+export type JiraIssuesResult = typeof JiraIssuesResult.Type
+
+export const JiraIssueResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    issue: JiraIssueDetail,
+  }),
+  JiraConnectionFailure,
+])
+export type JiraIssueResult = typeof JiraIssueResult.Type
+
 export const BocJiraGetConnectionStatus = Rpc.make("BocJiraGetConnectionStatus", {
   success: JiraConnectionStatus,
 })
@@ -84,9 +154,43 @@ export const BocJiraDisconnect = Rpc.make("BocJiraDisconnect", {
   success: JiraConnectionStatus,
 })
 
+export const BocJiraListBoards = Rpc.make("BocJiraListBoards", {
+  success: JiraBoardsResult,
+})
+
+export const BocJiraGetBoard = Rpc.make("BocJiraGetBoard", {
+  payload: JiraBoardIdInput,
+  success: JiraBoardResult,
+})
+
+export const BocJiraListIssues = Rpc.make("BocJiraListIssues", {
+  payload: JiraBoardIssuesInput,
+  success: JiraIssuesResult,
+})
+
+export const BocJiraGetIssue = Rpc.make("BocJiraGetIssue", {
+  payload: JiraIssueKeyInput,
+  success: JiraIssueResult,
+})
+
+export const BocJiraGetPreferences = Rpc.make("BocJiraGetPreferences", {
+  success: JiraPreferences,
+})
+
+export const BocJiraSavePreferences = Rpc.make("BocJiraSavePreferences", {
+  payload: JiraPreferences,
+  success: JiraPreferences,
+})
+
 export const JiraRpcs = RpcGroup.make(
   BocJiraGetConnectionStatus,
   BocJiraTestConnection,
   BocJiraSaveConnection,
   BocJiraDisconnect,
+  BocJiraListBoards,
+  BocJiraGetBoard,
+  BocJiraListIssues,
+  BocJiraGetIssue,
+  BocJiraGetPreferences,
+  BocJiraSavePreferences,
 )

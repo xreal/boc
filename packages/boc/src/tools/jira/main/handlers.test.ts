@@ -2,7 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
 import { RpcTest } from "effect/unstable/rpc"
 import { createJiraHandlers, type JiraRuntime } from "./handlers"
-import { memoryVault } from "./credentials"
+import { memoryVault, sealToken } from "./credentials"
 import { memoryJiraStore, readStoredConnection } from "./store"
 import { JiraRpcs } from "../rpcs"
 import { containsSecret } from "../domain/errors"
@@ -12,11 +12,19 @@ import {
   TOKEN_FIXTURE,
   authFailureResponse,
   fetchScript,
+  jsonResponse,
   malformedResponse,
   myselfSuccessResponse,
   permissionFailureResponse,
   rateLimitResponse,
 } from "../fixtures/http"
+import {
+  boardConfigurationResponse,
+  boardListResponse,
+  boardResponse,
+  issueSearchResponse,
+  sprintListResponse,
+} from "../fixtures/board"
 
 function runtime(overrides?: Partial<JiraRuntime> & { encryptionAvailable?: boolean }): JiraRuntime {
   return {
@@ -212,5 +220,102 @@ describe("Jira connection handlers", () => {
     )
     expect(status.status).toBe("not-configured")
     expect(JSON.stringify(status)).not.toContain(TOKEN_FIXTURE)
+  })
+})
+
+describe("Jira board handlers", () => {
+  test("lists boards and issues from a stored connection without returning the token", async () => {
+    const vault = memoryVault()
+    const store = memoryJiraStore({
+      site: SITE_FIXTURE,
+      email: EMAIL_FIXTURE,
+      displayName: "Mia Krystof",
+      tokenCiphertext: sealToken(vault, TOKEN_FIXTURE)!,
+    })
+    const requested: string[] = []
+    const jira = runtime({
+      store,
+      vault,
+      fetch: fetchScript((url, init) => {
+        requested.push(`${init?.method ?? "GET"} ${url.pathname}`)
+        expect(new Headers(init?.headers).get("Authorization")).toMatch(/^Basic /)
+        if (url.pathname === "/rest/agile/1.0/board") {
+          return url.searchParams.get("startAt") === "2" ? boardListResponse(2) : boardListResponse(1)
+        }
+        if (url.pathname === "/rest/agile/1.0/board/84/configuration") return boardConfigurationResponse()
+        if (url.pathname === "/rest/agile/1.0/board/84/sprint") return sprintListResponse()
+        if (url.pathname === "/rest/agile/1.0/board/84") return boardResponse()
+        if (url.pathname === "/rest/api/3/search/jql") {
+          const body = init?.body ? JSON.parse(String(init.body)) : {}
+          return issueSearchResponse(body.nextPageToken === "page-2" ? 2 : 1)
+        }
+        return jsonResponse(404, {})
+      }),
+    })
+
+    const result = await runJira(
+      jira,
+      Effect.gen(function* () {
+        const client = yield* RpcTest.makeClient(JiraRpcs)
+        const boards = yield* client.BocJiraListBoards()
+        const board = yield* client.BocJiraGetBoard({ boardId: 84 })
+        const issues = yield* client.BocJiraListIssues({ boardId: 84, sprintId: 37 })
+        return { boards, board, issues }
+      }),
+    )
+
+    expect(result.boards.ok).toBe(true)
+    expect(result.board.ok).toBe(true)
+    expect(result.issues.ok).toBe(true)
+    if (!result.boards.ok || !result.board.ok || !result.issues.ok) throw new Error("expected board reads")
+    expect(result.boards.boards.map((board) => board.id)).toEqual([84, 92, 101])
+    expect(result.board.board.columns).toHaveLength(3)
+    expect(result.issues.issues.map((issue) => issue.key)).toEqual(["PLAT-1", "PLAT-2"])
+    expect(requested.some((entry) => entry === "POST /rest/api/3/search/jql")).toBe(true)
+    expect(containsSecret(JSON.stringify(result), [TOKEN_FIXTURE])).toBe(false)
+  })
+
+  test("refuses board reads without a stored connection", async () => {
+    const result = await runJira(
+      runtime(),
+      Effect.gen(function* () {
+        const client = yield* RpcTest.makeClient(JiraRpcs)
+        return yield* client.BocJiraListBoards()
+      }),
+    )
+    expect(result).toEqual({ ok: false, category: "auth" })
+  })
+
+  test("saves at most ten unique boards and clears them on disconnect", async () => {
+    const vault = memoryVault()
+    const store = memoryJiraStore({
+      site: SITE_FIXTURE,
+      email: EMAIL_FIXTURE,
+      displayName: "Mia",
+      tokenCiphertext: sealToken(vault, TOKEN_FIXTURE)!,
+    })
+    const jira = runtime({ store, vault })
+    const savedBoards = Array.from({ length: 12 }, (_, index) => ({
+      id: index + 1,
+      name: `Board ${index + 1}`,
+      type: "kanban" as const,
+    }))
+
+    const result = await runJira(
+      jira,
+      Effect.gen(function* () {
+        const client = yield* RpcTest.makeClient(JiraRpcs)
+        const saved = yield* client.BocJiraSavePreferences({ savedBoards, defaultBoardId: 3 })
+        const loaded = yield* client.BocJiraGetPreferences()
+        yield* client.BocJiraDisconnect()
+        const after = yield* client.BocJiraGetPreferences()
+        return { saved, loaded, after }
+      }),
+    )
+
+    expect(result.saved.savedBoards).toHaveLength(10)
+    expect(result.saved.defaultBoardId).toBe(3)
+    expect(result.loaded).toEqual(result.saved)
+    expect(result.after).toEqual({ savedBoards: [] })
   })
 })

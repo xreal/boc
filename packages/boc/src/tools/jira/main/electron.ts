@@ -20,7 +20,20 @@ const electronJiraRuntime: JiraRuntime = {
   store: {
     read: () => getStore().get("connection"),
     write: (value) => getStore().set("connection", value),
-    clear: () => getStore().delete("connection"),
+    clear: () => {
+      getStore().delete("connection")
+      getStore().delete("savedBoards")
+      getStore().delete("defaultBoardId")
+    },
+    readPreferences: () => ({
+      savedBoards: getStore().get("savedBoards"),
+      defaultBoardId: getStore().get("defaultBoardId"),
+    }),
+    writePreferences: (value) => {
+      getStore().set("savedBoards", value.savedBoards)
+      if (value.defaultBoardId === undefined) getStore().delete("defaultBoardId")
+      else getStore().set("defaultBoardId", value.defaultBoardId)
+    },
   },
   vault: {
     isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
