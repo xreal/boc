@@ -12,6 +12,8 @@
 @source "../../../../session-ui/src";
 @source not "../../../../session-ui/src/**/*.test.{ts,tsx}";
 @source "../../../../storybook";
+@source "../../../../boc/src";
+@source not "../../../../boc/src/**/*.test.{ts,tsx}";
 @source "../../../src";
 @source not "../../../src/assets";
 @source not "../../../src/i18n";

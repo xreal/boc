@@ -46,6 +46,10 @@
       "reason": "Recognize the Boc release channel"
     },
     {
+      "path": "packages/ui/src/styles/tailwind/index.css",
+      "reason": "Scan BOC renderer sources for Tailwind utilities"
+    },
+    {
       "path": "packages/desktop/package.json",
       "reason": "Register the BOC workspace as a bundled devDependency"
     },
