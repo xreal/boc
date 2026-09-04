@@ -55,7 +55,7 @@ describe("Rift worktree registration", () => {
           })
 
           yield* worktrees.remove({ projectID: source.id, directory: created.directory, force: false })
-          expect(yield* Effect.promise(() => Bun.file(created.directory).exists())).toBe(false)
+          expect(yield* Effect.promise(() => directoryExists(created.directory))).toBe(false)
         }).pipe(Effect.provide(services)),
       ),
     )
@@ -106,5 +106,12 @@ function fixtureDirectory() {
       return { root, source, commit, checkouts: AbsolutePath.make(path.join(root, "checkouts")) }
     }),
     (fixture) => Effect.promise(() => fs.rm(fixture.root, { recursive: true, force: true })),
+  )
+}
+
+function directoryExists(directory: string) {
+  return fs.stat(directory).then(
+    (stat) => stat.isDirectory(),
+    () => false,
   )
 }
