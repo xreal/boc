@@ -1,3 +1,18 @@
+# Boc fork notes (append-only zone)
+
+- This is the Boc fork (`BergDevOrg/boc`). It extends the upstream opencode desktop beta.
+- Upstream remote is `upstream` (`anomalyco/opencode`); `origin` is this fork. Sync with `git fetch upstream && git merge upstream/beta`. Never push to upstream.
+- Fork line `boc-beta` tracks `upstream/beta` (deliberate deviation from the upstream AGENTS.md default of `v2` below).
+- Goal: stay as close to upstream as possible. Keep the upstream diff minimal so pulls stay trivial:
+  - Fork-owned code lives in dedicated directories (e.g. `packages/app/src/boc/`). Upstream files get additive-only touches (imports, registrations, extra switch/channel cases) — never behavior changes.
+  - Prefer existing extension seams: Effect `Layer` overrides, additive RPC groups, `command.register`, channel-keyed build config.
+  - New app identity is channel-keyed (`boc`: `ai.boc.desktop.beta` / `Boc Beta` / updates from `BergDevOrg/boc`) so Boc Beta installs side-by-side with upstream OpenCode Beta.
+- AGENTS.md convention: fork notes are added ABOVE the boundary line below, newest last. NEVER edit or delete anything below the boundary line — that content mirrors upstream verbatim so merges stay clean. NEVER rewrite the notes above; only append.
+
+---
+<!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->
+---
+
 - After changing the public Protocol or Server `HttpApi`, run `bun run generate` from `packages/client`. Do not edit generated client files directly.
 - Keep runtime dependencies directed from Schema to Core and Protocol, then from Core and Protocol to Server. Client runtime code may depend on Schema and Protocol but never Core or Server; `sdk` composes Client, Core, and Server.
 - Current implementation changes belong in `packages/core`, `packages/cli`, `packages/server`, `packages/protocol`, `packages/schema`, and related generated client surfaces when required.
