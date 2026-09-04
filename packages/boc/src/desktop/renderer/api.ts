@@ -13,6 +13,12 @@ export type BocDesktopInvoke = <Tag extends BocDesktopRpcTag>(
 
 export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
   return {
+    worktrees: {
+      getDefault: () => invoke("BocWorktreesGetDefault"),
+      setDefault: (input: BocDesktopInvokeArgs<"BocWorktreesSetDefault">[0]) => invoke("BocWorktreesSetDefault", input),
+      getProject: (input: BocDesktopInvokeArgs<"BocWorktreesGetProject">[0]) => invoke("BocWorktreesGetProject", input),
+      setProject: (input: BocDesktopInvokeArgs<"BocWorktreesSetProject">[0]) => invoke("BocWorktreesSetProject", input),
+    },
     deployments: {
       getWorkspace: () => invoke("BocDeploymentsGetWorkspace"),
       listSystems: (input: BocDesktopInvokeArgs<"BocDeploymentsListSystems">[0]) =>

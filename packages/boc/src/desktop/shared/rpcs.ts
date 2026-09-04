@@ -1,6 +1,19 @@
 import { RpcClient, RpcClientError } from "effect/unstable/rpc"
 import { DeploymentRpcs } from "../../tools/deployments/rpcs"
 import { JiraRpcs } from "../../tools/jira/rpcs"
+import { WorktreePreferenceRpcs } from "../../worktrees/desktop/rpcs"
+
+export {
+  BocWorktreesGetDefault,
+  BocWorktreesGetProject,
+  BocWorktreesSetDefault,
+  BocWorktreesSetProject,
+  WorktreeBackend,
+  WorktreeDefaultPreference,
+  WorktreePreferenceRpcs,
+  WorktreeProjectPreference,
+  WorktreeProjectScope,
+} from "../../worktrees/desktop/rpcs"
 
 export {
   BocDeploymentsCancelSystemsRead,
@@ -41,5 +54,5 @@ export {
   JiraRpcs,
 } from "../../tools/jira/rpcs"
 
-export const BocDesktopRpcs = JiraRpcs.merge(DeploymentRpcs)
+export const BocDesktopRpcs = JiraRpcs.merge(DeploymentRpcs).merge(WorktreePreferenceRpcs)
 export type BocDesktopRpcClient = RpcClient.FromGroup<typeof BocDesktopRpcs, RpcClientError.RpcClientError>

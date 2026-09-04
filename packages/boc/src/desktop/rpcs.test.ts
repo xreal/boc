@@ -10,6 +10,8 @@ import { memoryDeploymentStore } from "../tools/deployments/main/store"
 import { createJiraHandlers } from "../tools/jira/main/handlers"
 import { memoryVault } from "../tools/jira/main/credentials"
 import { memoryJiraStore } from "../tools/jira/main/store"
+import { createWorktreePreferenceHandlers } from "../worktrees/desktop/handlers"
+import { memoryWorktreePreferenceStore } from "../worktrees/desktop/store"
 
 test("composes RPC groups and handler layers", async () => {
   const rpcs = BocDesktopRpcs.merge(ExampleRpcs)
@@ -26,6 +28,7 @@ test("composes RPC groups and handler layers", async () => {
         platform: "win32",
       }),
     }),
+    createWorktreePreferenceHandlers(memoryWorktreePreferenceStore()),
     exampleHandlers,
   )
   const result = await Effect.runPromise(
@@ -34,8 +37,9 @@ test("composes RPC groups and handler layers", async () => {
         const client = yield* RpcTest.makeClient(rpcs)
         const connection = yield* client.BocJiraGetConnectionStatus()
         const deployment = yield* client.BocDeploymentsGetSettings()
+        const worktrees = yield* client.BocWorktreesGetDefault()
         const ping = yield* client.BocExamplePing()
-        return { connection, deployment, ping }
+        return { connection, deployment, worktrees, ping }
       }),
     ).pipe(Effect.provide(handlers)),
   )
@@ -47,6 +51,7 @@ test("composes RPC groups and handler layers", async () => {
       applicationLabelValue: "shop",
       notificationsEnabled: true,
     },
+    worktrees: { defaultBackend: "git" },
     ping: "pong",
   })
 })
