@@ -1,4 +1,5 @@
 import { Database } from "@opencode-ai/core/database/database"
+import { createRiftBackend, withRiftStrategy } from "@boc/extensions/worktrees/server"
 import { V1Migration } from "@opencode-ai/core/database/v1-migration"
 import { App } from "@opencode-ai/core/app"
 import { LayerNode } from "@opencode-ai/util/effect/layer-node"
@@ -110,6 +111,7 @@ function makeRoutes<AuthError, AuthServices>(
   overrides: LayerNode.Replacements,
   instances?: InstanceNode,
 ) {
+  const rift = options.app?.channel === "boc" ? createRiftBackend() : undefined
   const standard: LayerNode.Replacements = [
     Database.node.replace(Database.configured(options.database)),
     PersistentPty.node.replace(PersistentPty.configured(options.pty)),
@@ -140,6 +142,7 @@ function makeRoutes<AuthError, AuthServices>(
   const build = (overrides: LayerNode.Replacements) => {
     const replacements: LayerNode.Replacements = [
       ...standard,
+      ...(rift ? [Worktree.node.replace(withRiftStrategy(rift.strategy))] : []),
       // Private instances resolve this list lazily so they inherit the complete host graph, including the selector.
       ...(instances ? [Instance.node.replace(instances(() => replacements))] : []),
       ...overrides,
