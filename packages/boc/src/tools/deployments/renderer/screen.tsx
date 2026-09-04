@@ -7,9 +7,11 @@ import type { BocScreenProps } from "../../../registry"
 import { useBocDesktop } from "../../../renderer/desktop"
 import { createBocTranslator } from "../../../renderer/i18n"
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
+import { isBlockingDeploymentOperation, type DeploymentOperationSummary } from "../domain/operations"
 import { deploymentSystemFixtures } from "../fixtures/systems"
 import type { DeploymentFailure, DeploymentReadiness, DeploymentSettings } from "../rpcs"
 import { createLatestDeploymentRequest } from "./latest-request"
+import { DeploymentDialog, createFixtureDeploymentApi } from "./deploy-dialog"
 import { DeploymentReadinessPanel } from "./readiness-panel"
 import { DeploymentSettingsDialog } from "./settings-dialog"
 import { DeploymentSkeleton, DeploymentSystemsTable } from "./systems-table"
@@ -43,6 +45,8 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     refreshing: false,
     transportFailure: false,
     refreshNotice: undefined as "success" | "failure" | undefined,
+    queuedNotice: undefined as string | undefined,
+    queuedOperations: {} as Record<string, DeploymentOperationSummary>,
   })
 
   if (!desktop) return null
@@ -53,7 +57,15 @@ export default function DeploymentsScreen(props: BocScreenProps) {
   const systems = () => {
     if (!fixtureEnabled) return view.systems
     if (fixture === "empty" || fixture === "error" || fixture === "loading") return []
-    return deploymentSystemFixtures
+    return deploymentSystemFixtures.map((system) => {
+      const operation = view.queuedOperations[system.environment] ?? system.operation
+      return {
+        ...system,
+        ...(operation ? { operation } : {}),
+        allowedActions:
+          operation && isBlockingDeploymentOperation(operation.state) ? [] : (["deploy", "reset"] as const),
+      }
+    })
   }
   const filtered = () => filterDeploymentSystems(systems(), view.search, view.availability)
   const narrowed = () => view.search.trim().length > 0 || view.availability !== "all"
@@ -139,6 +151,26 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     })
   }
 
+  const openDeploy = (system: DeploymentSystem, kind: "deploy" | "reset") => {
+    void dialog.show(() => (
+      <DeploymentDialog
+        api={fixtureEnabled ? createFixtureDeploymentApi() : desktop.deployments}
+        locale={() => props.host.locale()}
+        system={system}
+        kind={kind}
+        onQueued={(operation) => {
+          setView({
+            queuedNotice: system.name,
+            queuedOperations: { ...view.queuedOperations, [operation.environment]: operation },
+            systems: view.systems.map((item) =>
+              item.environment === operation.environment ? { ...item, operation, allowedActions: [] } : item,
+            ),
+          })
+        }}
+      />
+    ))
+  }
+
   const openSettings = () => {
     if (!view.settings || !view.readiness) return
     void dialog.show(() => (
@@ -218,11 +250,13 @@ export default function DeploymentsScreen(props: BocScreenProps) {
       </Show>
 
       <p class="sr-only" role="status" aria-live="polite">
-        {view.refreshNotice === "success"
-          ? t("boc.deployments.refresh.success")
-          : view.refreshNotice === "failure"
-            ? t("boc.deployments.refresh.failure")
-            : ""}
+        {view.queuedNotice
+          ? t("boc.deployments.deploy.queued", { system: view.queuedNotice })
+          : view.refreshNotice === "success"
+            ? t("boc.deployments.refresh.success")
+            : view.refreshNotice === "failure"
+              ? t("boc.deployments.refresh.failure")
+              : ""}
       </p>
 
       <div data-boc-deployments-body class="flex min-h-0 flex-1 flex-col">
@@ -264,6 +298,8 @@ export default function DeploymentsScreen(props: BocScreenProps) {
             onToggleDetails={(environment) =>
               setView("expanded", view.expanded === environment ? undefined : environment)
             }
+            onDeploy={(system) => openDeploy(system, "deploy")}
+            onReset={(system) => openDeploy(system, "reset")}
           />
         </Show>
         <Show when={surface() === "loading"}>

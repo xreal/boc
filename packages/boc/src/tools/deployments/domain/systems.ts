@@ -21,6 +21,9 @@ export type DeploymentAutoSyncState = typeof DeploymentAutoSyncState.Type
 export const DeploymentAvailability = Schema.Literals(["free", "occupied", "reserved"])
 export type DeploymentAvailability = typeof DeploymentAvailability.Type
 
+export const DeploymentRowAction = Schema.Literals(["deploy", "reset", "redeploy", "auto-sync", "clear-cache", "ssh"])
+export type DeploymentRowAction = typeof DeploymentRowAction.Type
+
 export const DeploymentSystem = Schema.Struct({
   environment: AllowedDevEnvironment,
   name: Schema.String,
@@ -35,6 +38,7 @@ export const DeploymentSystem = Schema.Struct({
   autoSync: DeploymentAutoSyncState,
   availability: DeploymentAvailability,
   operation: Schema.optionalKey(DeploymentOperationSummary),
+  allowedActions: Schema.optionalKey(Schema.Array(DeploymentRowAction)),
 })
 export type DeploymentSystem = typeof DeploymentSystem.Type
 

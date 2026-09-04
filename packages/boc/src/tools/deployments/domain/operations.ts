@@ -54,6 +54,10 @@ export function isTerminalDeploymentOperation(state: DeploymentOperationState) {
   return TERMINAL_OPERATION_STATES.has(state)
 }
 
+export function isBlockingDeploymentOperation(state: DeploymentOperationState) {
+  return !isTerminalDeploymentOperation(state) && state !== "prepared"
+}
+
 export function aggregateDeploymentOperation(states: readonly DeploymentOperationState[]): DeploymentOperationState {
   if (states.length === 0) return "unknown"
   if (states.every((state) => state === "success")) return "success"

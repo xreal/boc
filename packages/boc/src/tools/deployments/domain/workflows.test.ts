@@ -2,8 +2,11 @@ import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
 import {
   DeploymentWorkflowFilename,
+  deploymentWorkflowFilenameFromPath,
   isDeploymentWorkflowFilename,
   normalizeDeploymentWorkflowInputs,
+  preferredDeploymentWorkflows,
+  resetDeploymentWorkflowInputs,
   type DeploymentWorkflowInputDefinition,
 } from "./workflows"
 
@@ -34,6 +37,14 @@ describe("deployment workflow contracts", () => {
       expect(isDeploymentWorkflowFilename(filename)).toBe(false)
       expect(() => Schema.decodeUnknownSync(DeploymentWorkflowFilename)(filename)).toThrow()
     }
+    expect(deploymentWorkflowFilenameFromPath(".github/workflows/app-shop.yml")).toBe("app-shop.yml")
+    expect(deploymentWorkflowFilenameFromPath("../app-shop.yml")).toBeUndefined()
+    expect(
+      preferredDeploymentWorkflows([
+        { filename: "app-admin.yml", name: "Admin" },
+        { filename: "app-shop.yml", name: "Shop" },
+      ]).map((target) => target.filename),
+    ).toEqual(["app-shop.yml", "app-admin.yml"])
   })
 
   test("keeps only declared values and applies typed defaults", () => {
@@ -41,6 +52,7 @@ describe("deployment workflow contracts", () => {
       values: { perform_tests: true, release_track: "preview" },
       issues: [],
     })
+    expect(resetDeploymentWorkflowInputs(inputs)).toEqual({ perform_tests: true, release_track: "stable" })
   })
 
   test("reports unknown, missing, and invalid inputs without coercion", () => {

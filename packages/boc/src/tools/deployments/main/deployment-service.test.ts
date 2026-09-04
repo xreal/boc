@@ -159,6 +159,7 @@ function healthyRunner(list: () => string | DeploymentCommandResult | Promise<st
 }
 
 function healthyCommand(command: DeploymentCommand): DeploymentCommandResult {
+  if (command.executable === "gh") return { ok: false, reason: "not-found", stdout: "", stderr: "" }
   if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
   if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
   if (command.executable === "kubectl") return success("dev\n")

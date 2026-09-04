@@ -3,6 +3,7 @@ import {
   DEFAULT_DEPLOYMENT_SETTINGS,
   memoryDeploymentStore,
   normalizeDeploymentSettings,
+  readDeploymentOperations,
   readDeploymentSettings,
 } from "./store"
 
@@ -31,5 +32,10 @@ describe("deployment settings store", () => {
       notificationsEnabled: false,
     })
     expect(JSON.stringify(DEFAULT_DEPLOYMENT_SETTINGS)).not.toMatch(/token|secret|authorization/i)
+  })
+
+  test("drops corrupt operations and never stores credentials", () => {
+    expect(readDeploymentOperations(memoryDeploymentStore(undefined, { token: "secret" }))).toEqual([])
+    expect(JSON.stringify(memoryDeploymentStore())).not.toMatch(/token|secret|authorization/i)
   })
 })

@@ -1,7 +1,26 @@
+import { isReservedDevEnvironment, type AllowedDevEnvironment } from "../domain/environments"
 import { deploymentFailure, type DeploymentFailure } from "../domain/failures"
-import type { DeploymentSystem } from "../domain/systems"
+import {
+  isBlockingDeploymentOperation,
+  pruneDeploymentHistory,
+  type DeploymentOperationState,
+  type DeploymentOperationSummary,
+  type DeploymentWorkflowOperation,
+} from "../domain/operations"
+import { deploymentTicketKey, type DeploymentSystem } from "../domain/systems"
+import {
+  normalizeDeploymentWorkflowInputs,
+  PREFERRED_DEPLOYMENT_WORKFLOW,
+  RESET_DEPLOYMENT_REF,
+  resetDeploymentWorkflowInputs,
+  type DeploymentWorkflowFilename,
+  type DeploymentWorkflowInputValue,
+} from "../domain/workflows"
 import type {
   DeploymentCapabilityStatus,
+  DeploymentDraft,
+  DeploymentPreparedKind,
+  DeploymentPreparedPlan,
   DeploymentReadiness,
   DeploymentSettings,
   DeploymentSettingsResult,
@@ -9,23 +28,39 @@ import type {
   DeploymentSystemsResult,
   DeploymentWorkspaceResult,
 } from "../rpcs"
-import { readArgoFleet, type ArgoCliRuntime } from "./argo-cli"
+import { readArgoFleet, verifyArgoDevTarget, type ArgoCliRuntime } from "./argo-cli"
 import type { DeploymentCommandRunner } from "./command-runner"
+import {
+  DEPLOYMENT_WORKFLOW_CACHE_MS,
+  dispatchGithubWorkflow,
+  githubReadiness,
+  listGithubBranches,
+  listGithubWorkflowTargets,
+  validateGithubRef,
+  type GithubWorkflowTarget,
+} from "./github-cli"
 import {
   autoSyncCapability,
   createDeploymentReadiness,
   validateDeploymentSettings,
   type DeploymentFileExists,
 } from "./readiness"
-import { normalizeDeploymentSettings, readDeploymentSettings, type DeploymentStore } from "./store"
+import {
+  normalizeDeploymentSettings,
+  readDeploymentOperations,
+  readDeploymentSettings,
+  type DeploymentStore,
+} from "./store"
 
 export const DEPLOYMENT_FLEET_CACHE_MS = 30_000
+export const DEPLOYMENT_PREPARED_PLAN_TTL_MS = 5 * 60 * 1000
 
 export type DeploymentRuntime = {
   store: DeploymentStore
   run: DeploymentCommandRunner
   platform: NodeJS.Platform
   now?: () => number
+  createId?: () => string
   fileExists?: DeploymentFileExists
 }
 
@@ -51,26 +86,70 @@ type FleetFlight = {
   promise: Promise<FreshFleet>
 }
 
+type StoredPreparedPlan = {
+  public: DeploymentPreparedPlan
+  bound: ReadonlyArray<{
+    filename: DeploymentWorkflowFilename
+    inputs: Readonly<Record<string, DeploymentWorkflowInputValue>>
+  }>
+  expiresAt: number
+}
+
 export function createDeploymentService(runtime: DeploymentRuntime) {
   const now = runtime.now ?? Date.now
+  const createId = runtime.createId ?? crypto.randomUUID.bind(crypto)
   const argo: ArgoCliRuntime = { run: runtime.run, platform: runtime.platform }
+  const github = { run: runtime.run }
   let generation = 0
   let cache: FleetSnapshot | undefined
   let flight: FleetFlight | undefined
+  let workflowCache:
+    | { generation: number; fetchedAt: number; ref?: string; targets: readonly GithubWorkflowTarget[] }
+    | undefined
+  const prepared = new Map<string, StoredPreparedPlan>()
+  let writes = Promise.resolve()
+
+  const operations = () => readDeploymentOperations(runtime.store, now())
+
+  const persistOperations = (next: readonly DeploymentOperationSummary[]) => {
+    const pruned = pruneDeploymentHistory(next, now())
+    writes = writes.then(() => {
+      runtime.store.writeOperations(pruned)
+    })
+    return writes
+  }
+
+  const blockingOperation = (environment: AllowedDevEnvironment) =>
+    operations().find(
+      (operation) => operation.environment === environment && isBlockingDeploymentOperation(operation.state),
+    )
+
+  const attachSystems = (systems: readonly DeploymentSystem[], readiness: DeploymentReadiness) =>
+    systems.map((system) => {
+      const operation = blockingOperation(system.environment)
+      const allowed = readiness.deploymentReady && !operation ? (["deploy", "reset"] as const) : []
+      return {
+        ...system,
+        ...(operation ? { operation } : {}),
+        allowedActions: [...allowed],
+      }
+    })
 
   const readFresh = async (settings: DeploymentSettings, targetGeneration: number, signal: AbortSignal) => {
-    const [argoResult, autoSync] = await Promise.all([
+    const [argoResult, autoSync, githubResult] = await Promise.all([
       readArgoFleet(argo, settings, signal),
       autoSyncCapability(settings, runtime.fileExists),
+      githubReadiness(github, signal),
     ])
     const readiness = createDeploymentReadiness({
       ...argoResult.statuses,
+      ...githubResult.statuses,
       bf_deploy_auto_sync: withoutCapability(autoSync),
     })
     if (!argoResult.ok) return { ok: false as const, failure: argoResult.failure, readiness }
 
     const snapshot = {
-      systems: argoResult.systems,
+      systems: attachSystems(argoResult.systems, readiness),
       readiness,
       fetchedAt: new Date(now()).toISOString(),
       generation: targetGeneration,
@@ -144,10 +223,11 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       cache.generation === generation &&
       now() - Date.parse(cache.fetchedAt) < DEPLOYMENT_FLEET_CACHE_MS
     ) {
+      const readiness = cache.readiness
       return {
         ok: true,
-        systems: cache.systems,
-        readiness: cache.readiness,
+        systems: attachSystems(cache.systems, readiness),
+        readiness,
         fetchedAt: cache.fetchedAt,
       }
     }
@@ -156,7 +236,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     if (result.ok) {
       return {
         ok: true as const,
-        systems: result.snapshot.systems,
+        systems: attachSystems(result.snapshot.systems, result.snapshot.readiness),
         readiness: result.snapshot.readiness,
         fetchedAt: result.snapshot.fetchedAt,
         ...(result.staleFailure ? { staleFailure: result.staleFailure } : {}),
@@ -165,18 +245,221 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     if (result.failure.category === "cancelled") return result.failure
     return {
       ok: true as const,
-      systems: cache?.systems ?? [],
+      systems: attachSystems(cache?.systems ?? [], result.readiness),
       readiness: result.readiness,
       ...(cache ? { fetchedAt: cache.fetchedAt } : {}),
       staleFailure: result.failure,
     }
   }
 
+  const invalidatePrepared = () => {
+    prepared.clear()
+  }
+
   const invalidate = () => {
     generation += 1
     cache = undefined
+    workflowCache = undefined
+    invalidatePrepared()
     flight?.controller.abort()
     flight = undefined
+  }
+
+  const requireGithub = async (signal?: AbortSignal) => {
+    const result = await githubReadiness(github, signal)
+    if (!result.ok) return result.failure
+    return undefined
+  }
+
+  const loadWorkflowTargets = async (refresh: boolean, ref?: string, signal?: AbortSignal) => {
+    if (
+      !refresh &&
+      workflowCache &&
+      workflowCache.generation === generation &&
+      workflowCache.ref === ref &&
+      now() - workflowCache.fetchedAt < DEPLOYMENT_WORKFLOW_CACHE_MS
+    ) {
+      return { ok: true as const, targets: workflowCache.targets }
+    }
+    const result = await listGithubWorkflowTargets(github, ref, signal)
+    if (!result.ok) return result
+    workflowCache = { generation, fetchedAt: now(), ref, targets: result.targets }
+    return result
+  }
+
+  const preparePlan = async (
+    kind: DeploymentPreparedKind,
+    draft: DeploymentDraft,
+    signal?: AbortSignal,
+  ): Promise<{ ok: true; plan: DeploymentPreparedPlan } | DeploymentFailure> => {
+    for (const [preflightId, stored] of prepared) {
+      if (stored.public.environment === draft.environment) prepared.delete(preflightId)
+    }
+
+    const githubFailure = await requireGithub(signal)
+    if (githubFailure) return githubFailure
+
+    const settings = readDeploymentSettings(runtime.store)
+    const target = await verifyArgoDevTarget(argo, settings, signal)
+    if (!target.ok) return target.failure
+
+    const ref = await validateGithubRef(github, draft.ref, signal)
+    if (!ref.ok) return ref
+
+    if (blockingOperation(draft.environment)) {
+      return deploymentFailure("conflict", {
+        capability: "github_workflow_dispatch",
+        context: { environment: draft.environment },
+      })
+    }
+
+    const listed = await loadWorkflowTargets(true, ref.ref, signal)
+    if (!listed.ok) return listed
+    const selected = draft.workflows.map((selection) => {
+      const targetWorkflow = listed.targets.find((workflow) => workflow.target.filename === selection.filename)
+      return { selection, targetWorkflow }
+    })
+    const missing = selected.find((item) => !item.targetWorkflow)
+    if (missing) {
+      return deploymentFailure("not-found", {
+        capability: "github_workflow_dispatch",
+        context: { workflow: missing.selection.filename },
+      })
+    }
+
+    const normalized = selected.map((item) => {
+      const workflow = item.targetWorkflow!
+      const requiredUnsupported = workflow.issues.filter((issue) => issue.reason === "unsupported")
+      const inputs = normalizeDeploymentWorkflowInputs(workflow.target.inputs, item.selection.inputs)
+      const bound = Object.fromEntries(
+        Object.entries(workflow.boundInputs).map(([name, source]) => [
+          name,
+          source === "environment" ? draft.environment : ref.ref,
+        ]),
+      )
+      return { workflow, requiredUnsupported, inputs, bound }
+    })
+    const blocked = normalized.find((item) => item.requiredUnsupported.length > 0 || item.inputs.issues.length > 0)
+    if (blocked) {
+      return deploymentFailure("invalid-input", {
+        capability: "github_workflow_dispatch",
+        context: { workflow: blocked.workflow.target.filename },
+      })
+    }
+
+    const warnings = isReservedDevEnvironment(draft.environment) ? (["unsafe-target"] as const) : []
+    const preflightId = createId()
+    const expiresAt = now() + DEPLOYMENT_PREPARED_PLAN_TTL_MS
+    const plan: DeploymentPreparedPlan = {
+      preflightId,
+      expiresAt: new Date(expiresAt).toISOString(),
+      kind,
+      environment: draft.environment,
+      ref: ref.ref,
+      workflows: normalized.map((item) => ({
+        filename: item.workflow.target.filename,
+        name: item.workflow.target.name,
+        inputs: item.inputs.values,
+      })),
+      warnings: [...warnings],
+    }
+    prepared.set(preflightId, {
+      public: plan,
+      expiresAt,
+      bound: normalized.map((item) => ({
+        filename: item.workflow.target.filename,
+        inputs: { ...item.inputs.values, ...item.bound },
+      })),
+    })
+    return { ok: true, plan }
+  }
+
+  const dispatchPlan = async (
+    preflightId: string,
+    kind: DeploymentPreparedKind,
+  ): Promise<{ ok: true; operation: DeploymentOperationSummary } | DeploymentFailure> => {
+    const stored = prepared.get(preflightId)
+    if (!stored) return deploymentFailure("not-found", { capability: "github_workflow_dispatch" })
+    if (stored.public.kind !== kind) {
+      return deploymentFailure("invalid-input", { capability: "github_workflow_dispatch", context: { field: "kind" } })
+    }
+    if (now() >= stored.expiresAt) {
+      prepared.delete(preflightId)
+      return deploymentFailure("timeout", { capability: "github_workflow_dispatch", context: { field: "preflight" } })
+    }
+
+    const githubFailure = await requireGithub()
+    if (githubFailure) return githubFailure
+    const settings = readDeploymentSettings(runtime.store)
+    const target = await verifyArgoDevTarget(argo, settings)
+    if (!target.ok) return target.failure
+    if (blockingOperation(stored.public.environment)) {
+      return deploymentFailure("conflict", {
+        capability: "github_workflow_dispatch",
+        context: { environment: stored.public.environment },
+      })
+    }
+
+    prepared.delete(preflightId)
+    const createdAt = new Date(now()).toISOString()
+    const ticketKey = deploymentTicketKey(stored.public.ref)
+    const operation: DeploymentOperationSummary = {
+      id: createId(),
+      environment: stored.public.environment,
+      branch: stored.public.ref,
+      ...(ticketKey ? { ticketKey } : {}),
+      workflows: stored.public.workflows.map((workflow) => ({
+        filename: workflow.filename,
+        state: "dispatching" as const,
+      })),
+      state: "dispatching",
+      createdAt,
+      updatedAt: createdAt,
+    }
+    await persistOperations([...operations(), operation])
+
+    const workflowResults = await stored.bound.reduce<Promise<DeploymentWorkflowOperation[]>>(
+      async (previous, workflow) => {
+        const completed = await previous
+        const dispatched = await dispatchGithubWorkflow(github, {
+          filename: workflow.filename,
+          ref: stored.public.ref,
+          inputs: workflow.inputs,
+        })
+        if (!dispatched.ok) {
+          const uncertain = dispatched.category === "timeout" || dispatched.category === "cancelled"
+          return [
+            ...completed,
+            {
+              filename: workflow.filename,
+              state: uncertain ? "unknown" : "failure",
+            },
+          ]
+        }
+        if (!dispatched.runUrl) {
+          return [...completed, { filename: workflow.filename, state: "unknown" }]
+        }
+        return [
+          ...completed,
+          {
+            filename: workflow.filename,
+            state: "queued",
+            runId: dispatched.runId,
+            runUrl: dispatched.runUrl,
+          },
+        ]
+      },
+      Promise.resolve([]),
+    )
+
+    const next: DeploymentOperationSummary = {
+      ...operation,
+      workflows: workflowResults,
+      state: aggregateDispatchState(workflowResults.map((workflow) => workflow.state)),
+      updatedAt: new Date(now()).toISOString(),
+    }
+    await persistOperations(operations().map((item) => (item.id === operation.id ? next : item)))
+    return { ok: true, operation: next }
   }
 
   return {
@@ -204,7 +487,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
           settings: readDeploymentSettings(runtime.store),
           readiness: result.readiness,
           systems: result.systems,
-          operations: [],
+          operations: operations(),
           ...(result.fetchedAt ? { fetchedAt: result.fetchedAt } : {}),
           ...(result.staleFailure ? { staleFailure: result.staleFailure } : {}),
         },
@@ -214,11 +497,61 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       const result = await listSystems({ requestId: "readiness", refresh: true })
       return result.ok ? result.readiness : createDeploymentReadiness({})
     },
+    listOperations: () => ({ ok: true as const, operations: operations() }),
+    async listBranches(input: { query: string }, signal?: AbortSignal) {
+      const githubFailure = await requireGithub(signal)
+      if (githubFailure) return githubFailure
+      return listGithubBranches(github, input.query, signal)
+    },
+    async listWorkflowTargets(input: { refresh: boolean }, signal?: AbortSignal) {
+      const githubFailure = await requireGithub(signal)
+      if (githubFailure) return githubFailure
+      const listed = await loadWorkflowTargets(input.refresh, undefined, signal)
+      if (!listed.ok) return listed
+      return { ok: true as const, targets: listed.targets.map((item) => item.target) }
+    },
+    prepareDeployment: (draft: DeploymentDraft, signal?: AbortSignal) => preparePlan("deploy", draft, signal),
+    dispatchPrepared: (input: { preflightId: string }) => dispatchPlan(input.preflightId, "deploy"),
+    async prepareReset(input: { environment: AllowedDevEnvironment }, signal?: AbortSignal) {
+      const githubFailure = await requireGithub(signal)
+      if (githubFailure) return githubFailure
+      const listed = await loadWorkflowTargets(true, RESET_DEPLOYMENT_REF, signal)
+      if (!listed.ok) return listed
+      const shop = listed.targets.find((item) => item.target.filename === PREFERRED_DEPLOYMENT_WORKFLOW)
+      if (!shop) {
+        return deploymentFailure("not-found", {
+          capability: "github_workflow_dispatch",
+          context: { workflow: PREFERRED_DEPLOYMENT_WORKFLOW },
+        })
+      }
+      return preparePlan(
+        "reset",
+        {
+          environment: input.environment,
+          ref: RESET_DEPLOYMENT_REF,
+          workflows: [
+            {
+              filename: shop.target.filename,
+              inputs: resetDeploymentWorkflowInputs(shop.target.inputs),
+            },
+          ],
+        },
+        signal,
+      )
+    },
+    dispatchPreparedReset: (input: { preflightId: string }) => dispatchPlan(input.preflightId, "reset"),
     invalidate,
   }
 }
 
 export type DeploymentService = ReturnType<typeof createDeploymentService>
+
+function aggregateDispatchState(states: readonly DeploymentOperationState[]): DeploymentOperationState {
+  if (states.some((state) => state === "failure")) return "failure"
+  if (states.some((state) => state === "unknown")) return "unknown"
+  if (states.every((state) => state === "queued")) return "queued"
+  return "unknown"
+}
 
 function cancelledReadiness(): FreshFleet {
   return {

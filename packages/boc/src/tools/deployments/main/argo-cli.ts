@@ -3,7 +3,8 @@ import { DEPLOYMENT_KUBE_CONTEXT } from "../domain/environments"
 import type { DeploymentSystem } from "../domain/systems"
 import type { DeploymentCapabilityStatus, DeploymentSettings } from "../rpcs"
 import { parseArgoApplications } from "./application-parser"
-import type { DeploymentCommandResult, DeploymentCommandRunner } from "./command-runner"
+import { deploymentCommandFailure } from "./command-failure"
+import type { DeploymentCommandRunner } from "./command-runner"
 import { platformCapability, validateDeploymentSettings } from "./readiness"
 
 const requiredArgoFlags = ["--core", "--kube-context", "--output", "--prompts-enabled", "--selector"] as const
@@ -61,7 +62,7 @@ export async function readArgoFleet(
 
   const result = await runtime.run({ executable: "argocd", args: argoApplicationListArgs(settings), signal })
   if (!result.ok) {
-    const failure = commandFailure(result, "argocd_list_applications")
+    const failure = deploymentCommandFailure(result, "argocd_list_applications")
     return {
       ok: false,
       failure,
@@ -99,7 +100,7 @@ export async function readArgoFleet(
   }
 }
 
-async function verifyArgoDevTarget(
+export async function verifyArgoDevTarget(
   runtime: ArgoCliRuntime,
   settings: DeploymentSettings,
   signal?: AbortSignal,
@@ -123,7 +124,7 @@ async function verifyArgoDevTarget(
 
   const version = await runtime.run({ executable: "argocd", args: ["version", "--client"], signal })
   if (!version.ok) {
-    const failure = commandFailure(version, "argocd_cli")
+    const failure = deploymentCommandFailure(version, "argocd_cli")
     return {
       ok: false as const,
       failure,
@@ -133,7 +134,7 @@ async function verifyArgoDevTarget(
   const installedVersion = version.stdout.match(/v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?/)?.[0]
   const help = await runtime.run({ executable: "argocd", args: ["app", "list", "--help"], signal })
   if (!help.ok) {
-    const failure = commandFailure(help, "argocd_cli")
+    const failure = deploymentCommandFailure(help, "argocd_cli")
     return {
       ok: false as const,
       failure,
@@ -163,7 +164,7 @@ async function verifyArgoDevTarget(
     signal,
   })
   if (!contexts.ok) {
-    const failure = commandFailure(contexts, "dev_target_verified")
+    const failure = deploymentCommandFailure(contexts, "dev_target_verified")
     return {
       ok: false as const,
       failure,
@@ -206,25 +207,6 @@ async function verifyArgoDevTarget(
       dev_target_verified: { status: "available" as const, context: { context: DEPLOYMENT_KUBE_CONTEXT } },
     },
   }
-}
-
-function commandFailure(result: Exclude<DeploymentCommandResult, { ok: true }>, capability: DeploymentCapability) {
-  if (result.reason === "not-found") return deploymentFailure("missing-cli", { capability })
-  if (result.reason === "timeout") return deploymentFailure("timeout", { capability })
-  if (result.reason === "cancelled") return deploymentFailure("cancelled", { capability })
-  if (result.reason === "output-limit") return deploymentFailure("malformed", { capability })
-
-  const diagnostic = `${result.stdout}\n${result.stderr}`.toLowerCase()
-  if (/unauthorized|unauthenticated|authentication required|not logged in/.test(diagnostic)) {
-    return deploymentFailure("not-authenticated", { capability })
-  }
-  if (/forbidden|permission denied|access denied/.test(diagnostic)) {
-    return deploymentFailure("permission", { capability })
-  }
-  if (/connection refused|network|no such host|timed out/.test(diagnostic)) {
-    return deploymentFailure("network", { capability })
-  }
-  return deploymentFailure("unknown", { capability })
 }
 
 function withoutCapability(status: DeploymentCapabilityStatus) {

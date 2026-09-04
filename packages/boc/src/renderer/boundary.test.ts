@@ -66,4 +66,5 @@ test("keeps deployment main code silent so command output and environments canno
   expect(sources.every((source) => !/\b(?:console|logger|log)\.(?:debug|error|info|log|warn)\s*\(/.test(source))).toBe(
     true,
   )
+  expect(sources.every((source) => !/auth token|--show-token/.test(source))).toBe(true)
 })

@@ -4,7 +4,52 @@ export const deploymentBranchFixtures = [
   "SHOP-617-product-gallery",
   "feature/SHOP-318-search-filters",
   "OPS-88-queue-observability",
+  "master",
 ] as const
+
+export const deploymentShopWorkflowYaml = `name: Shop
+on:
+  workflow_dispatch:
+    inputs:
+      perform_tests:
+        description: Perform tests
+        type: boolean
+        default: true
+        required: true
+      force_rebuild:
+        description: Force image rebuild
+        type: boolean
+        default: false
+      run_regression_tests:
+        description: Run regression tests
+        type: boolean
+        default: false
+      environment:
+        description: Target environment
+        type: string
+        required: true
+`
+
+export const deploymentAdminWorkflowYaml = `name: Admin
+on:
+  workflow_dispatch:
+    inputs:
+      perform_tests:
+        description: Perform tests
+        type: boolean
+        default: true
+        required: true
+`
+
+export const deploymentUnsupportedWorkflowYaml = `name: Billing
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: Release note
+        type: string
+        required: true
+`
 
 export const deploymentWorkflowFixtures = [
   {
@@ -14,12 +59,11 @@ export const deploymentWorkflowFixtures = [
       { name: "perform_tests", label: "Perform tests", type: "boolean", required: true, default: true },
       { name: "force_rebuild", label: "Force image rebuild", type: "boolean", required: false, default: false },
       {
-        name: "release_track",
-        label: "Release track",
-        type: "choice",
-        required: true,
-        default: "stable",
-        options: ["stable", "preview"],
+        name: "run_regression_tests",
+        label: "Run regression tests",
+        type: "boolean",
+        required: false,
+        default: false,
       },
     ],
   },

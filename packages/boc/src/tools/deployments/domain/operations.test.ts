@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 import {
   aggregateDeploymentOperation,
+  isBlockingDeploymentOperation,
   isTerminalDeploymentOperation,
   pruneDeploymentHistory,
   type DeploymentOperationSummary,
@@ -45,5 +46,8 @@ describe("deployment operations", () => {
     ])
     expect(isTerminalDeploymentOperation("success")).toBe(true)
     expect(isTerminalDeploymentOperation("unknown")).toBe(false)
+    expect(isBlockingDeploymentOperation("dispatching")).toBe(true)
+    expect(isBlockingDeploymentOperation("prepared")).toBe(false)
+    expect(isBlockingDeploymentOperation("success")).toBe(false)
   })
 })

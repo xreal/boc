@@ -2,6 +2,10 @@ import { Schema } from "effect"
 
 const WORKFLOW_FILENAME = /^app-[a-z0-9]+(?:-[a-z0-9]+)*\.ya?ml$/
 
+export const PREFERRED_DEPLOYMENT_WORKFLOW = "app-shop.yml"
+export const RESET_DEPLOYMENT_REF = "master"
+export const DEPLOYMENT_WORKFLOW_PATH_PREFIX = ".github/workflows/"
+
 export const DeploymentWorkflowFilename = Schema.String.check(
   Schema.isPattern(WORKFLOW_FILENAME),
   Schema.isMaxLength(128),
@@ -40,6 +44,61 @@ export type NormalizedDeploymentWorkflowInputs = {
 
 export function isDeploymentWorkflowFilename(filename: string): filename is DeploymentWorkflowFilename {
   return WORKFLOW_FILENAME.test(filename) && filename.length <= 128
+}
+
+export function deploymentWorkflowFilenameFromPath(path: string) {
+  const normalized = path.replaceAll("\\", "/")
+  const filename = normalized.startsWith(DEPLOYMENT_WORKFLOW_PATH_PREFIX)
+    ? normalized.slice(DEPLOYMENT_WORKFLOW_PATH_PREFIX.length)
+    : normalized.includes("/")
+      ? undefined
+      : normalized
+  if (!filename || filename.includes("/") || filename.includes("..")) return undefined
+  return isDeploymentWorkflowFilename(filename) ? filename : undefined
+}
+
+export function preferredDeploymentWorkflows<Target extends { filename: string; name: string }>(
+  targets: readonly Target[],
+) {
+  return [...targets].toSorted((left, right) => {
+    if (left.filename === PREFERRED_DEPLOYMENT_WORKFLOW) return -1
+    if (right.filename === PREFERRED_DEPLOYMENT_WORKFLOW) return 1
+    return left.name.localeCompare(right.name)
+  })
+}
+
+export function isDeploymentTestInput(name: string) {
+  return /test/i.test(name) && !/regression/i.test(name)
+}
+
+export function isDeploymentRebuildInput(name: string) {
+  return /rebuild|force.?image/i.test(name)
+}
+
+export function isDeploymentRegressionInput(name: string) {
+  return /regression/i.test(name)
+}
+
+export function isCommonDeploymentInput(name: string) {
+  return isDeploymentTestInput(name) || isDeploymentRebuildInput(name) || isDeploymentRegressionInput(name)
+}
+
+export function boundDeploymentWorkflowInput(name: string) {
+  if (/^(environment|env|system|target)$/i.test(name)) return "environment" as const
+  if (/^(ref|branch|revision)$/i.test(name)) return "ref" as const
+  return undefined
+}
+
+export function resetDeploymentWorkflowInputs(definitions: readonly DeploymentWorkflowInputDefinition[]) {
+  const values = { ...normalizeDeploymentWorkflowInputs(definitions, {}).values }
+  definitions.forEach((definition) => {
+    if (definition.type !== "boolean") return
+    if (isDeploymentTestInput(definition.name)) values[definition.name] = true
+    if (isDeploymentRebuildInput(definition.name) || isDeploymentRegressionInput(definition.name)) {
+      values[definition.name] = false
+    }
+  })
+  return values
 }
 
 export function normalizeDeploymentWorkflowInputs(

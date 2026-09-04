@@ -19,6 +19,7 @@ export {
   DeploymentAutoSyncState,
   DeploymentAvailability,
   DeploymentHealthState,
+  DeploymentRowAction,
   DeploymentSyncState,
   DeploymentSystem,
 } from "./domain/systems"
@@ -27,6 +28,8 @@ export {
   DeploymentWorkflowInputDefinition,
   DeploymentWorkflowInputValue,
   DeploymentWorkflowTarget,
+  PREFERRED_DEPLOYMENT_WORKFLOW,
+  RESET_DEPLOYMENT_REF,
 } from "./domain/workflows"
 
 const DeploymentRequestId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
@@ -146,12 +149,23 @@ export const DeploymentDraft = Schema.Struct({
 })
 export type DeploymentDraft = typeof DeploymentDraft.Type
 
+export const DeploymentPreparedKind = Schema.Literals(["deploy", "reset"])
+export type DeploymentPreparedKind = typeof DeploymentPreparedKind.Type
+
+export const DeploymentPreparedWorkflow = Schema.Struct({
+  filename: DeploymentWorkflowFilename,
+  name: Schema.String,
+  inputs: Schema.Record(Schema.String, DeploymentWorkflowInputValue),
+})
+export type DeploymentPreparedWorkflow = typeof DeploymentPreparedWorkflow.Type
+
 export const DeploymentPreparedPlan = Schema.Struct({
   preflightId: DeploymentPreflightId,
   expiresAt: Schema.String,
+  kind: DeploymentPreparedKind,
   environment: AllowedDevEnvironment,
   ref: DeploymentRef,
-  workflows: Schema.Array(DeploymentWorkflowSelection).check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  workflows: Schema.Array(DeploymentPreparedWorkflow).check(Schema.isMinLength(1), Schema.isMaxLength(32)),
   warnings: Schema.Array(DeploymentFailureCategory),
 })
 export type DeploymentPreparedPlan = typeof DeploymentPreparedPlan.Type

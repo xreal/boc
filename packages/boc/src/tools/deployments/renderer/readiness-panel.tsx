@@ -102,6 +102,10 @@ function deploymentCapabilityFix(t: BocTranslator, status: DeploymentCapabilityS
   if (status.capability === "argocd_list_applications") return t("boc.deployments.readiness.fix.argo_list")
   if (status.capability === "deployment_settings") return t("boc.deployments.readiness.fix.settings")
   if (status.capability === "bf_deploy_auto_sync") return t("boc.deployments.readiness.fix.devenv")
+  if (status.capability === "gh_cli") return t("boc.deployments.readiness.fix.gh_cli")
+  if (status.capability === "github_auth") return t("boc.deployments.readiness.fix.github_auth")
+  if (status.capability === "github_repo_access") return t("boc.deployments.readiness.fix.github_repo")
+  if (status.capability === "github_workflow_dispatch") return t("boc.deployments.readiness.fix.github_dispatch")
   if (status.capability === "platform_supported") return t("boc.deployments.screen.unsupported.description")
   return t("boc.deployments.readiness.fix.future")
 }

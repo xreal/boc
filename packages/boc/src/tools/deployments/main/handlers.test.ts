@@ -35,8 +35,8 @@ describe("deployment RPC handlers", () => {
     expect(result.operations).toEqual({ ok: true, operations: [] })
     expect(result.unavailable).toMatchObject({
       ok: false,
-      category: "not-found",
-      capability: "github_workflow_dispatch",
+      category: "missing-cli",
+      capability: "gh_cli",
     })
   })
 
@@ -69,6 +69,9 @@ describe("deployment RPC handlers", () => {
 
 function healthyRuntime(): Parameters<typeof createDeploymentService>[0] {
   const run: DeploymentCommandRunner = async (command) => {
+    if (command.executable === "gh") {
+      return { ok: false, reason: "not-found", stdout: "", stderr: "" }
+    }
     if (command.executable === "argocd" && command.args[0] === "version") {
       return { ok: true, exitCode: 0, stdout: "argocd: v3.1.7", stderr: "" }
     }
