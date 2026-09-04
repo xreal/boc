@@ -54,6 +54,7 @@ export const DeploymentCapabilityStatus = Schema.Struct({
   capability: DeploymentCapability,
   status: Schema.Literals(["available", "unavailable", "unknown"]),
   failure: Schema.optionalKey(DeploymentFailureCategory),
+  context: Schema.optionalKey(Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number]))),
 })
 export type DeploymentCapabilityStatus = typeof DeploymentCapabilityStatus.Type
 
@@ -74,10 +75,11 @@ export const DeploymentWorkspace = Schema.Struct({
 })
 export type DeploymentWorkspace = typeof DeploymentWorkspace.Type
 
-const DeploymentWorkspaceResult = Schema.Union([
+export const DeploymentWorkspaceResult = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), workspace: DeploymentWorkspace }),
   DeploymentFailure,
 ])
+export type DeploymentWorkspaceResult = typeof DeploymentWorkspaceResult.Type
 
 export const DeploymentSystemsReadInput = Schema.Struct({
   requestId: DeploymentRequestId,
@@ -87,21 +89,23 @@ export type DeploymentSystemsReadInput = typeof DeploymentSystemsReadInput.Type
 
 const DeploymentRequestInput = Schema.Struct({ requestId: DeploymentRequestId })
 
-const DeploymentSystemsResult = Schema.Union([
+export const DeploymentSystemsResult = Schema.Union([
   Schema.Struct({
     ok: Schema.Literal(true),
     systems: Schema.Array(DeploymentSystem),
     readiness: DeploymentReadiness,
-    fetchedAt: Schema.String,
+    fetchedAt: Schema.optionalKey(Schema.String),
     staleFailure: Schema.optionalKey(DeploymentFailure),
   }),
   DeploymentFailure,
 ])
+export type DeploymentSystemsResult = typeof DeploymentSystemsResult.Type
 
-const DeploymentSettingsResult = Schema.Union([
+export const DeploymentSettingsResult = Schema.Union([
   Schema.Struct({ ok: Schema.Literal(true), settings: DeploymentSettings, readiness: DeploymentReadiness }),
   DeploymentFailure,
 ])
+export type DeploymentSettingsResult = typeof DeploymentSettingsResult.Type
 
 export const DeploymentBranchSearchInput = Schema.Struct({
   requestId: DeploymentRequestId,

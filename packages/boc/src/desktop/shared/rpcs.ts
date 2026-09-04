@@ -1,5 +1,25 @@
 import { RpcClient, RpcClientError } from "effect/unstable/rpc"
+import { DeploymentRpcs } from "../../tools/deployments/rpcs"
 import { JiraRpcs } from "../../tools/jira/rpcs"
+
+export {
+  BocDeploymentsCancelSystemsRead,
+  BocDeploymentsCheckReadiness,
+  BocDeploymentsDispatchPrepared,
+  BocDeploymentsDispatchPreparedReset,
+  BocDeploymentsGetSettings,
+  BocDeploymentsGetWorkspace,
+  BocDeploymentsListBranches,
+  BocDeploymentsListOperations,
+  BocDeploymentsListSystems,
+  BocDeploymentsListWorkflowTargets,
+  BocDeploymentsPrepareDeployment,
+  BocDeploymentsPrepareReset,
+  BocDeploymentsRedeployBranch,
+  BocDeploymentsSaveSettings,
+  BocDeploymentsSetAutoSync,
+  DeploymentRpcs,
+} from "../../tools/deployments/rpcs"
 
 export {
   BocJiraDisconnect,
@@ -21,5 +41,5 @@ export {
   JiraRpcs,
 } from "../../tools/jira/rpcs"
 
-export const BocDesktopRpcs = JiraRpcs
+export const BocDesktopRpcs = JiraRpcs.merge(DeploymentRpcs)
 export type BocDesktopRpcClient = RpcClient.FromGroup<typeof BocDesktopRpcs, RpcClientError.RpcClientError>

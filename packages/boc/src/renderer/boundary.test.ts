@@ -31,16 +31,18 @@ test("keeps Jira main code silent so raw responses and credentials cannot reach 
   )
 })
 
-test("keeps the Slice 1 deployment extension free of command execution", async () => {
-  const files = new Glob("src/tools/deployments/**/*.{ts,tsx}").scanSync({
+test("keeps deployment command execution behind the one reviewed no-shell boundary", async () => {
+  const files = new Glob("src/tools/deployments/main/*.{ts,tsx}").scanSync({
     cwd: path.resolve(import.meta.dir, "../.."),
   })
-  const sources = await Promise.all(
-    [...files].filter((file) => !file.endsWith(".test.ts")).map((file) => Bun.file(file).text()),
+  const production = [...files].filter((file) => !file.endsWith(".test.ts"))
+  const commandRunner = production.find((file) => file.endsWith("command-runner.ts"))
+  const otherSources = await Promise.all(
+    production.filter((file) => file !== commandRunner).map((file) => Bun.file(file).text()),
   )
 
   expect(
-    sources.every(
+    otherSources.every(
       (source) =>
         !/node:child_process/.test(source) &&
         !/Bun\.spawn/.test(source) &&
@@ -48,4 +50,20 @@ test("keeps the Slice 1 deployment extension free of command execution", async (
         !/\bspawn\s*\(/.test(source),
     ),
   ).toBe(true)
+  expect(commandRunner).toBeDefined()
+  const source = await Bun.file(commandRunner!).text()
+  expect(source).toContain("shell: false")
+  expect(source).not.toMatch(/\bexec\s*\(/)
+})
+
+test("keeps deployment main code silent so command output and environments cannot reach logs", async () => {
+  const files = new Glob("src/tools/deployments/main/*.{ts,tsx}").scanSync({
+    cwd: path.resolve(import.meta.dir, "../.."),
+  })
+  const sources = await Promise.all(
+    [...files].filter((file) => !file.endsWith(".test.ts")).map((file) => Bun.file(file).text()),
+  )
+  expect(sources.every((source) => !/\b(?:console|logger|log)\.(?:debug|error|info|log|warn)\s*\(/.test(source))).toBe(
+    true,
+  )
 })

@@ -13,6 +13,34 @@ export type BocDesktopInvoke = <Tag extends BocDesktopRpcTag>(
 
 export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
   return {
+    deployments: {
+      getWorkspace: () => invoke("BocDeploymentsGetWorkspace"),
+      listSystems: (input: BocDesktopInvokeArgs<"BocDeploymentsListSystems">[0]) =>
+        invoke("BocDeploymentsListSystems", input),
+      cancelSystemsRead: (input: BocDesktopInvokeArgs<"BocDeploymentsCancelSystemsRead">[0]) =>
+        invoke("BocDeploymentsCancelSystemsRead", input),
+      getSettings: () => invoke("BocDeploymentsGetSettings"),
+      saveSettings: (input: BocDesktopInvokeArgs<"BocDeploymentsSaveSettings">[0]) =>
+        invoke("BocDeploymentsSaveSettings", input),
+      checkReadiness: () => invoke("BocDeploymentsCheckReadiness"),
+      listBranches: (input: BocDesktopInvokeArgs<"BocDeploymentsListBranches">[0]) =>
+        invoke("BocDeploymentsListBranches", input),
+      listWorkflowTargets: (input: BocDesktopInvokeArgs<"BocDeploymentsListWorkflowTargets">[0]) =>
+        invoke("BocDeploymentsListWorkflowTargets", input),
+      listOperations: () => invoke("BocDeploymentsListOperations"),
+      prepareDeployment: (input: BocDesktopInvokeArgs<"BocDeploymentsPrepareDeployment">[0]) =>
+        invoke("BocDeploymentsPrepareDeployment", input),
+      dispatchPrepared: (input: BocDesktopInvokeArgs<"BocDeploymentsDispatchPrepared">[0]) =>
+        invoke("BocDeploymentsDispatchPrepared", input),
+      prepareReset: (input: BocDesktopInvokeArgs<"BocDeploymentsPrepareReset">[0]) =>
+        invoke("BocDeploymentsPrepareReset", input),
+      dispatchPreparedReset: (input: BocDesktopInvokeArgs<"BocDeploymentsDispatchPreparedReset">[0]) =>
+        invoke("BocDeploymentsDispatchPreparedReset", input),
+      redeployBranch: (input: BocDesktopInvokeArgs<"BocDeploymentsRedeployBranch">[0]) =>
+        invoke("BocDeploymentsRedeployBranch", input),
+      setAutoSync: (input: BocDesktopInvokeArgs<"BocDeploymentsSetAutoSync">[0]) =>
+        invoke("BocDeploymentsSetAutoSync", input),
+    },
     jira: {
       getConnectionStatus: () => invoke("BocJiraGetConnectionStatus"),
       testConnection: (input: BocDesktopInvokeArgs<"BocJiraTestConnection">[0]) =>

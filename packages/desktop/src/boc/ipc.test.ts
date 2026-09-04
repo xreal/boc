@@ -17,9 +17,28 @@ const jiraTags = [
   "BocJiraSavePreferences",
 ] as const
 
+const deploymentTags = [
+  "BocDeploymentsGetWorkspace",
+  "BocDeploymentsListSystems",
+  "BocDeploymentsCancelSystemsRead",
+  "BocDeploymentsGetSettings",
+  "BocDeploymentsSaveSettings",
+  "BocDeploymentsCheckReadiness",
+  "BocDeploymentsListBranches",
+  "BocDeploymentsListWorkflowTargets",
+  "BocDeploymentsListOperations",
+  "BocDeploymentsPrepareDeployment",
+  "BocDeploymentsDispatchPrepared",
+  "BocDeploymentsPrepareReset",
+  "BocDeploymentsDispatchPreparedReset",
+  "BocDeploymentsRedeployBranch",
+  "BocDeploymentsSetAutoSync",
+] as const
+
 test("merges BOC RPCs into the desktop RPC group", () => {
-  expect([...BocDesktopRpcs.requests.keys()]).toEqual([...jiraTags])
-  for (const tag of jiraTags) {
+  const tags = [...jiraTags, ...deploymentTags]
+  expect([...BocDesktopRpcs.requests.keys()]).toEqual(tags)
+  for (const tag of tags) {
     expect(DesktopRpcs.requests.has(tag)).toBe(true)
   }
 })

@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 
-export const DeploymentCapability = Schema.Literals([
+export const DEPLOYMENT_CAPABILITIES = [
   "platform_supported",
   "argocd_cli",
   "dev_target_verified",
@@ -15,7 +15,9 @@ export const DeploymentCapability = Schema.Literals([
   "bf_deploy_auto_sync",
   "ssh",
   "terminal_host",
-])
+] as const
+
+export const DeploymentCapability = Schema.Literals(DEPLOYMENT_CAPABILITIES)
 export type DeploymentCapability = typeof DeploymentCapability.Type
 
 export const DeploymentFailureCategory = Schema.Literals([
