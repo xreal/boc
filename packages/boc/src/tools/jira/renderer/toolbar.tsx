@@ -1,7 +1,7 @@
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
-import { SegmentedControl, SegmentedControlItem } from "@opencode-ai/ui/segmented-control"
+import { Menu } from "@opencode-ai/ui/menu"
 import { Select } from "@opencode-ai/ui/select"
 import { TextInput } from "@opencode-ai/ui/text-input"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
@@ -19,48 +19,68 @@ export function JiraBoardHeader(props: {
   connection?: JiraConnectionStatus
   board?: JiraBoardSummary
   preferences: JiraPreferences
+  selectedBoardId?: number
   loading: boolean
-  savingBoard: boolean
   onRefresh: () => void
-  onSaveBoard: () => void
+  onAddBoard: () => void
+  onSelectBoard: (boardId: number) => void
   onOpenSettings: () => void
 }) {
   const connected = () => props.connection?.status === "connected"
-  const saved = () => props.preferences.savedBoards.some((entry) => entry.id === props.board?.id)
   const atSavedLimit = () => props.preferences.savedBoards.length >= MAX_SAVED_JIRA_BOARDS
+  const canSwitch = () => props.preferences.savedBoards.length > 0
 
   return (
     <header
       data-boc-board-header
       class="flex h-11 shrink-0 items-center gap-3 border-b border-v2-border-border-muted px-4"
     >
-      <h1 class="min-w-0 truncate text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
-        {props.t("boc.jira.title")}
-        <Show when={props.board}>
-          {(board) => (
-            <>
-              <span class="text-v2-text-text-faint">: </span>
-              <Show when={board().projectName}>
-                {(project) => <span class="font-normal text-v2-text-text-muted">{project()} / </span>}
-              </Show>
-              {board().name}
-            </>
-          )}
+      <h1 class="flex min-w-0 items-center overflow-hidden text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+        <Show when={canSwitch()} fallback={<BoardTitle t={props.t} board={props.board} />}>
+          <Menu placement="bottom-start" gutter={4}>
+            <Menu.Trigger
+              type="button"
+              data-boc-board-switcher
+              aria-label={props.t("boc.jira.board.switcher")}
+              class="flex min-w-0 max-w-full items-center gap-1 rounded-sm text-left outline-none hover:bg-v2-overlay-simple-overlay-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus data-[expanded]:bg-v2-overlay-simple-overlay-pressed"
+            >
+              <BoardTitle t={props.t} board={props.board} />
+              <Icon name="chevron-down" size="small" class="shrink-0 text-v2-icon-icon-accent" />
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content>
+                <Menu.RadioGroup
+                  value={props.selectedBoardId !== undefined ? String(props.selectedBoardId) : undefined}
+                  onChange={(value) => {
+                    if (value) props.onSelectBoard(Number(value))
+                  }}
+                >
+                  <For each={props.preferences.savedBoards}>
+                    {(board) => (
+                      <Menu.RadioItem value={String(board.id)} closeOnSelect>
+                        {board.projectName ? `${board.projectName} / ${board.name}` : board.name}
+                      </Menu.RadioItem>
+                    )}
+                  </For>
+                </Menu.RadioGroup>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu>
         </Show>
       </h1>
 
       <div class="ml-auto flex shrink-0 items-center gap-1">
-        <Show when={connected() && props.board && !saved()}>
+        <Show when={connected()}>
           <Tooltip value={props.t("boc.jira.board.savedFull")} inactive={!atSavedLimit()} placement="bottom">
             <Button
               type="button"
               variant="ghost-muted"
               size="small"
               icon="plus"
-              disabled={props.savingBoard || atSavedLimit()}
-              onClick={props.onSaveBoard}
+              disabled={atSavedLimit()}
+              onClick={props.onAddBoard}
             >
-              {props.t("boc.jira.board.save")}
+              {props.t("boc.jira.board.add")}
             </Button>
           </Tooltip>
         </Show>
@@ -90,9 +110,6 @@ export function JiraBoardHeader(props: {
 
 export function JiraBoardToolbar(props: {
   t: BocTranslator
-  boards: readonly JiraBoardSummary[]
-  preferences: JiraPreferences
-  selectedBoardId?: number
   board?: JiraBoardView
   sprintId?: number
   issues: readonly JiraBoardIssue[]
@@ -101,23 +118,11 @@ export function JiraBoardToolbar(props: {
   assignee?: string
   issueType?: string
   priority?: string
-  onSelectBoard: (boardId: number) => void
   onSelectSprint: (sprintId: number) => void
   onSearch: (value: string) => void
   onFilter: (field: "assignee" | "issueType" | "priority", value?: string) => void
   onClearFilters: () => void
 }) {
-  const selectedBoard = () => props.boards.find((board) => board.id === props.selectedBoardId)
-  const savedIds = () => new Set(props.preferences.savedBoards.map((board) => board.id))
-  const boardOptions = () => {
-    const saved = savedIds()
-    return [
-      ...props.boards.filter((board) => saved.has(board.id)),
-      ...props.boards.filter((board) => !saved.has(board.id)),
-    ]
-  }
-  const savedSelection = () =>
-    props.selectedBoardId !== undefined && savedIds().has(props.selectedBoardId) ? String(props.selectedBoardId) : null
   const narrowed = () => Boolean(props.search || props.assignee || props.issueType || props.priority)
 
   return (
@@ -135,40 +140,6 @@ export function JiraBoardToolbar(props: {
         clearLabel={props.t("boc.jira.board.filters.clear")}
         onClearClick={() => props.onSearch("")}
         onInput={(event) => props.onSearch(event.currentTarget.value)}
-      />
-
-      <Show when={props.preferences.savedBoards.length > 0}>
-        <SegmentedControl
-          aria-label={props.t("boc.jira.board.savedBoards.label")}
-          class="!w-auto"
-          value={savedSelection()}
-          onChange={(value) => {
-            if (value) props.onSelectBoard(Number(value))
-          }}
-        >
-          <For each={props.preferences.savedBoards}>
-            {(board) => (
-              <SegmentedControlItem value={String(board.id)} class="!flex-none max-w-48">
-                {board.name}
-              </SegmentedControlItem>
-            )}
-          </For>
-        </SegmentedControl>
-      </Show>
-
-      <Select
-        aria-label={props.t("boc.jira.board.picker.label")}
-        options={[...boardOptions()]}
-        current={selectedBoard()}
-        value={(board) => String(board.id)}
-        label={(board) => board.name}
-        groupBy={(board) =>
-          savedIds().has(board.id) ? props.t("boc.jira.board.group.saved") : props.t("boc.jira.board.group.all")
-        }
-        placeholder={props.t("boc.jira.board.picker.placeholder")}
-        onSelect={(board) => {
-          if (board) props.onSelectBoard(board.id)
-        }}
       />
 
       <Show when={props.board?.type === "scrum" && props.board.sprints.length > 0}>
@@ -226,6 +197,25 @@ export function JiraBoardToolbar(props: {
         </span>
       </Show>
     </div>
+  )
+}
+
+function BoardTitle(props: { t: BocTranslator; board?: JiraBoardSummary }) {
+  return (
+    <span class="min-w-0 truncate">
+      {props.t("boc.jira.title")}
+      <Show when={props.board}>
+        {(board) => (
+          <>
+            <span class="text-v2-text-text-faint">: </span>
+            <Show when={board().projectName}>
+              {(project) => <span class="font-normal text-v2-text-text-muted">{project()} / </span>}
+            </Show>
+            {board().name}
+          </>
+        )}
+      </Show>
+    </span>
   )
 }
 

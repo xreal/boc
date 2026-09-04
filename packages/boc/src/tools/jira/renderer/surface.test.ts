@@ -63,6 +63,16 @@ describe("jiraBoardSurface", () => {
         loading: false,
         connection: connected,
         boards: [{ id: 84 }],
+        issues: [],
+        filtered: [],
+      }),
+    ).toBe("needs-default")
+    expect(
+      jiraBoardSurface({
+        online: true,
+        loading: false,
+        connection: connected,
+        boards: [{ id: 84 }],
         board: { ...board, sprints: [] },
         issues: [],
         filtered: [],
@@ -107,6 +117,7 @@ describe("jiraBoardSurface", () => {
 describe("jiraBoardMessage", () => {
   test("maps each board surface to dictionary copy without a token", () => {
     expect(jiraBoardMessage(t, "offline")).toBe("You are offline. Reconnect to load the Jira board.")
+    expect(jiraBoardMessage(t, "needs-default")).toBe("Choose a default board to open this Jira site.")
     expect(jiraBoardMessage(t, "empty")).toBe("No issues in this view.")
     expect(jiraBoardMessage(t, "rate-limit", { ok: false, category: "rate-limit", retryAfterSeconds: 8 })).toBe(
       "Jira rate-limited the request. Try again in 8 seconds.",

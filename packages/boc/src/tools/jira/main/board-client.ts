@@ -14,6 +14,7 @@ import {
   mapJiraIssueDetail,
   mapJiraSprint,
   selectableSprints,
+  storyPointFieldIds,
   type JiraBoardIssue,
   type JiraBoardSummary,
   type JiraBoardView,
@@ -193,6 +194,7 @@ export async function fetchJiraIssuesByJql(
   auth: JiraAuth,
   jql: string,
 ): Promise<{ ok: true; issues: JiraBoardIssue[] } | JiraClientFailure> {
+  const storyPointFields = await fetchStoryPointFieldIds(auth)
   const issues: JiraBoardIssue[] = []
   let nextPageToken: string | undefined
 
@@ -204,7 +206,7 @@ export async function fetchJiraIssuesByJql(
       body: {
         jql,
         maxResults: ISSUE_PAGE_SIZE,
-        fields: ISSUE_FIELDS,
+        fields: [...ISSUE_FIELDS, ...storyPointFields],
         ...(nextPageToken ? { nextPageToken } : {}),
       },
       retry: "safe-read",
@@ -215,7 +217,7 @@ export async function fetchJiraIssuesByJql(
 
     const rawIssues = decoded.issues ?? []
     for (const raw of rawIssues) {
-      const issue = mapJiraBoardIssue(raw, auth.origin.origin)
+      const issue = mapJiraBoardIssue(raw, auth.origin.origin, storyPointFields)
       if (issue) issues.push(issue)
     }
 
@@ -250,6 +252,16 @@ function sprintFailureAsEmpty(type: "scrum" | "kanban", failure: JiraClientFailu
   if (type === "scrum") return failure
   if (failure.category === "auth" || failure.category === "rate-limit" || failure.category === "network") return failure
   return []
+}
+
+async function fetchStoryPointFieldIds(auth: JiraAuth) {
+  const result = await jiraRequest({
+    ...auth,
+    path: "/rest/api/3/field",
+    retry: "safe-read",
+  })
+  if (!result.ok) return []
+  return storyPointFieldIds(Option.getOrUndefined(decodeUnknownJson(result.text)))
 }
 
 function decodeUnknown(text: string): unknown {

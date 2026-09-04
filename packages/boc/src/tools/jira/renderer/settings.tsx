@@ -17,6 +17,7 @@ export function JiraSettingsDialog(props: {
   locale: () => string
   openExternal: (url: string) => void
   onChanged?: () => void
+  onNeedsDefaultBoard?: () => void
 }) {
   const t = createBocTranslator(props.locale)
   let tokenInput: HTMLInputElement | undefined
@@ -62,8 +63,13 @@ export function JiraSettingsDialog(props: {
       if (action !== "save") return
       if (tokenInput) tokenInput.value = ""
       setForm("notice", "saved")
+      const preferences = await props.api.getPreferences()
       void refetch()
       void refetchPreferences()
+      if (preferences.defaultBoardId === undefined && props.onNeedsDefaultBoard) {
+        props.onNeedsDefaultBoard()
+        return
+      }
       props.onChanged?.()
       return
     }
@@ -179,7 +185,7 @@ export function JiraSettingsDialog(props: {
           <Field.Prefix>
             <button
               type="button"
-              class="rounded-sm text-left text-v2-text-text-muted underline-offset-2 outline-none hover:text-v2-text-text-base hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
+              class="rounded-sm text-left text-v2-text-text-muted underline underline-offset-2 outline-none hover:text-v2-text-text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
               onClick={() => props.openExternal(TOKEN_SETTINGS_URL)}
             >
               {t("boc.jira.connection.token.helpLink")}

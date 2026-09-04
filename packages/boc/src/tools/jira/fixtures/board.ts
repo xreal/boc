@@ -107,8 +107,18 @@ export const issueSearchIssue = {
   fields: {
     summary: "Render the Jira board",
     status: { id: "10000", name: "To Do" },
-    assignee: { displayName: "Mia Krystof" },
-    issuetype: { name: "Story" },
+    assignee: {
+      displayName: "Mia Krystof",
+      avatarUrls: {
+        "24x24":
+          "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
+      },
+    },
+    issuetype: {
+      name: "Story",
+      iconUrl: "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
+    },
+    customfield_10016: 3,
     priority: { name: "Medium" },
     labels: ["board"],
     created: "2026-09-01T00:00:00.000Z",
@@ -180,4 +190,22 @@ export function issueSearchResponse(page: 1 | 2 = 1) {
 
 export function issueDetailResponse() {
   return jsonResponse(200, issueDetailFixture)
+}
+
+export const fieldListFixture = [
+  { id: "summary", name: "Summary", schema: { type: "string" } },
+  {
+    id: "customfield_10016",
+    name: "Story Points",
+    schema: { type: "number", custom: "com.pyxis.greenhopper.jira:jsw-story-points" },
+  },
+  {
+    id: "customfield_10020",
+    name: "Sprint",
+    schema: { type: "array", custom: "com.pyxis.greenhopper.jira:gh-sprint" },
+  },
+]
+
+export function fieldListResponse() {
+  return jsonResponse(200, fieldListFixture)
 }

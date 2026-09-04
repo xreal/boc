@@ -2,7 +2,6 @@ import { describe, expect, test } from "bun:test"
 import {
   MAX_SAVED_JIRA_BOARDS,
   JIRA_UNASSIGNED,
-  adfToPlainText,
   boardIssuesJql,
   columnsFromConfiguration,
   configurationFilterId,
@@ -14,14 +13,18 @@ import {
   mapJiraSprint,
   normalizeSavedBoards,
   resolveSelectedBoardId,
+  resolveSetupBoardId,
   resolveSprintId,
   selectableSprints,
   sortSprints,
   uniqueIssueNames,
+  jiraIssueIsSubtask,
+  jiraAssetUrl,
+  storyPointFieldIds,
   type JiraBoardIssue,
   type JiraBoardSummary,
 } from "./board"
-import { boardConfigurationFixture, issueSearchIssue } from "../fixtures/board"
+import { boardConfigurationFixture, fieldListFixture, issueSearchIssue } from "../fixtures/board"
 
 function issue(id: string, statusId?: string): JiraBoardIssue {
   return {
@@ -79,7 +82,10 @@ describe("Jira board mapping", () => {
       statusId: "10000",
       statusName: "To Do",
       assigneeName: "Mia Krystof",
+      assigneeAvatarUrl:
+        "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
       issueTypeName: "Story",
+      issueTypeIconUrl: "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
       priorityName: "Medium",
       labels: ["board"],
       createdAt: "2026-09-01T00:00:00.000Z",
@@ -92,6 +98,42 @@ describe("Jira board mapping", () => {
       state: "active",
       goal: "Ship the board",
     })
+  })
+
+  test("maps subtask, story points, and rejects unsafe asset URLs", () => {
+    expect(
+      mapJiraBoardIssue(
+        {
+          id: "10003",
+          key: "PLAT-3",
+          fields: {
+            summary: "Write the failing test",
+            issuetype: { name: "Sub-Task", iconUrl: "javascript:alert(1)" },
+            assignee: { displayName: "Ada", avatarUrls: { "24x24": "https://evil.example/avatar.png" } },
+            customfield_10016: 5,
+          },
+        },
+        "https://acme.atlassian.net",
+        ["customfield_10016"],
+      ),
+    ).toEqual({
+      id: "10003",
+      key: "PLAT-3",
+      summary: "Write the failing test",
+      issueTypeName: "Sub-Task",
+      subtask: true,
+      storyPoints: 5,
+      assigneeName: "Ada",
+      labels: [],
+      url: "https://acme.atlassian.net/browse/PLAT-3",
+    })
+    expect(jiraIssueIsSubtask({ issueTypeName: "Sub-Task" })).toBe(true)
+    expect(jiraIssueIsSubtask({ issueTypeName: "Story" })).toBe(false)
+    expect(storyPointFieldIds(fieldListFixture)).toEqual(["customfield_10016"])
+    expect(jiraAssetUrl("https://acme.atlassian.net/images/icons/story.svg", "https://acme.atlassian.net")).toBe(
+      "https://acme.atlassian.net/images/icons/story.svg",
+    )
+    expect(jiraAssetUrl("javascript:alert(1)", "https://acme.atlassian.net")).toBeUndefined()
   })
 })
 
@@ -183,6 +225,14 @@ describe("saved boards", () => {
     expect(resolveSelectedBoardId(8, { savedBoards: [board(2)], defaultBoardId: 2 }, available)).toBe(8)
     expect(resolveSelectedBoardId(undefined, { savedBoards: [board(9)] }, available)).toBe(4)
   })
+
+  test("does not pick a board until a default exists or the session already selected one", () => {
+    const available = [board(4), board(8)]
+    expect(resolveSetupBoardId(undefined, { savedBoards: [] }, available)).toBeUndefined()
+    expect(resolveSetupBoardId(undefined, { savedBoards: [board(8)] }, available)).toBeUndefined()
+    expect(resolveSetupBoardId(undefined, { savedBoards: [board(8)], defaultBoardId: 8 }, available)).toBe(8)
+    expect(resolveSetupBoardId(4, { savedBoards: [] }, available)).toBe(4)
+  })
 })
 
 describe("board issue JQL", () => {
@@ -193,28 +243,6 @@ describe("board issue JQL", () => {
       'filter = 1001 AND (fixVersion = "1.0")',
     )
     expect(boardIssuesJql({ filterId: "1001", sprintId: 37, subQuery: "ignored" })).toBe("filter = 1001 AND sprint = 37")
-  })
-})
-
-describe("adfToPlainText", () => {
-  test("flattens Atlassian document text without HTML", () => {
-    expect(
-      adfToPlainText({
-        type: "doc",
-        content: [
-          {
-            type: "paragraph",
-            content: [
-              { type: "text", text: "Hello " },
-              { type: "text", text: "board" },
-            ],
-          },
-          { type: "paragraph", content: [{ type: "text", text: "Second line" }] },
-        ],
-      }),
-    ).toBe("Hello board\n\nSecond line")
-    expect(adfToPlainText("Already plain")).toBe("Already plain")
-    expect(adfToPlainText(null)).toBeUndefined()
   })
 })
 

@@ -1,25 +1,8 @@
 import { describe, expect, test } from "bun:test"
-import type { JiraColumnGroup } from "../domain/board"
 import { jiraRelativeTime } from "./time"
-import { jiraColumnTone, jiraPriorityTone } from "./tone"
-
-const column = (id: string): JiraColumnGroup => ({ column: { id, name: id, statusIds: [] }, issues: [] })
+import { jiraPriorityTone } from "./tone"
 
 describe("Jira board tones", () => {
-  test("reads the status category from the column position", () => {
-    const groups = [column("todo"), column("doing"), column("review"), column("done")]
-    expect(jiraColumnTone(groups, 0)).toBe("neutral")
-    expect(jiraColumnTone(groups, 1)).toBe("info")
-    expect(jiraColumnTone(groups, 2)).toBe("info")
-    expect(jiraColumnTone(groups, 3)).toBe("success")
-  })
-
-  test("keeps the done tone on the last mapped column when unmapped issues trail it", () => {
-    const groups = [column("todo"), column("done"), column("unmapped")]
-    expect(jiraColumnTone(groups, 1)).toBe("success")
-    expect(jiraColumnTone(groups, 2)).toBe("warning")
-  })
-
   test("maps common Jira priority names", () => {
     expect(jiraPriorityTone("Highest")).toBe("danger")
     expect(jiraPriorityTone("High")).toBe("warning")

@@ -9,9 +9,7 @@ import { createBocTranslator } from "../../../renderer/i18n"
 import {
   filterIssues,
   groupIssuesByColumn,
-  MAX_SAVED_JIRA_BOARDS,
-  normalizeSavedBoards,
-  resolveSelectedBoardId,
+  resolveSetupBoardId,
   resolveSprintId,
   type JiraBoardIssue,
   type JiraBoardSummary,
@@ -23,6 +21,7 @@ import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
 import { JiraBoardColumns } from "./columns"
 import { JiraIssueInspector } from "./inspector"
 import { createLatestRequest, type LatestRequest } from "./latest-request"
+import { JiraPickBoardDialog } from "./pick-board"
 import { JiraSettingsDialog } from "./settings"
 import { jiraBoardMessage, jiraBoardSurface } from "./surface"
 import { JiraBoardHeader, JiraBoardToolbar } from "./toolbar"
@@ -56,7 +55,6 @@ export default function JiraScreen(props: BocScreenProps) {
     issue: undefined as JiraIssueDetail | undefined,
     issueFailure: undefined as JiraConnectionFailure | undefined,
     loading: false as false | "workspace" | "board" | "issues" | "issue",
-    savingBoard: false,
     failure: undefined as JiraConnectionFailure | undefined,
   })
 
@@ -70,7 +68,9 @@ export default function JiraScreen(props: BocScreenProps) {
       priority: view.priority,
     })
   const groups = () => groupIssuesByColumn(view.board?.columns ?? [], filtered())
-  const selectedBoard = () => view.boards.find((board) => board.id === view.selectedBoardId)
+  const selectedBoard = () =>
+    view.boards.find((board) => board.id === view.selectedBoardId) ??
+    view.preferences.savedBoards.find((board) => board.id === view.selectedBoardId)
   const refreshing = () => view.loading !== false && view.loading !== "issue"
   const surface = () =>
     jiraBoardSurface({
@@ -130,7 +130,7 @@ export default function JiraScreen(props: BocScreenProps) {
       return
     }
 
-    const selectedBoardId = resolveSelectedBoardId(view.selectedBoardId, preferences, boardsResult.boards)
+    const selectedBoardId = resolveSetupBoardId(view.selectedBoardId, preferences, boardsResult.boards)
     setView({
       boards: boardsResult.boards,
       preferences,
@@ -223,18 +223,22 @@ export default function JiraScreen(props: BocScreenProps) {
     issueRequests.finish(request)
   }
 
-  const saveCurrentBoard = async () => {
-    const board = view.boards.find((entry) => entry.id === view.selectedBoardId)
-    if (!board) return
-    if (view.preferences.savedBoards.some((entry) => entry.id === board.id)) return
-    if (view.preferences.savedBoards.length >= MAX_SAVED_JIRA_BOARDS) return
-    setView("savingBoard", true)
-    const preferences = normalizeSavedBoards(
-      [...view.preferences.savedBoards, board],
-      view.preferences.defaultBoardId ?? board.id,
+  const openPickBoard = (kind: "default" | "add") => {
+    void dialog.show(
+      () => (
+        <JiraPickBoardDialog
+          api={desktop.jira}
+          locale={props.host.locale}
+          kind={kind}
+          excludeIds={kind === "add" ? view.preferences.savedBoards.map((board) => board.id) : undefined}
+          onSaved={(board) => {
+            if (kind === "add") setView("selectedBoardId", board.id)
+            dialog.close()
+          }}
+        />
+      ),
+      () => void bootstrap(),
     )
-    const saved = await desktop.jira.savePreferences(preferences)
-    setView({ preferences: saved, savingBoard: false })
   }
 
   const openSettings = () => {
@@ -244,6 +248,7 @@ export default function JiraScreen(props: BocScreenProps) {
         locale={props.host.locale}
         openExternal={(url) => props.host.openExternal(url)}
         onChanged={() => void bootstrap()}
+        onNeedsDefaultBoard={() => openPickBoard("default")}
       />
     ))
   }
@@ -290,19 +295,17 @@ export default function JiraScreen(props: BocScreenProps) {
         connection={view.connection}
         board={selectedBoard()}
         preferences={view.preferences}
+        selectedBoardId={view.selectedBoardId}
         loading={refreshing()}
-        savingBoard={view.savingBoard}
         onRefresh={() => void bootstrap()}
-        onSaveBoard={() => void saveCurrentBoard()}
+        onAddBoard={() => openPickBoard("add")}
+        onSelectBoard={(boardId) => void loadBoard(boardId)}
         onOpenSettings={openSettings}
       />
 
-      <Show when={view.connection?.status === "connected" && view.boards.length > 0}>
+      <Show when={view.connection?.status === "connected" && view.selectedBoardId !== undefined}>
         <JiraBoardToolbar
           t={t}
-          boards={view.boards}
-          preferences={view.preferences}
-          selectedBoardId={view.selectedBoardId}
           board={view.board}
           sprintId={view.sprintId}
           issues={view.issues}
@@ -311,7 +314,6 @@ export default function JiraScreen(props: BocScreenProps) {
           assignee={view.assignee}
           issueType={view.issueType}
           priority={view.priority}
-          onSelectBoard={(boardId) => void loadBoard(boardId)}
           onSelectSprint={(sprintId) => {
             if (view.selectedBoardId === undefined) return
             void loadIssues(view.selectedBoardId, sprintId)
@@ -330,6 +332,7 @@ export default function JiraScreen(props: BocScreenProps) {
             groups={groups()}
             selectedIssueKey={view.selectedIssueKey}
             onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
+            onOpenExternal={(url) => props.host.openExternal(url)}
           />
           <Show when={view.selectedIssueKey}>
             <JiraIssueInspector
@@ -371,6 +374,11 @@ export default function JiraScreen(props: BocScreenProps) {
           <Show when={surface() === "not-configured" || surface() === "encryption-unavailable"}>
             <Button type="button" variant="neutral" size="small" onClick={openSettings}>
               {t("boc.jira.connection.settings")}
+            </Button>
+          </Show>
+          <Show when={surface() === "needs-default"}>
+            <Button type="button" variant="neutral" size="small" onClick={() => openPickBoard("default")}>
+              {t("boc.jira.board.default.choose")}
             </Button>
           </Show>
           <Show when={surface() === "no-matches"}>

@@ -11,6 +11,7 @@ export type JiraBoardSurface =
   | "rate-limit"
   | "error"
   | "no-boards"
+  | "needs-default"
   | "no-sprints"
   | "empty"
   | "no-matches"
@@ -34,7 +35,7 @@ export function jiraBoardSurface(input: {
   if (input.failure) return "error"
   if (input.boards.length === 0) return "no-boards"
   if (input.board?.type === "scrum" && input.board.sprints.length === 0) return "no-sprints"
-  if (!input.board) return "loading"
+  if (!input.board) return "needs-default"
   if (input.issues.length === 0) return "empty"
   if (input.filtered.length === 0) return "no-matches"
   return "board"
@@ -50,6 +51,7 @@ export function jiraBoardMessage(
   if (surface === "not-configured") return t("boc.jira.connection.notConfigured")
   if (surface === "encryption-unavailable") return t("boc.jira.connection.encryptionUnavailable")
   if (surface === "no-boards") return t("boc.jira.board.noBoards")
+  if (surface === "needs-default") return t("boc.jira.board.needsDefault")
   if (surface === "no-sprints") return t("boc.jira.board.noSprints")
   if (surface === "empty") return t("boc.jira.board.empty")
   if (surface === "no-matches") return t("boc.jira.board.noMatches")

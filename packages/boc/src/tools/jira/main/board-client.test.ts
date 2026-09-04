@@ -15,6 +15,7 @@ import {
   boardResponse,
   issueDetailResponse,
   issueSearchResponse,
+  fieldListResponse,
   sprintListResponse,
 } from "../fixtures/board"
 
@@ -36,6 +37,7 @@ function boardCloudFetch() {
       const body = init?.body ? JSON.parse(String(init.body)) : {}
       return issueSearchResponse(body.nextPageToken === "page-2" ? 2 : 1)
     }
+    if (url.pathname === "/rest/api/3/field") return fieldListResponse()
     if (url.pathname === "/rest/api/3/issue/PLAT-1") return issueDetailResponse()
     return jsonResponse(404, { errorMessages: ["missing"] })
   })
@@ -79,12 +81,24 @@ describe("Jira board client", () => {
     expect(result.ok).toBe(true)
     if (!result.ok) throw new Error("expected issues")
     expect(result.issues.map((issue) => issue.key)).toEqual(["PLAT-1", "PLAT-2"])
-    expect(requested).toEqual(["GET /rest/agile/1.0/board/84/configuration", "POST /rest/api/3/search/jql", "POST /rest/api/3/search/jql"])
+    expect(requested).toEqual([
+      "GET /rest/agile/1.0/board/84/configuration",
+      "GET /rest/api/3/field",
+      "POST /rest/api/3/search/jql",
+      "POST /rest/api/3/search/jql",
+    ])
     expect(requested.every((entry) => !entry.includes("/rest/api/3/search?"))).toBe(true)
     expect(bodies[0]).toEqual({
       jql: "filter = 1001 AND sprint = 37",
       maxResults: 100,
-      fields: ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated"],
+      fields: ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated", "customfield_10016"],
+    })
+    expect(result.issues[0]).toMatchObject({
+      key: "PLAT-1",
+      issueTypeName: "Story",
+      storyPoints: 3,
+      assigneeAvatarUrl:
+        "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
     })
     expect(bodies[1]).toMatchObject({ nextPageToken: "page-2" })
     expect(containsSecret(JSON.stringify(result), [TOKEN_FIXTURE])).toBe(false)

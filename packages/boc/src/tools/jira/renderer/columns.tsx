@@ -4,7 +4,6 @@ import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraBoardIssue } from "../domain/board"
 import type { JiraColumnGroup } from "../domain/board"
 import { JiraIssueCard } from "./card"
-import { jiraColumnTone, jiraToneDot } from "./tone"
 
 export function JiraBoardColumns(props: {
   t: BocTranslator
@@ -12,6 +11,7 @@ export function JiraBoardColumns(props: {
   groups: JiraColumnGroup[]
   selectedIssueKey?: string
   onSelectIssue: (issue: JiraBoardIssue, returnFocus: HTMLButtonElement) => void
+  onOpenExternal: (url: string) => void
 }) {
   const moveFocus = (event: KeyboardEvent & { currentTarget: HTMLDivElement; target: Element }) => {
     if (!(event.target instanceof HTMLElement)) return
@@ -49,7 +49,6 @@ export function JiraBoardColumns(props: {
           const name = () =>
             group.column.id === "unmapped" ? props.t("boc.jira.board.column.other") : group.column.name
           const empty = () => group.issues.length === 0
-          const dot = () => `size-2 shrink-0 rounded-full ${jiraToneDot[jiraColumnTone(props.groups, columnIndex())]}`
           return (
             <section
               data-boc-board-column={group.column.id}
@@ -64,7 +63,6 @@ export function JiraBoardColumns(props: {
                 when={!empty()}
                 fallback={
                   <>
-                    <span aria-hidden="true" class={dot()} />
                     <Badge>{props.t("boc.jira.board.column.count", { count: 0 })}</Badge>
                     <h2
                       id={`boc-jira-column-${columnIndex()}`}
@@ -76,7 +74,6 @@ export function JiraBoardColumns(props: {
                 }
               >
                 <header class="flex h-10 shrink-0 items-center gap-2 px-3">
-                  <span aria-hidden="true" class={dot()} />
                   <h2
                     id={`boc-jira-column-${columnIndex()}`}
                     class="min-w-0 truncate text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-base [font-weight:530]"
@@ -91,11 +88,13 @@ export function JiraBoardColumns(props: {
                   <For each={group.issues}>
                     {(issue, cardIndex) => (
                       <JiraIssueCard
+                        t={props.t}
                         issue={issue}
                         locale={props.locale}
                         index={cardIndex()}
                         selected={props.selectedIssueKey === issue.key}
                         onSelect={(returnFocus) => props.onSelectIssue(issue, returnFocus)}
+                        onOpenExternal={props.onOpenExternal}
                       />
                     )}
                   </For>

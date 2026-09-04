@@ -1,4 +1,7 @@
 import { Schema } from "effect"
+import { adfToMarkdown } from "./adf"
+
+export { adfToMarkdown, adfToPlainText, safeHttpUrl } from "./adf"
 
 export const MAX_SAVED_JIRA_BOARDS = 10
 export const JIRA_UNASSIGNED = "__boc_unassigned__"
@@ -41,7 +44,11 @@ export const JiraBoardIssue = Schema.Struct({
   statusName: Schema.optionalKey(Schema.String),
   assigneeName: Schema.optionalKey(Schema.String),
   issueTypeName: Schema.optionalKey(Schema.String),
+  issueTypeIconUrl: Schema.optionalKey(Schema.String),
+  subtask: Schema.optionalKey(Schema.Boolean),
   priorityName: Schema.optionalKey(Schema.String),
+  storyPoints: Schema.optionalKey(Schema.Number),
+  assigneeAvatarUrl: Schema.optionalKey(Schema.String),
   labels: Schema.Array(Schema.String),
   createdAt: Schema.optionalKey(Schema.String),
   updatedAt: Schema.optionalKey(Schema.String),
@@ -182,7 +189,11 @@ export function mapJiraSprint(raw: unknown): JiraSprintSummary | undefined {
   })
 }
 
-export function mapJiraBoardIssue(raw: unknown, browseOrigin: string): JiraBoardIssue | undefined {
+export function mapJiraBoardIssue(
+  raw: unknown,
+  browseOrigin: string,
+  storyPointFields: readonly string[] = [],
+): JiraBoardIssue | undefined {
   if (!isRecord(raw)) return
   const id = text(raw.id) ?? numericId(raw.id)
   const key = text(raw.key)
@@ -200,8 +211,12 @@ export function mapJiraBoardIssue(raw: unknown, browseOrigin: string): JiraBoard
     statusId: status ? text(status.id) : undefined,
     statusName: status ? text(status.name) : undefined,
     assigneeName: assignee ? text(assignee.displayName) : undefined,
+    assigneeAvatarUrl: assigneeAvatarUrl(assignee, browseOrigin),
     issueTypeName: issueType ? text(issueType.name) : undefined,
+    issueTypeIconUrl: issueType ? jiraAssetUrl(issueType.iconUrl, browseOrigin) : undefined,
+    subtask: isSubtaskIssueType(issueType) ? true : undefined,
     priorityName: priority ? text(priority.name) : undefined,
+    storyPoints: fields ? storyPointsFrom(fields, storyPointFields) : undefined,
     labels: stringList(fields?.labels),
     createdAt: fields ? text(fields.created) : undefined,
     updatedAt: fields ? text(fields.updated) : undefined,
@@ -218,7 +233,7 @@ export function mapJiraIssueDetail(raw: unknown, browseOrigin: string): JiraIssu
     id: issue.id,
     key: issue.key,
     summary: issue.summary,
-    description: fields ? adfToPlainText(fields.description) : undefined,
+    description: fields ? adfToMarkdown(fields.description) : undefined,
     statusName: issue.statusName,
     assigneeName: issue.assigneeName,
     reporterName: reporter ? text(reporter.displayName) : undefined,
@@ -362,27 +377,17 @@ export function resolveSelectedBoardId(
   return saved?.id ?? pool[0]?.id
 }
 
+export function resolveSetupBoardId(
+  requested: number | undefined,
+  preferences: JiraPreferences,
+  available: readonly JiraBoardSummary[],
+) {
+  if (requested === undefined && preferences.defaultBoardId === undefined) return
+  return resolveSelectedBoardId(requested, preferences, available)
+}
+
 export function isJiraIssueKey(value: string) {
   return /^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(value.trim())
-}
-
-export function adfToPlainText(value: unknown): string | undefined {
-  const text = collectAdfText(value).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
-  if (!text) return
-  return text
-}
-
-function collectAdfText(value: unknown): string {
-  if (typeof value === "string") return value
-  if (!value || typeof value !== "object") return ""
-  if (Array.isArray(value)) return value.map(collectAdfText).join("")
-  if (!isRecord(value)) return ""
-  if (typeof value.text === "string") return value.text
-  const inner = Array.isArray(value.content) ? value.content.map(collectAdfText).join("") : ""
-  if (value.type === "paragraph" || value.type === "heading" || value.type === "blockquote") return inner ? `${inner}\n\n` : ""
-  if (value.type === "listItem") return inner ? `${inner}\n` : ""
-  if (value.type === "hardBreak") return "\n"
-  return inner
 }
 
 function sprintStateOrder(state: string) {
@@ -396,6 +401,76 @@ function sprintTimestamp(sprint: JiraSprintSummary) {
   const value = sprint.completeDate ?? sprint.endDate ?? sprint.startDate
   const timestamp = value ? Date.parse(value) : Number.NaN
   return Number.isNaN(timestamp) ? sprint.id : timestamp
+}
+
+export function storyPointFieldIds(raw: unknown) {
+  if (!Array.isArray(raw)) return []
+  return [...new Set(raw.flatMap((field) => {
+    if (!isRecord(field) || !isStoryPointField(field)) return []
+    const id = text(field.id) ?? text(field.key)
+    return id ? [id] : []
+  }))]
+}
+
+export function jiraAssetUrl(value: unknown, origin: string) {
+  const raw = text(value)
+  if (!raw) return
+  const absolute = raw.startsWith("/") ? `${origin.replace(/\/+$/, "")}${raw}` : raw
+  if (!URL.canParse(absolute)) return
+  const url = new URL(absolute)
+  if (url.protocol !== "https:") return
+  if (url.username !== "" || url.password !== "") return
+  const host = url.hostname.toLowerCase()
+  if (host.endsWith(".atlassian.net") || host.endsWith(".atl-paas.net") || host === "id.atlassian.com") {
+    return url.toString()
+  }
+}
+
+export function jiraIssueIsSubtask(issue: Pick<JiraBoardIssue, "subtask" | "issueTypeName">) {
+  return issue.subtask === true || isSubtaskTypeName(issue.issueTypeName)
+}
+
+function assigneeAvatarUrl(assignee: Record<string, unknown> | undefined, origin: string) {
+  if (!assignee) return
+  const urls = isRecord(assignee.avatarUrls) ? assignee.avatarUrls : undefined
+  if (!urls) return
+  return jiraAssetUrl(urls["24x24"] ?? urls["48x48"] ?? urls["32x32"] ?? urls["16x16"], origin)
+}
+
+function storyPointsFrom(fields: Record<string, unknown>, fieldIds: readonly string[]) {
+  for (const id of fieldIds) {
+    const points = finiteNumber(fields[id])
+    if (points !== undefined) return points
+  }
+}
+
+function isStoryPointField(field: Record<string, unknown>) {
+  const schema = isRecord(field.schema) ? field.schema : undefined
+  const custom = text(schema?.custom)?.toLowerCase() ?? ""
+  if (custom.includes("story-points") || custom.includes("storypoint")) return true
+  const key = text(field.key)?.toLowerCase() ?? ""
+  if (key === "storypointestimate") return true
+  const name = (text(field.name) ?? text(field.untranslatedName) ?? "").toLowerCase()
+  return name === "story points" || name === "story point estimate"
+}
+
+function finiteNumber(value: unknown) {
+  if (typeof value === "number" && Number.isFinite(value)) return value
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value)
+    if (Number.isFinite(parsed)) return parsed
+  }
+}
+
+function isSubtaskIssueType(issueType: Record<string, unknown> | undefined) {
+  if (!issueType) return false
+  if (issueType.subtask === true) return true
+  return isSubtaskTypeName(text(issueType.name))
+}
+
+function isSubtaskTypeName(name: string | undefined) {
+  if (!name) return false
+  return name.toLowerCase().replace(/[\s_-]+/g, "") === "subtask"
 }
 
 function compact<T extends Record<string, unknown>>(value: T): T {

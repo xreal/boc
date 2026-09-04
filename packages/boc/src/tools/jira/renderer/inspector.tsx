@@ -9,6 +9,7 @@ import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail } from "../domain/board"
 import type { JiraConnectionFailure } from "../rpcs"
 import { jiraConnectionErrorKey } from "./status"
+import { JiraIssueDescription } from "./description"
 import { jiraRelativeTime } from "./time"
 import { jiraPriorityTone, jiraToneText } from "./tone"
 
@@ -37,11 +38,11 @@ export function JiraIssueInspector(props: {
       role={props.overlay ? "dialog" : "complementary"}
       aria-labelledby="boc-jira-issue-inspector-title"
       tabIndex={-1}
-      class="flex min-h-0 flex-col overflow-hidden rounded-[8px] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
+      class="flex min-h-0 flex-col overflow-hidden rounded-[8px] outline-none select-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
       classList={{
-        "absolute bottom-3 right-3 top-0 z-10 w-[min(24rem,calc(100%-1.5rem))] bg-v2-background-bg-base shadow-[var(--v2-elevation-floating)]":
+        "absolute bottom-3 right-3 top-0 z-10 w-[min(36rem,calc(100%-1.5rem))] bg-v2-background-bg-base shadow-[var(--v2-elevation-floating)]":
           props.overlay,
-        "relative w-[24rem] shrink-0 bg-v2-background-bg-layer-01": !props.overlay,
+        "relative w-[36rem] shrink-0 bg-v2-background-bg-layer-01": !props.overlay,
       }}
     >
       <div class="flex h-10 shrink-0 items-center gap-1 pl-4 pr-2">
@@ -158,9 +159,7 @@ export function JiraIssueInspector(props: {
                   }
                 >
                   {(description) => (
-                    <p class="whitespace-pre-wrap leading-[var(--line-height-base)] text-v2-text-text-base">
-                      {description()}
-                    </p>
+                    <JiraIssueDescription markdown={description()} onOpenExternal={props.onOpenExternal} />
                   )}
                 </Show>
               </section>
