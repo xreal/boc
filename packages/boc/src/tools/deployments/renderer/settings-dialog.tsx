@@ -29,18 +29,34 @@ export function DeploymentSettingsDialog(props: {
     busy: false as false | "save" | "retry",
     failure: undefined as DeploymentFailure | undefined,
     saved: false,
+    checked: false,
+    transportFailure: false,
+    savedSettings: props.settings,
   })
+
+  const dirty = () =>
+    form.devenvPath !== (form.savedSettings.devenvPath ?? "") ||
+    form.argoProject !== (form.savedSettings.argoProject ?? "") ||
+    form.applicationLabelKey !== form.savedSettings.applicationLabelKey ||
+    form.applicationLabelValue !== form.savedSettings.applicationLabelValue ||
+    form.notificationsEnabled !== form.savedSettings.notificationsEnabled
 
   const save = async () => {
     if (form.busy) return
-    setForm({ busy: "save", failure: undefined, saved: false })
-    const result = await props.api.saveSettings({
-      ...(form.devenvPath.trim() ? { devenvPath: form.devenvPath } : {}),
-      ...(form.argoProject.trim() ? { argoProject: form.argoProject } : {}),
-      applicationLabelKey: form.applicationLabelKey,
-      applicationLabelValue: form.applicationLabelValue,
-      notificationsEnabled: form.notificationsEnabled,
-    })
+    setForm({ busy: "save", failure: undefined, saved: false, checked: false, transportFailure: false })
+    const result = await props.api
+      .saveSettings({
+        ...(form.devenvPath.trim() ? { devenvPath: form.devenvPath } : {}),
+        ...(form.argoProject.trim() ? { argoProject: form.argoProject } : {}),
+        applicationLabelKey: form.applicationLabelKey,
+        applicationLabelValue: form.applicationLabelValue,
+        notificationsEnabled: form.notificationsEnabled,
+      })
+      .catch(() => undefined)
+    if (!result) {
+      setForm({ busy: false, transportFailure: true })
+      return
+    }
     if (!result.ok) {
       setForm({ busy: false, failure: result })
       return
@@ -48,6 +64,7 @@ export function DeploymentSettingsDialog(props: {
     setForm({
       busy: false,
       saved: true,
+      savedSettings: result.settings,
       failure: undefined,
       readiness: result.readiness,
       devenvPath: result.settings.devenvPath ?? "",
@@ -60,10 +77,15 @@ export function DeploymentSettingsDialog(props: {
   }
 
   const retry = async () => {
-    if (form.busy) return
-    setForm({ busy: "retry", failure: undefined, saved: false })
-    const readiness = await props.api.checkReadiness()
-    setForm({ busy: false, readiness })
+    if (form.busy || dirty()) return
+    setForm({ busy: "retry", failure: undefined, saved: false, checked: false, transportFailure: false })
+    const readiness = await props.api.checkReadiness().catch(() => undefined)
+    if (!readiness) {
+      setForm({ busy: false, transportFailure: true })
+      return
+    }
+    setForm({ busy: false, readiness, checked: true })
+    props.onSaved(form.savedSettings, readiness)
   }
 
   return (
@@ -84,16 +106,26 @@ export function DeploymentSettingsDialog(props: {
             {settingsFailureMessage(t, form.failure!)}
           </p>
         </Show>
-        <Show when={form.saved}>
+        <Show when={form.saved && !dirty()}>
           <p role="status" class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-success">
             {t("boc.deployments.settings.saved")}
+          </p>
+        </Show>
+
+        <Show when={form.transportFailure}>
+          <p role="alert" class="text-[13px] leading-[var(--line-height-base)] text-v2-state-fg-danger">
+            {t("boc.deployments.settings.failure.connection")}
+          </p>
+        </Show>
+        <Show when={dirty() || form.checked}>
+          <p role="status" class="text-[13px] leading-[var(--line-height-base)]">
+            {t(dirty() ? "boc.deployments.settings.unsaved" : "boc.deployments.settings.checked")}
           </p>
         </Show>
 
         <Field>
           <Field.Label>{t("boc.deployments.settings.devenv.label")}</Field.Label>
           <TextInput
-            autofocus
             class="!w-full"
             name="deployment-devenv-path"
             autocomplete="off"
@@ -145,7 +177,7 @@ export function DeploymentSettingsDialog(props: {
                   onInput={(event) => setForm("argoProject", event.currentTarget.value)}
                 />
               </Field>
-              <div class="grid grid-cols-2 gap-3">
+              <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <Field>
                   <Field.Label>{t("boc.deployments.settings.labelKey.label")}</Field.Label>
                   <TextInput
@@ -183,7 +215,7 @@ export function DeploymentSettingsDialog(props: {
         </div>
       </DialogBody>
       <DialogFooter>
-        <Button type="button" variant="outline" disabled={form.busy !== false} onClick={() => void retry()}>
+        <Button type="button" variant="outline" disabled={form.busy !== false || dirty()} onClick={() => void retry()}>
           {form.busy === "retry" ? t("boc.deployments.readiness.retrying") : t("boc.deployments.settings.retry")}
         </Button>
         <Button type="button" variant="neutral" disabled={form.busy !== false} onClick={() => void save()}>

@@ -45,7 +45,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     refreshing: false,
     transportFailure: false,
     refreshNotice: undefined as "success" | "failure" | undefined,
-    queuedNotice: undefined as string | undefined,
+    queuedNotice: undefined as { system: string; state: DeploymentOperationSummary["state"] } | undefined,
     queuedOperations: {} as Record<string, DeploymentOperationSummary>,
   })
 
@@ -160,7 +160,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         kind={kind}
         onQueued={(operation) => {
           setView({
-            queuedNotice: system.name,
+            queuedNotice: { system: system.name, state: operation.state },
             queuedOperations: { ...view.queuedOperations, [operation.environment]: operation },
             systems: view.systems.map((item) =>
               item.environment === operation.environment ? { ...item, operation, allowedActions: [] } : item,
@@ -251,7 +251,10 @@ export default function DeploymentsScreen(props: BocScreenProps) {
 
       <p class="sr-only" role="status" aria-live="polite">
         {view.queuedNotice
-          ? t("boc.deployments.deploy.queued", { system: view.queuedNotice })
+          ? t("boc.deployments.deploy.result", {
+              system: view.queuedNotice.system,
+              state: t(`boc.deployments.operation.${view.queuedNotice.state}`),
+            })
           : view.refreshNotice === "success"
             ? t("boc.deployments.refresh.success")
             : view.refreshNotice === "failure"
@@ -259,6 +262,16 @@ export default function DeploymentsScreen(props: BocScreenProps) {
               : ""}
       </p>
 
+      <Show when={view.queuedNotice}>
+        {(notice) => (
+          <p class="border-b border-v2-border-border-muted px-4 py-2 text-[13px] leading-[var(--line-height-base)]">
+            {t("boc.deployments.deploy.result", {
+              system: notice().system,
+              state: t(`boc.deployments.operation.${notice().state}`),
+            })}
+          </p>
+        )}
+      </Show>
       <div data-boc-deployments-body class="flex min-h-0 flex-1 flex-col">
         <Show when={failed() && surface() === "fleet"}>
           <div

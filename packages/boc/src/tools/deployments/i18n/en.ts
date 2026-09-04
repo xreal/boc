@@ -87,8 +87,36 @@ export const deploymentsEnglish = {
   "boc.deployments.refresh.success": "Development systems refreshed.",
   "boc.deployments.refresh.failure":
     "Development systems could not be refreshed. Previous data is still shown when available.",
-  "boc.deployments.readiness.title": "Deployment setup needs attention",
-  "boc.deployments.readiness.description": "Resolve the unavailable capability, then retry the development fleet read.",
+  "boc.deployments.readiness.title": "Connect your development tools",
+  "boc.deployments.readiness.description":
+    "Complete the system checks to load your dev systems. GitHub is only needed to deploy; Devenv is optional.",
+  "boc.deployments.readiness.group.fleet": "View dev systems",
+  "boc.deployments.readiness.group.fleet.help": "Required to load applications from the Kubernetes dev context.",
+  "boc.deployments.readiness.group.deploy": "Deploy with GitHub",
+  "boc.deployments.readiness.group.deploy.help":
+    "Uses your GitHub CLI account for bergfreunde/shop. System browsing works without it.",
+  "boc.deployments.readiness.group.optional": "Optional tools",
+  "boc.deployments.readiness.group.optional.help": "Missing optional tools never block browsing or deployment.",
+  "boc.deployments.readiness.status.available": "Ready",
+  "boc.deployments.readiness.status.unavailable": "Needs attention",
+  "boc.deployments.readiness.status.unknown": "Not checked",
+  "boc.deployments.readiness.required": "Setup needed",
+  "boc.deployments.readiness.optional": "Optional",
+  "boc.deployments.readiness.retryHelp": "Made a change? Run the checks again.",
+  "boc.deployments.readiness.pendingHelp":
+    "Not checked means an earlier prerequisite must pass first. Workflow checks confirm visibility; dispatch still requires write access.",
+  "boc.deployments.readiness.fix.network": "Could not reach the service. Check your network or VPN, then try again.",
+  "boc.deployments.readiness.fix.timeout": "The check took too long. Check your connection, then try again.",
+  "boc.deployments.readiness.fix.rateLimit":
+    "The service is rate limiting requests. Wait a few minutes before checking again.",
+  "boc.deployments.readiness.fix.malformed":
+    "The tool returned an unexpected response. Check your CLI version and try again.",
+  "boc.deployments.settings.unsaved": "You have unsaved changes. Save and check to test these values.",
+  "boc.deployments.settings.checked": "Checks complete. Review the results below.",
+  "boc.deployments.settings.failure.connection":
+    "Could not complete the request. Check again to refresh the saved settings and connection status.",
+  "boc.deployments.readiness.otherChecks": "Passed and pending checks",
+  "boc.deployments.readiness.notConfigured": "Not configured",
   "boc.deployments.readiness.retrying": "Checking…",
   "boc.deployments.readiness.degraded": "Readiness issue",
   "boc.deployments.readiness.fleetReady": "The development fleet is ready.",
@@ -101,7 +129,7 @@ export const deploymentsEnglish = {
   "boc.deployments.readiness.capability.gh_cli": "GitHub CLI",
   "boc.deployments.readiness.capability.github_auth": "GitHub authentication",
   "boc.deployments.readiness.capability.github_repo_access": "Deployment repository access",
-  "boc.deployments.readiness.capability.github_workflow_dispatch": "Workflow dispatch access",
+  "boc.deployments.readiness.capability.github_workflow_dispatch": "Workflow discovery",
   "boc.deployments.readiness.capability.jira_connection": "Jira enrichment",
   "boc.deployments.readiness.capability.bf_deploy_auto_sync": "Devenv auto-sync",
   "boc.deployments.readiness.capability.ssh": "SSH",
@@ -120,11 +148,11 @@ export const deploymentsEnglish = {
     "Choose a Devenv checkout containing src/tools/bf-deploy. Fleet reads remain available.",
   "boc.deployments.readiness.fix.gh_cli": "Install gh and make it available in your login-shell PATH.",
   "boc.deployments.readiness.fix.github_auth":
-    "Authenticate the GitHub CLI for github.com. Boc never asks for or stores a GitHub token.",
+    "Run gh auth login --hostname github.com in your terminal, then check again.",
   "boc.deployments.readiness.fix.github_repo":
-    "Confirm your GitHub account can read the Bergfreunde deployment repository.",
+    "Run gh repo view bergfreunde/shop in your terminal. If access is denied, check your active GitHub account and repository permissions.",
   "boc.deployments.readiness.fix.github_dispatch":
-    "Confirm GitHub Actions workflow dispatch access for the deployment repository.",
+    "Check that GitHub Actions workflows are visible in bergfreunde/shop. Write permission is verified when a deployment is submitted.",
   "boc.deployments.readiness.fix.future": "This capability is not available in the current delivery slice.",
   "boc.deployments.action.reason.readiness": "Deployment requires GitHub CLI access to the Bergfreunde repository.",
   "boc.deployments.action.reason.active": "This system already has an active deployment operation.",
@@ -162,6 +190,8 @@ export const deploymentsEnglish = {
   "boc.deployments.deploy.submit.workflows": "Select at least one workflow.",
   "boc.deployments.deploy.submit.expired": "The prepared plan expired. Review the current draft again.",
   "boc.deployments.deploy.cancel": "Cancel",
+  "boc.deployments.deploy.result":
+    "Deployment for {{system}}: {{state}}. Review workflow details before starting another deployment.",
   "boc.deployments.deploy.queued": "Deployment queued for {{system}}.",
   "boc.deployments.deploy.failure.invalid": "This draft could not be prepared. Review the ref, workflows, and inputs.",
   "boc.deployments.deploy.failure.conflict": "This system already has an active operation.",
@@ -171,8 +201,9 @@ export const deploymentsEnglish = {
   "boc.deployments.deploy.warning.unsafe-target": "This is a reserved development system.",
   "boc.deployments.settings.close": "Close deployment settings",
   "boc.deployments.settings.title": "Deployment settings",
-  "boc.deployments.settings.description": "Configure non-secret local paths and the fixed development fleet filter.",
-  "boc.deployments.settings.devenv.label": "Devenv checkout",
+  "boc.deployments.settings.description":
+    "Check your connections, configure optional tools, and choose which development applications to show.",
+  "boc.deployments.settings.devenv.label": "Devenv checkout (optional)",
   "boc.deployments.settings.devenv.placeholder": "/path/to/devenv",
   "boc.deployments.settings.devenv.help": "Optional. Auto-sync requires src/tools/bf-deploy; fleet reads do not.",
   "boc.deployments.settings.notifications.label": "Completion notifications",
@@ -182,10 +213,10 @@ export const deploymentsEnglish = {
   "boc.deployments.settings.project.label": "Argo project (optional)",
   "boc.deployments.settings.labelKey.label": "Application label key",
   "boc.deployments.settings.labelValue.label": "Application label value",
-  "boc.deployments.settings.readiness": "Readiness",
-  "boc.deployments.settings.retry": "Retry readiness",
-  "boc.deployments.settings.save": "Save settings",
-  "boc.deployments.settings.saving": "Saving…",
+  "boc.deployments.settings.readiness": "Connection checks",
+  "boc.deployments.settings.retry": "Check again",
+  "boc.deployments.settings.save": "Save and check",
+  "boc.deployments.settings.saving": "Saving and checking…",
   "boc.deployments.settings.saved": "Settings saved. Fleet readiness was checked again.",
   "boc.deployments.settings.failure.invalid":
     "These settings could not be saved. Review the path and Argo filter values.",
