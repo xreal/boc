@@ -11,7 +11,7 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "noEmit": true,
-    "lib": ["es2023", "dom", "dom.iterable"],
+    "lib": ["esnext", "dom", "dom.iterable"],
     "strict": true,
     "types": ["bun", "node", "electron"]
   }

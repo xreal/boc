@@ -111,7 +111,9 @@
       "name": "@boc/extensions",
       "version": "0.0.0",
       "dependencies": {
+        "@opencode-ai/core": "workspace:*",
         "@opencode-ai/ui": "workspace:*",
+        "@opencode-ai/util": "workspace:*",
         "@solid-primitives/i18n": "2.2.1",
         "effect": "catalog:",
         "electron-store": "11.0.2",
