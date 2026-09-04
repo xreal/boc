@@ -2,6 +2,7 @@ export * as Ipc from "./ipc"
 
 import { app, BrowserWindow, MessageChannelMain } from "electron"
 import { Effect, Layer } from "effect"
+import { bocDesktopHandlers, bocDesktopServices } from "@boc/extensions/desktop/main"
 import { RpcServer } from "effect/unstable/rpc"
 import { DesktopRpcs } from "../shared/ipc-rpc"
 import { IpcTransportPort } from "../shared/ipc-transport"
@@ -24,7 +25,7 @@ import { Updater } from "./updater"
 import { getLastFocusedWindow } from "./windows"
 import { Wsl } from "./wsl/start"
 
-const services = Layer.mergeAll(DesktopFiles.layer, DesktopStorage.layer, Wsl.layer)
+const services = Layer.mergeAll(DesktopFiles.layer, DesktopStorage.layer, Wsl.layer, bocDesktopServices)
 const handlers = Layer.mergeAll(
   appHandlers,
   storageHandlers,
@@ -34,6 +35,7 @@ const handlers = Layer.mergeAll(
   updaterHandlers,
   wslHandlers,
   eventHandlers,
+  bocDesktopHandlers,
 )
 export const layer = RpcServer.layer(DesktopRpcs, { disableFatalDefects: true }).pipe(
   Layer.provide(handlers),

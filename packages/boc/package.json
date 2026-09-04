@@ -1,0 +1,31 @@
+{
+  "name": "@boc/extensions",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./renderer": "./src/renderer/index.ts",
+    "./desktop/shared": "./src/desktop/shared/rpcs.ts",
+    "./desktop/main": "./src/desktop/main/index.ts",
+    "./desktop/renderer": "./src/desktop/renderer/api.ts"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit",
+    "test": "bun test --conditions=solid --preload ./happydom.ts ./src"
+  },
+  "dependencies": {
+    "@opencode-ai/ui": "workspace:*",
+    "@solid-primitives/i18n": "2.2.1",
+    "effect": "catalog:",
+    "solid-js": "catalog:"
+  },
+  "devDependencies": {
+    "@happy-dom/global-registrator": "20.0.11",
+    "@tsconfig/node22": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "electron": "42.10.1",
+    "happy-dom": "20.11.1"
+  }
+}

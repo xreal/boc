@@ -1,4 +1,5 @@
 import { RpcClient, RpcClientError } from "effect/unstable/rpc"
+import { BocDesktopRpcs } from "@boc/extensions/desktop/shared"
 import { AppRpcs } from "./ipc-rpc/app"
 import { EventRpcs } from "./ipc-rpc/events"
 import { FileRpcs } from "./ipc-rpc/files"
@@ -17,5 +18,5 @@ export { UpdaterRpcs } from "./ipc-rpc/updater"
 export { WindowRpcs } from "./ipc-rpc/window"
 export { WslRpcs } from "./ipc-rpc/wsl"
 
-export const DesktopRpcs = AppRpcs.merge(StorageRpcs, FileRpcs, WindowRpcs, MenuRpcs, UpdaterRpcs, WslRpcs, EventRpcs)
+export const DesktopRpcs = AppRpcs.merge(StorageRpcs, FileRpcs, WindowRpcs, MenuRpcs, UpdaterRpcs, WslRpcs, EventRpcs, BocDesktopRpcs)
 export type DesktopRpcClient = RpcClient.FromGroup<typeof DesktopRpcs, RpcClientError.RpcClientError>

@@ -30,6 +30,7 @@ import { LoadingSplash } from "./startup/splash"
 import { getLastActiveUrl } from "./window/route-storage"
 import { DesktopMemoryRouter } from "./window/router"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
+import BocDesktopProvider from "../boc/provider"
 
 const MigrationStatus = lazy(() => import("./migration-status").then((module) => ({ default: module.MigrationStatus })))
 
@@ -138,6 +139,7 @@ function DesktopWindow(props: {
 
   return (
     <PlatformProvider value={platform}>
+      <BocDesktopProvider>
       <AppBaseProviders
         locale={locale.latest}
         onNativeTranslations={(bundle) => void props.api.setNativeTranslations(bundle).catch(() => undefined)}
@@ -148,6 +150,7 @@ function DesktopWindow(props: {
       >
         <Show when={true}>{(_) => <ReadyApp />}</Show>
       </AppBaseProviders>
+      </BocDesktopProvider>
     </PlatformProvider>
   )
 }

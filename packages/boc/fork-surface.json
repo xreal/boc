@@ -1,0 +1,101 @@
+{
+  "owned": [
+    "packages/boc/**",
+    "packages/app/src/boc/**",
+    "packages/desktop/src/boc/**",
+    "packages/desktop/icons/boc/**",
+    "BOC_*.md",
+    "tmp/BOC_*.md",
+    ".github/workflows/boc-*.yml"
+  ],
+  "approved": [
+    {
+      "path": "AGENTS.md",
+      "reason": "Append-only Boc fork guidance above the upstream boundary"
+    },
+    {
+      "path": "bun.lock",
+      "reason": "Lock the BOC workspace and its app and desktop dependency edges"
+    },
+    {
+      "path": "packages/app/package.json",
+      "reason": "Register the BOC workspace dependency"
+    },
+    {
+      "path": "packages/app/src/env.d.ts",
+      "reason": "Recognize the Boc release channel"
+    },
+    {
+      "path": "packages/app/src/runtime/i18n/en.ts",
+      "reason": "Keep only the Boc channel identity string in upstream i18n"
+    },
+    {
+      "path": "packages/app/src/shell/routes/routes.tsx",
+      "reason": "Mount the generic BOC route and command bridges"
+    },
+    {
+      "path": "packages/app/src/shell/state/layout.tsx",
+      "reason": "Recognize the generic BOC layout route"
+    },
+    {
+      "path": "packages/app/src/shell/titlebar/titlebar.tsx",
+      "reason": "Mount the generic BOC navigation bridge"
+    },
+    {
+      "path": "packages/app/vite.js",
+      "reason": "Recognize the Boc release channel"
+    },
+    {
+      "path": "packages/desktop/package.json",
+      "reason": "Register the BOC workspace as a bundled devDependency"
+    },
+    {
+      "path": "packages/desktop/electron-builder.config.test.ts",
+      "reason": "Verify Boc channel packaging identity"
+    },
+    {
+      "path": "packages/desktop/electron-builder.config.ts",
+      "reason": "Configure Boc channel packaging identity"
+    },
+    {
+      "path": "packages/desktop/electron.vite.config.ts",
+      "reason": "Configure the Boc renderer build channel"
+    },
+    {
+      "path": "packages/desktop/scripts/copy-icons.ts",
+      "reason": "Select Boc channel icons"
+    },
+    {
+      "path": "packages/desktop/scripts/copy-metainfo.ts",
+      "reason": "Select Boc channel metadata"
+    },
+    {
+      "path": "packages/desktop/scripts/prebuild.ts",
+      "reason": "Prepare the Boc release channel"
+    },
+    {
+      "path": "packages/desktop/scripts/utils.ts",
+      "reason": "Describe the Boc release channel"
+    },
+    {
+      "path": "packages/desktop/src/main/constants.ts",
+      "reason": "Use Boc channel application identity"
+    },
+    {
+      "path": "packages/desktop/src/main/ipc.ts",
+      "reason": "Compose generic BOC desktop handlers and services"
+    },
+    {
+      "path": "packages/desktop/src/main/lifecycle/environment.ts",
+      "reason": "Use Boc channel runtime identity"
+    },
+    {
+      "path": "packages/desktop/src/renderer/desktop-app.tsx",
+      "reason": "Mount the generic BOC desktop provider"
+    },
+    {
+      "path": "packages/desktop/src/shared/ipc-rpc.ts",
+      "reason": "Compose generic BOC desktop RPC schemas"
+    }
+  ]
+}

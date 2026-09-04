@@ -8,6 +8,8 @@ import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import { LayoutProvider } from "@/shell/state/layout"
 import { SettingsSurfaceProvider } from "@/settings/surface"
 import Shell from "@/shell/shell"
+import { BocCommandBridge } from "@/boc/commands"
+import { BocRouteBridge, preloadBocRoute } from "@/boc/route"
 import { requireServerKey } from "./session"
 
 export const File = lazy(() => import("@opencode-ai/session-ui/file").then((module) => ({ default: module.File })))
@@ -22,6 +24,7 @@ export function preloadRoute(url: string) {
   const pathname = url.split(/[?#]/, 1)[0]
   if (pathname === "/new-session") return DraftRoute.preload().then(() => undefined)
   if (pathname === "/settings") return SettingsScreen.preload().then(() => undefined)
+  if (pathname.startsWith("/boc/")) return preloadBocRoute(pathname)
   if (/^\/server\/[^/]+\/session\/[^/]+$/.test(pathname))
     return TargetSessionRouteContent.preload().then(() => undefined)
   return Promise.resolve()
@@ -32,6 +35,7 @@ export function AppRoutes() {
     <Route component={AppLayout}>
       <Route path="/" component={Home} />
       <Route path="/settings" component={SettingsScreen} />
+      <Route path="/boc/*path" component={BocRouteBridge} />
       <Route
         path="/server/:serverKey/session/:id"
         component={() => (
@@ -73,6 +77,7 @@ function AppLayout(props: ParentProps) {
   return (
     <LayoutProvider>
       <SettingsSurfaceProvider>
+        <BocCommandBridge />
         <Shell>{props.children}</Shell>
       </SettingsSurfaceProvider>
     </LayoutProvider>
