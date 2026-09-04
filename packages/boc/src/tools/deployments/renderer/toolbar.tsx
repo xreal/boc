@@ -38,6 +38,7 @@ export function DeploymentsToolbar(props: {
       />
 
       <SegmentedControl
+        class="!w-64"
         aria-label={props.t("boc.deployments.toolbar.filter.label")}
         value={props.availability}
         onChange={(value) => {
@@ -77,7 +78,7 @@ export function DeploymentsToolbar(props: {
             aria-label={props.t("boc.deployments.toolbar.settings")}
             disabled={!props.live}
             onClick={props.onOpenSettings}
-            icon={<Icon name="settings-gear" />}
+            icon={<Icon name="outline-sliders" />}
           />
         </Tooltip>
       </div>

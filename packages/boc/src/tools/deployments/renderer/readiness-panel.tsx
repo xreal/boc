@@ -74,7 +74,7 @@ export function DeploymentReadinessSummary(props: { t: BocTranslator; readiness:
       >
         <For each={unavailable()}>
           {(capability) => (
-            <div class="text-[12px] leading-[var(--line-height-compact)]">
+            <div class="min-w-0 break-words text-[12px] leading-[var(--line-height-compact)]">
               <span class="[font-weight:530]">{deploymentCapabilityLabel(props.t, capability)}</span>
               <span class="text-v2-text-text-muted"> — {deploymentCapabilityFix(props.t, capability)}</span>
             </div>

@@ -67,14 +67,18 @@ export function DeploymentSettingsDialog(props: {
   }
 
   return (
-    <Dialog fit data-boc-dialog="deployment-settings">
+    <Dialog
+      fit
+      containerClass="!h-auto !max-h-[calc(100vh-2rem)] !w-[min(40rem,calc(100vw-2rem))]"
+      data-boc-dialog="deployment-settings"
+    >
       <DialogHeader closeLabel={t("boc.deployments.settings.close")}>
         <DialogTitleGroup
           title={t("boc.deployments.settings.title")}
           description={t("boc.deployments.settings.description")}
         />
       </DialogHeader>
-      <DialogBody class="flex min-w-[min(32rem,calc(100vw-2rem))] flex-col gap-4 px-4 pb-4">
+      <DialogBody class="flex min-w-0 flex-col gap-4 overflow-x-hidden !overflow-y-auto px-4 pb-4">
         <Show when={form.failure}>
           <p role="alert" class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-danger">
             {settingsFailureMessage(t, form.failure!)}
