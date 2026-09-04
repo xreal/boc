@@ -57,6 +57,10 @@
       "reason": "Register the BOC workspace as a bundled devDependency"
     },
     {
+      "path": "packages/desktop/.gitignore",
+      "reason": "Exclude prepared Rift packaging artifacts"
+    },
+    {
       "path": "packages/desktop/electron-builder.config.test.ts",
       "reason": "Verify Boc channel packaging identity"
     },
@@ -95,6 +99,10 @@
     {
       "path": "packages/desktop/src/main/lifecycle/environment.ts",
       "reason": "Use Boc channel runtime identity"
+    },
+    {
+      "path": "packages/desktop/src/main/service/background-service.ts",
+      "reason": "Start the Boc backend with its isolated service registration and staged Rift runtime"
     },
     {
       "path": "packages/desktop/src/renderer/desktop-app.tsx",

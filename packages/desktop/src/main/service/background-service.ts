@@ -1,6 +1,8 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
+import { resolveRiftEnvironment } from "../../boc/rift"
 import type { ServerReadyData } from "../../shared/ipc-contract"
+import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages, DesktopCli } from "./desktop-cli"
 
@@ -33,17 +35,16 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const runFork = Effect.runForkWith(yield* Effect.context())
   const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
   const cli = yield* desktopCli.resolve
+  const rift = yield* resolveRiftEnvironment
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode-ai/client/service"))
   const service = yield* Effect.tryPromise(() =>
     client.Service.ensure({
-      file:
-        isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local"
-          ? path.join(app.getPath("userData"), "opencode", "service-local.json")
-          : undefined,
+      file: serviceFile(path, isolated),
       version,
       command: [...cli.command, "serve", "--service", ...(isolated ? ["--port", "0"] : [])],
+      env: rift,
       onStart: (reason, previousVersion) =>
         runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
     }),
@@ -61,6 +62,14 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     password: service.auth.password,
   } satisfies ServerReadyData
 })
+
+function serviceFile(path: Path.Path, isolated: boolean) {
+  if (CHANNEL === "boc") return path.join(app.getPath("userData"), "opencode", "service-boc.json")
+  if (isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
+    return path.join(app.getPath("userData"), "opencode", "service-local.json")
+  }
+  return undefined
+}
 
 function endpoint(url: string | undefined) {
   if (!url || !URL.canParse(url)) return {}

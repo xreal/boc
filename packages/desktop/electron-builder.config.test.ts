@@ -6,6 +6,7 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Configuration } from "electron-builder"
+import { packagedResources } from "./electron-builder.config"
 
 const legacyDesktopEntry = "resources/linux/opencode-desktop.desktop"
 // Use electron-builder's matcher so the tests also cover its glob and directory traversal semantics.
@@ -196,3 +197,15 @@ for (const channel of ["dev", "beta"] as const) {
     ])
   })
 }
+
+test("packages Rift as an external Boc backend resource", () => {
+  expect(packagedResources(true)).toEqual([
+    {
+      from: "resources/",
+      to: "",
+      filter: ["opencode-cli", "opencode-cli.exe"],
+    },
+    { from: "resources/rift/rift", to: "rift/rift" },
+  ])
+  expect(packagedResources(false)).toHaveLength(1)
+})

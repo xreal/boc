@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process"
+import { existsSync } from "node:fs"
 import { stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -16,6 +17,7 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 // pins still resolve after the canonical app id changes back to ai.opencode.desktop.
 const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
+const riftResource = path.join(packageDir, "resources", "rift", "rift")
 
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
@@ -57,7 +59,16 @@ const APP_IDS = {
   prod: "ai.opencode.desktop",
 } as const
 
-const getBase = (appId: string): Configuration => ({
+export const packagedResources = (includeRift: boolean): Configuration["extraResources"] => [
+  {
+    from: "resources/",
+    to: "",
+    filter: ["opencode-cli", "opencode-cli.exe"],
+  },
+  ...(includeRift ? [{ from: "resources/rift/rift", to: "rift/rift" }] : []),
+]
+
+const getBase = (appId: string, includeRift: boolean): Configuration => ({
   artifactName: "opencode-desktop-${os}-${arch}.${ext}",
   directories: {
     output: "dist",
@@ -75,6 +86,7 @@ const getBase = (appId: string): Configuration => ({
     "out/**/*",
     "resources/**/*",
     "!resources/opencode-cli*",
+    "!resources/rift{,/**/*}",
     // Log export imports Zip.js as ESM. Keep index.js and lib, including its inline worker.
     "!**/node_modules/@zip.js/zip.js/dist{,/**/*}",
     "!**/node_modules/@zip.js/zip.js/{index.cjs,index.min.js,index-fflate.js,deno.json,eslint.config.mjs}",
@@ -87,13 +99,7 @@ const getBase = (appId: string): Configuration => ({
     "!**/node_modules/js-yaml/dist/{js-yaml.js,js-yaml.min.js,*.map}",
     "!**/node_modules/js-yaml/bin{,/**/*}",
   ],
-  extraResources: [
-    {
-      from: "resources/",
-      to: "",
-      filter: ["opencode-cli", "opencode-cli.exe"],
-    },
-  ],
+  extraResources: packagedResources(includeRift),
   afterPack: async (context) => {
     const cli = path.join(
       context.packager.getResourcesDir(context.appOutDir),
@@ -101,6 +107,10 @@ const getBase = (appId: string): Configuration => ({
     )
     const file = await stat(cli)
     if (!file.isFile() || file.size === 0) throw new Error(`Bundled CLI must be a non-empty file: ${cli}`)
+    if (!includeRift) return
+    const rift = path.join(context.packager.getResourcesDir(context.appOutDir), "rift", "rift")
+    const riftFile = await stat(rift)
+    if (!riftFile.isFile() || riftFile.size === 0) throw new Error(`Bundled Rift must be a non-empty file: ${rift}`)
   },
   mac: {
     category: "public.app-category.developer-tools",
@@ -155,7 +165,7 @@ const getBase = (appId: string): Configuration => ({
 
 function getConfig() {
   const appId = APP_IDS[channel]
-  const base = getBase(appId)
+  const base = getBase(appId, channel === "boc" && existsSync(riftResource))
 
   switch (channel) {
     case "dev": {

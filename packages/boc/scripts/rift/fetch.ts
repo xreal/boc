@@ -4,16 +4,14 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import pin from "./pin.json" with { type: "json" }
-
-const targets = ["darwin-arm64", "darwin-x64", "linux-x64"] as const
-type Target = (typeof targets)[number]
+import { isRiftTarget } from "./target"
 
 const requested = Bun.argv[2] ?? `${process.platform}-${process.arch}`
-if (!isTarget(requested)) throw new Error(`Rift ${pin.version} is not pinned for ${requested}`)
+if (!isRiftTarget(requested)) throw new Error(`Rift ${pin.version} is not pinned for ${requested}`)
 const target = requested
 const artifact = pin.targets[target]
 const directory = path.dirname(fileURLToPath(import.meta.url))
-const output = path.resolve(directory, "../../resources/rift", target, "rift")
+const output = Bun.argv[3] ? path.resolve(Bun.argv[3]) : path.resolve(directory, "../../resources/rift", target, "rift")
 const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "boc-rift-fetch-"))
 
 try {
@@ -39,18 +37,18 @@ try {
   await fs.chmod(staged, 0o755)
   if (target === `${process.platform}-${process.arch}`) {
     const health = Bun.spawn([staged, "--help"], { stdin: "ignore", stdout: "pipe", stderr: "pipe" })
-    const [healthCode, help] = await Promise.all([health.exited, new Response(health.stdout).text()])
-    if (healthCode !== 0 || !help.includes("rift <COMMAND>")) {
+    const [healthCode, help, error] = await Promise.all([
+      health.exited,
+      new Response(health.stdout).text(),
+      new Response(health.stderr).text(),
+    ])
+    if (healthCode !== 0 || !help.includes("Usage:") || !help.includes("<COMMAND>") || !help.includes("create")) {
       await fs.rm(staged, { force: true })
-      throw new Error(`Rift ${target} failed its launch check`)
+      throw new Error(`Rift ${target} failed its launch check${error.trim() ? `: ${error.trim()}` : ""}`)
     }
   }
   await fs.rename(staged, output)
   console.log(`Verified and staged Rift ${pin.version} (${pin.commit}) for ${target}`)
 } finally {
   await fs.rm(temporary, { recursive: true, force: true })
-}
-
-function isTarget(value: string): value is Target {
-  return targets.some((target) => target === value)
 }
