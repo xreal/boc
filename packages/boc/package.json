@@ -17,6 +17,7 @@
     "@opencode-ai/ui": "workspace:*",
     "@solid-primitives/i18n": "2.2.1",
     "effect": "catalog:",
+    "electron-store": "11.0.2",
     "solid-js": "catalog:"
   },
   "devDependencies": {

@@ -15,6 +15,11 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
   return {
     jira: {
       getConnectionStatus: () => invoke("BocJiraGetConnectionStatus"),
+      testConnection: (input: BocDesktopInvokeArgs<"BocJiraTestConnection">[0]) =>
+        invoke("BocJiraTestConnection", input),
+      saveConnection: (input: BocDesktopInvokeArgs<"BocJiraSaveConnection">[0]) =>
+        invoke("BocJiraSaveConnection", input),
+      disconnect: () => invoke("BocJiraDisconnect"),
     },
   }
 }
