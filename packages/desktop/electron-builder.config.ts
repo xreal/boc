@@ -45,7 +45,7 @@ export function macSignOptions(options: CustomMacSignOptions): CustomMacSignOpti
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
-  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
+  if (raw === "dev" || raw === "beta" || raw === "prod" || raw === "boc") return raw
   if (raw === "latest") return "prod"
   return "dev"
 })()
@@ -53,6 +53,7 @@ const channel = (() => {
 const APP_IDS = {
   dev: "ai.opencode.desktop.dev",
   beta: "ai.opencode.desktop.beta",
+  boc: "ai.boc.desktop.beta",
   prod: "ai.opencode.desktop",
 } as const
 
@@ -186,6 +187,19 @@ function getConfig() {
         publish: { provider: "github", owner: "anomalyco", repo: "opencode", channel: "latest" },
         deb: { fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
         rpm: { packageName: "opencode", fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
+      }
+    }
+    // Boc fork: same shape as beta, own identity and update repo so it
+    // installs side-by-side with upstream OpenCode Beta.
+    case "boc": {
+      return {
+        ...base,
+        appId,
+        productName: "Boc Beta",
+        protocols: { name: "Boc Beta", schemes: ["opencode"] },
+        publish: { provider: "github", owner: "BergDevOrg", repo: "boc", channel: "latest" },
+        deb: { fpm: [metainfoFpm(appId)] },
+        rpm: { packageName: "boc-beta", fpm: [metainfoFpm(appId)] },
       }
     }
   }

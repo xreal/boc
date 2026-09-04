@@ -14,6 +14,7 @@ const { FileMatcher } = createRequire(import.meta.resolve("electron-builder"))("
 const channels = [
   { channel: "dev", appId: "ai.opencode.desktop.dev" },
   { channel: "beta", appId: "ai.opencode.desktop.beta" },
+  { channel: "boc", appId: "ai.boc.desktop.beta" },
   { channel: "prod", appId: "ai.opencode.desktop" },
 ] as const
 

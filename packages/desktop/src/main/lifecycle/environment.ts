@@ -14,11 +14,13 @@ import { registerRendererProtocol, setDockIcon } from "../windows"
 const appNames: Record<string, string> = {
   dev: "OpenCode Dev",
   beta: "OpenCode Beta",
+  boc: "Boc Beta",
   prod: "OpenCode",
 }
 const appIDs: Record<string, string> = {
   dev: "ai.opencode.desktop.dev",
   beta: "ai.opencode.desktop.beta",
+  boc: "ai.boc.desktop.beta",
   prod: "ai.opencode.desktop",
 }
 const testOnboarding = process.env.OPENCODE_TEST_ONBOARDING === "1"

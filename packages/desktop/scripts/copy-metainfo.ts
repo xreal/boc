@@ -1,10 +1,12 @@
 import { resolveChannel } from "./utils"
 
 const arg = process.argv[2]
-const channel = arg === "dev" || arg === "beta" || arg === "prod" ? arg : resolveChannel()
+const channel = arg === "dev" || arg === "beta" || arg === "boc" || arg === "prod" ? arg : resolveChannel()
 
-const appId = channel === "prod" ? "ai.opencode.desktop" : `ai.opencode.desktop.${channel}`
-const productName = channel === "prod" ? "OpenCode" : `OpenCode ${channel.charAt(0).toUpperCase() + channel.slice(1)}`
+// Boc fork keeps its own application identity so it installs side-by-side
+// with upstream OpenCode Beta.
+const appId = channel === "boc" ? "ai.boc.desktop.beta" : channel === "prod" ? "ai.opencode.desktop" : `ai.opencode.desktop.${channel}`
+const productName = channel === "boc" ? "Boc Beta" : channel === "prod" ? "OpenCode" : `OpenCode ${channel.charAt(0).toUpperCase() + channel.slice(1)}`
 const summary = `Open source AI coding agent${channel !== "prod" ? ` (${channel})` : ""}`
 
 const xml = `<?xml version="1.0" encoding="UTF-8"?>
@@ -31,9 +33,9 @@ const xml = `<?xml version="1.0" encoding="UTF-8"?>
 
   <content_rating type="oars-1.1" />
 
-  <url type="bugtracker">https://github.com/anomalyco/opencode/issues</url>
+  <url type="bugtracker">${channel === "boc" ? "https://github.com/BergDevOrg/boc/issues" : "https://github.com/anomalyco/opencode/issues"}</url>
   <url type="homepage">https://opencode.ai</url>
-  <url type="vcs-browser">https://github.com/anomalyco/opencode</url>
+  <url type="vcs-browser">${channel === "boc" ? "https://github.com/BergDevOrg/boc" : "https://github.com/anomalyco/opencode"}</url>
 
   <screenshots>
     <screenshot type="default">
