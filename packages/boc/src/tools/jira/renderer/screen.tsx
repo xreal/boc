@@ -1,14 +1,36 @@
+import { Button } from "@opencode-ai/ui/button"
+import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { createResource, Show } from "solid-js"
 import type { BocScreenProps } from "../../../registry"
 import { useBocDesktop } from "../../../renderer/desktop"
 import { createBocTranslator } from "../../../renderer/i18n"
+import { JiraSettingsDialog } from "./settings"
+import { jiraStatusLabel } from "./status"
 
 export default function JiraScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
+  const t = createBocTranslator(props.host.locale)
+  const dialog = useDialog()
+  const [connection, { refetch }] = createResource(() => desktop?.jira.getConnectionStatus())
+
   if (!desktop) return null
 
-  const t = createBocTranslator(props.host.locale)
-  const [connection] = createResource(() => desktop.jira.getConnectionStatus())
+  const openSettings = () => {
+    void dialog.show(() => (
+      <JiraSettingsDialog
+        api={desktop.jira}
+        locale={props.host.locale}
+        openExternal={(url) => props.host.openExternal(url)}
+        onChanged={() => void refetch()}
+      />
+    ))
+  }
+
+  const statusLabel = () => {
+    const value = connection()
+    if (!value) return t("boc.jira.connection.loading")
+    return jiraStatusLabel(t, value)
+  }
 
   return (
     <main data-boc-screen="jira" class="flex min-h-0 flex-1 px-2 pb-2 pt-2 text-v2-text-text-base">
@@ -19,13 +41,16 @@ export default function JiraScreen(props: BocScreenProps) {
             {t("boc.jira.placeholder.description")}
           </p>
         </div>
-        <div class="mt-6 flex items-center gap-2 text-[13px] leading-[var(--line-height-compact)]">
+        <div class="mt-6 flex flex-wrap items-center gap-3 text-[13px] leading-[var(--line-height-compact)]">
           <span class="text-v2-text-text-muted">{t("boc.jira.connection.label")}</span>
           <span data-boc-connection-status class="font-medium">
-            <Show when={connection()} fallback={t("boc.jira.connection.loading")}>
-              {(connection) => (connection().status === "not-configured" ? t("boc.jira.connection.notConfigured") : "")}
+            <Show when={!connection.loading} fallback={t("boc.jira.connection.loading")}>
+              {statusLabel()}
             </Show>
           </span>
+          <Button type="button" variant="outline" size="small" onClick={openSettings}>
+            {t("boc.jira.connection.settings")}
+          </Button>
         </div>
       </section>
     </main>
