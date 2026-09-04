@@ -643,6 +643,8 @@ export const dict = {
   "home.empty.title": "No recent projects",
   "home.empty.description": "Get started by opening a local project",
   "home.title": "Home",
+  "boc.title": "Boc",
+  "boc.opened.description": "Boc fork extension point. This button and command are owned by the boc fork.",
   "home.projects": "Projects",
   "home.projects.all": "All projects",
   "home.project.add": "Add project",
@@ -815,6 +817,7 @@ export const dict = {
   "titlebar.channel.local": "Local",
   "titlebar.channel.dev": "Dev",
   "titlebar.channel.beta": "Beta",
+  "titlebar.channel.boc": "Boc",
   "titlebar.toggleDebugTools": "Toggle debug tools",
   "titlebar.updateVersion": "Update {{version}}",
 

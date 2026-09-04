@@ -15,6 +15,7 @@ import { useSettings } from "@/settings/model"
 import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
+import { BocNavButton } from "@/boc/boc"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { readSessionTabsRemovedDetail, SESSION_TABS_REMOVED_EVENT } from "@/shell/titlebar/session-events"
@@ -451,6 +452,9 @@ export function Titlebar(props: {
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
                 <Show when={!mobile() && !props.verticalTabs}>{homeButton()}</Show>
+                <Show when={!mobile() && !props.verticalTabs}>
+                  <BocNavButton orientation="horizontal" />
+                </Show>
 
                 <Show
                   when={!mobile()}
@@ -643,6 +647,7 @@ export function Titlebar(props: {
                             </Show>
                             <ChannelIndicator sidebar debugTools={props.debugTools} />
                             {homeButton(true)}
+                            <BocNavButton orientation="vertical" />
                             <button
                               type="button"
                               data-action="vertical-tabs-new-session"
