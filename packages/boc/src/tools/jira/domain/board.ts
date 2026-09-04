@@ -5,6 +5,8 @@ export { adfToMarkdown, adfToPlainText, safeHttpUrl } from "./adf"
 
 export const MAX_SAVED_JIRA_BOARDS = 10
 export const JIRA_UNASSIGNED = "__boc_unassigned__"
+export const JIRA_BOARD_LANES = ["stories", "critical", "support"] as const
+export type JiraBoardLane = (typeof JIRA_BOARD_LANES)[number]
 
 export const JiraBoardType = Schema.Literals(["scrum", "kanban"])
 export type JiraBoardType = typeof JiraBoardType.Type
@@ -101,6 +103,12 @@ export type JiraIssueFilters = {
 export type JiraColumnGroup = {
   column: JiraBoardColumn
   issues: JiraBoardIssue[]
+}
+
+export type JiraBoardLaneSummary = {
+  value: JiraBoardLane
+  count: number
+  newCount: number
 }
 
 export function mapJiraBoardSummary(raw: unknown): JiraBoardSummary | undefined {
@@ -303,6 +311,51 @@ export function filterIssues(issues: readonly JiraBoardIssue[], filters: JiraIss
     if (filters.priority && issue.priorityName !== filters.priority) return false
     return true
   })
+}
+
+export function isJiraBoardLane(value: string): value is JiraBoardLane {
+  return JIRA_BOARD_LANES.some((lane) => lane === value)
+}
+
+/** Split the board into label-driven lanes. Critical wins on overlap. */
+export function jiraIssueLane(issue: Pick<JiraBoardIssue, "labels">): JiraBoardLane {
+  const labels = new Set(issue.labels.map((label) => label.toLocaleLowerCase()))
+  if (labels.has("critical")) return "critical"
+  if (labels.has("pc_fastlane")) return "support"
+  return "stories"
+}
+
+export function filterIssuesByLane(issues: readonly JiraBoardIssue[], lane: JiraBoardLane) {
+  return issues.filter((issue) => jiraIssueLane(issue) === lane)
+}
+
+export function countNewLaneIssues(issues: readonly JiraBoardIssue[], lane: JiraBoardLane, since: number) {
+  return filterIssuesByLane(issues, lane).filter((issue) => {
+    if (!issue.createdAt) return false
+    const createdAt = Date.parse(issue.createdAt)
+    return !Number.isNaN(createdAt) && createdAt > since
+  }).length
+}
+
+export function parseLaneLastViewed(raw: unknown): Partial<Record<JiraBoardLane, number>> {
+  if (!raw || typeof raw !== "object") return {}
+  return Object.fromEntries(
+    Object.entries(raw).filter(
+      ([lane, value]) => isJiraBoardLane(lane) && typeof value === "number" && Number.isFinite(value),
+    ),
+  )
+}
+
+export function summarizeBoardLanes(
+  issues: readonly JiraBoardIssue[],
+  lastViewed: Partial<Record<JiraBoardLane, number>>,
+  firstOpenCutoff: number,
+): JiraBoardLaneSummary[] {
+  return JIRA_BOARD_LANES.map((lane) => ({
+    value: lane,
+    count: filterIssuesByLane(issues, lane).length,
+    newCount: countNewLaneIssues(issues, lane, lastViewed[lane] ?? firstOpenCutoff),
+  }))
 }
 
 export function uniqueIssueNames(

@@ -8,10 +8,12 @@ import { useBocDesktop } from "../../../renderer/desktop"
 import { createBocTranslator } from "../../../renderer/i18n"
 import {
   filterIssues,
+  filterIssuesByLane,
   groupIssuesByColumn,
   resolveSetupBoardId,
   resolveSprintId,
   type JiraBoardIssue,
+  type JiraBoardLane,
   type JiraBoardSummary,
   type JiraBoardView,
   type JiraIssueDetail,
@@ -20,6 +22,7 @@ import {
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
 import { JiraBoardColumns } from "./columns"
 import { JiraIssueInspector } from "./inspector"
+import { createJiraBoardLanes } from "./lanes"
 import { createLatestRequest, type LatestRequest } from "./latest-request"
 import { JiraPickBoardDialog } from "./pick-board"
 import { JiraSettingsDialog } from "./settings"
@@ -47,6 +50,7 @@ export default function JiraScreen(props: BocScreenProps) {
     board: undefined as JiraBoardView | undefined,
     sprintId: undefined as number | undefined,
     issues: [] as readonly JiraBoardIssue[],
+    lane: "stories" as JiraBoardLane,
     search: "",
     assignee: undefined as string | undefined,
     issueType: undefined as string | undefined,
@@ -61,12 +65,16 @@ export default function JiraScreen(props: BocScreenProps) {
   if (!desktop) return null
 
   const filtered = () =>
-    filterIssues(view.issues, {
-      search: view.search,
-      assignee: view.assignee,
-      issueType: view.issueType,
-      priority: view.priority,
-    })
+    filterIssuesByLane(
+      filterIssues(view.issues, {
+        search: view.search,
+        assignee: view.assignee,
+        issueType: view.issueType,
+        priority: view.priority,
+      }),
+      view.lane,
+    )
+  const hasIssueFilters = () => Boolean(view.search || view.assignee || view.issueType || view.priority)
   const groups = () => groupIssuesByColumn(view.board?.columns ?? [], filtered())
   const selectedBoard = () =>
     view.boards.find((board) => board.id === view.selectedBoardId) ??
@@ -83,7 +91,16 @@ export default function JiraScreen(props: BocScreenProps) {
       board: view.board,
       issues: view.issues,
       filtered: filtered(),
+      hasIssueFilters: hasIssueFilters(),
     })
+
+  const lanes = createJiraBoardLanes({
+    issues: () => view.issues,
+    site: () => (view.connection?.status === "connected" ? view.connection.site : undefined),
+    boardId: () => view.selectedBoardId,
+    lane: () => view.lane,
+    ready: () => view.loading === false && view.board !== undefined && view.failure === undefined,
+  })
 
   const boardRequests = createLatestRequest({
     prefix: "board",
@@ -310,10 +327,13 @@ export default function JiraScreen(props: BocScreenProps) {
           sprintId={view.sprintId}
           issues={view.issues}
           filtered={filtered()}
+          lanes={lanes()}
+          lane={view.lane}
           search={view.search}
           assignee={view.assignee}
           issueType={view.issueType}
           priority={view.priority}
+          onSelectLane={(lane) => setView("lane", lane)}
           onSelectSprint={(sprintId) => {
             if (view.selectedBoardId === undefined) return
             void loadIssues(view.selectedBoardId, sprintId)

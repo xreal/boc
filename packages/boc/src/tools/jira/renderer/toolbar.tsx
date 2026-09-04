@@ -6,9 +6,16 @@ import { Select } from "@opencode-ai/ui/select"
 import { TextInput } from "@opencode-ai/ui/text-input"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
 import { createMemo, For, Show } from "solid-js"
-import type { BocTranslator } from "../../../renderer/i18n"
+import type { BocI18nKey, BocTranslator } from "../../../renderer/i18n"
 import { JIRA_UNASSIGNED, MAX_SAVED_JIRA_BOARDS, uniqueIssueNames } from "../domain/board"
-import type { JiraBoardIssue, JiraBoardSummary, JiraBoardView, JiraPreferences } from "../domain/board"
+import type {
+  JiraBoardIssue,
+  JiraBoardLane,
+  JiraBoardLaneSummary,
+  JiraBoardSummary,
+  JiraBoardView,
+  JiraPreferences,
+} from "../domain/board"
 import type { JiraConnectionStatus } from "../rpcs"
 import { jiraStatusLabel } from "./status"
 
@@ -114,10 +121,13 @@ export function JiraBoardToolbar(props: {
   sprintId?: number
   issues: readonly JiraBoardIssue[]
   filtered: readonly JiraBoardIssue[]
+  lanes: readonly JiraBoardLaneSummary[]
+  lane: JiraBoardLane
   search: string
   assignee?: string
   issueType?: string
   priority?: string
+  onSelectLane: (lane: JiraBoardLane) => void
   onSelectSprint: (sprintId: number) => void
   onSearch: (value: string) => void
   onFilter: (field: "assignee" | "issueType" | "priority", value?: string) => void
@@ -141,6 +151,8 @@ export function JiraBoardToolbar(props: {
         onClearClick={() => props.onSearch("")}
         onInput={(event) => props.onSearch(event.currentTarget.value)}
       />
+
+      <LaneSelector t={props.t} lanes={props.lanes} value={props.lane} onChange={props.onSelectLane} />
 
       <Show when={props.board?.type === "scrum" && props.board.sprints.length > 0}>
         <Select
@@ -193,9 +205,77 @@ export function JiraBoardToolbar(props: {
                 count: props.filtered.length,
                 total: props.issues.length,
               })
-            : props.t("boc.jira.board.issueCount", { count: props.issues.length })}
+            : props.t("boc.jira.board.issueCount", { count: props.filtered.length })}
         </span>
       </Show>
+    </div>
+  )
+}
+
+const LANE_SHORT: Record<JiraBoardLane, BocI18nKey> = {
+  stories: "boc.jira.board.lanes.stories",
+  critical: "boc.jira.board.lanes.critical",
+  support: "boc.jira.board.lanes.support",
+}
+
+const LANE_FULL: Record<JiraBoardLane, BocI18nKey> = {
+  stories: "boc.jira.board.lanes.stories.full",
+  critical: "boc.jira.board.lanes.critical.full",
+  support: "boc.jira.board.lanes.support.full",
+}
+
+function LaneSelector(props: {
+  t: BocTranslator
+  lanes: readonly JiraBoardLaneSummary[]
+  value: JiraBoardLane
+  onChange: (lane: JiraBoardLane) => void
+}) {
+  return (
+    <div
+      data-boc-board-lanes
+      role="group"
+      aria-label={props.t("boc.jira.board.lanes.label")}
+      class="flex min-w-0 items-center gap-0.5 rounded-md bg-v2-background-bg-layer-01 p-0.5 shadow-[0_0_0_0.5px_var(--v2-border-border-base)]"
+    >
+      <For each={props.lanes}>
+        {(lane) => (
+          <button
+            type="button"
+            title={props.t(LANE_FULL[lane.value])}
+            aria-pressed={lane.value === props.value}
+            aria-label={
+              lane.newCount > 0
+                ? props.t("boc.jira.board.lanes.item.new", {
+                    lane: props.t(LANE_FULL[lane.value]),
+                    count: lane.count,
+                    newCount: lane.newCount,
+                  })
+                : props.t("boc.jira.board.lanes.item", {
+                    lane: props.t(LANE_FULL[lane.value]),
+                    count: lane.count,
+                  })
+            }
+            class="flex min-w-0 items-center gap-1 rounded-[5px] px-2 py-0.5 text-[12px] leading-[var(--line-height-compact)] outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
+            classList={{
+              "bg-v2-background-bg-base text-v2-text-text-base shadow-[0_0_0_0.5px_var(--v2-border-border-strong)]":
+                lane.value === props.value,
+              "text-v2-text-text-muted hover:bg-v2-overlay-simple-overlay-hover": lane.value !== props.value,
+            }}
+            onClick={() => {
+              if (lane.value === props.value) return
+              props.onChange(lane.value)
+            }}
+          >
+            <span>{props.t(LANE_SHORT[lane.value])}</span>
+            <span class="tabular-nums text-v2-text-text-faint">{lane.count}</span>
+            <Show when={lane.newCount > 0}>
+              <span class="rounded-full bg-v2-icon-icon-accent/15 px-1.5 text-[10px] font-medium text-v2-icon-icon-accent">
+                {props.t("boc.jira.board.lanes.new", { count: lane.newCount })}
+              </span>
+            </Show>
+          </button>
+        )}
+      </For>
     </div>
   )
 }

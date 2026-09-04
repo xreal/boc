@@ -18,6 +18,10 @@ import {
   selectableSprints,
   sortSprints,
   uniqueIssueNames,
+  countNewLaneIssues,
+  filterIssuesByLane,
+  parseLaneLastViewed,
+  summarizeBoardLanes,
   jiraIssueIsSubtask,
   jiraAssetUrl,
   storyPointFieldIds,
@@ -178,6 +182,39 @@ describe("filterIssues", () => {
     ).toEqual([issues[0]])
     expect(filterIssues(issues, { assignee: JIRA_UNASSIGNED })).toEqual([issues[1]])
     expect(uniqueIssueNames(issues, "assigneeName")).toEqual(["Ada Lovelace"])
+  })
+})
+
+describe("Jira board lanes", () => {
+  const createdAt = "2026-08-31T08:00:00.000Z"
+  const stories = { ...issue("1", "1"), labels: ["frontend"], createdAt }
+  const critical = { ...issue("2", "1"), labels: ["Critical"], createdAt }
+  const support = { ...issue("3", "1"), labels: ["PC_fastlane"], createdAt }
+  const criticalSupport = {
+    ...issue("4", "1"),
+    labels: ["PC_fastlane", "critical"],
+    createdAt,
+  }
+  const issues = [stories, critical, support, criticalSupport]
+
+  test("partitions issues by label and gives Critical precedence", () => {
+    expect(filterIssuesByLane(issues, "stories")).toEqual([stories])
+    expect(filterIssuesByLane(issues, "critical")).toEqual([critical, criticalSupport])
+    expect(filterIssuesByLane(issues, "support")).toEqual([support])
+  })
+
+  test("counts tickets created after the lane was last viewed", () => {
+    expect(countNewLaneIssues(issues, "critical", Date.parse(createdAt) - 1)).toBe(2)
+    expect(countNewLaneIssues(issues, "critical", Date.parse(createdAt))).toBe(0)
+  })
+
+  test("ignores unknown last-viewed keys and summarizes each lane", () => {
+    expect(parseLaneLastViewed({ stories: 10, extra: 1, critical: "nope" })).toEqual({ stories: 10 })
+    expect(summarizeBoardLanes(issues, { critical: Date.parse(createdAt) }, Date.parse(createdAt) - 1)).toEqual([
+      { value: "stories", count: 1, newCount: 1 },
+      { value: "critical", count: 2, newCount: 0 },
+      { value: "support", count: 1, newCount: 1 },
+    ])
   })
 })
 

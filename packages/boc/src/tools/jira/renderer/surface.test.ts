@@ -99,6 +99,18 @@ describe("jiraBoardSurface", () => {
         issues: [{ id: "1", key: "PLAT-1", summary: "A", labels: [], url: "https://acme.atlassian.net/browse/PLAT-1" }],
         filtered: [],
       }),
+    ).toBe("board")
+    expect(
+      jiraBoardSurface({
+        online: true,
+        loading: false,
+        connection: connected,
+        boards: [{ id: 84 }],
+        board,
+        issues: [{ id: "1", key: "PLAT-1", summary: "A", labels: [], url: "https://acme.atlassian.net/browse/PLAT-1" }],
+        filtered: [],
+        hasIssueFilters: true,
+      }),
     ).toBe("no-matches")
     expect(
       jiraBoardSurface({
