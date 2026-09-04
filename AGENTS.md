@@ -16,6 +16,7 @@
 ## Private iteration workflow
 - Until the repository owner explicitly changes this policy, work directly on `boc-beta`. Make small, logical conventional commits and push them to `origin/boc-beta`; do not open a pull request unless explicitly requested. Never push to `upstream` and do not force-push `boc-beta`.
 - Files under `tmp/` are local working documents. Update them when a task requires it, but never force-add or commit ignored `tmp/` files.
+- Never include personal names, email addresses, or user-specific absolute paths in repository files, plans, handovers, or prompts. Use role-based wording and repository-relative paths.
 - When the fork opens to other contributors, replace this policy with branch protection, required checks, and pull-request review before merging.
 
 ---
