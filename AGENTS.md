@@ -13,6 +13,11 @@
 ## Importand Rules:
 - Write code for expression, not just correctness: make variable names, method names, conditions, abstractions, and composition communicate intent clearly and naturally. Prefer simple, deliberate, Taylor Otwell or DHH style code that reads almost like prose, keeps control flow shallow, gives important concepts good names, removes unnecessary ceremony, and feels thoughtfully designed rather than merely working—without introducing speculative abstractions or architecture.
 
+## Private iteration workflow
+- Until the repository owner explicitly changes this policy, work directly on `boc-beta`. Make small, logical conventional commits and push them to `origin/boc-beta`; do not open a pull request unless explicitly requested. Never push to `upstream` and do not force-push `boc-beta`.
+- Files under `tmp/` are local working documents. Update them when a task requires it, but never force-add or commit ignored `tmp/` files.
+- When the fork opens to other contributors, replace this policy with branch protection, required checks, and pull-request review before merging.
+
 ---
 <!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->
 ---
