@@ -11,6 +11,7 @@ describe("deployment fleet surface", () => {
   test("prioritizes unsupported, loading, and initial errors before data states", () => {
     const input = {
       supported: true,
+      ready: true,
       loading: false,
       failed: false,
       systems: deploymentSystemFixtures,
@@ -20,6 +21,7 @@ describe("deployment fleet surface", () => {
 
     expect(deploymentSurface({ ...input, supported: false })).toBe("unsupported")
     expect(deploymentSurface({ ...input, loading: true })).toBe("loading")
+    expect(deploymentSurface({ ...input, ready: false, systems: [], filtered: [] })).toBe("readiness")
     expect(deploymentSurface({ ...input, failed: true, systems: [], filtered: [] })).toBe("error")
     expect(deploymentSurface({ ...input, systems: [], filtered: [] })).toBe("empty")
     expect(deploymentSurface({ ...input, filtered: [], narrowed: true })).toBe("filtered-empty")

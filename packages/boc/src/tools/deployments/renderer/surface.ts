@@ -16,6 +16,7 @@ export function deploymentFixtureMode(search: string): DeploymentFixtureMode {
 
 export function deploymentSurface(input: {
   supported: boolean
+  ready?: boolean
   loading: boolean
   failed: boolean
   systems: readonly DeploymentSystem[]
@@ -24,6 +25,7 @@ export function deploymentSurface(input: {
 }) {
   if (!input.supported) return "unsupported" as const
   if (input.loading) return "loading" as const
+  if (input.ready === false && input.systems.length === 0) return "readiness" as const
   if (input.failed && input.systems.length === 0) return "error" as const
   if (input.systems.length === 0) return "empty" as const
   if (input.filtered.length === 0 && input.narrowed) return "filtered-empty" as const

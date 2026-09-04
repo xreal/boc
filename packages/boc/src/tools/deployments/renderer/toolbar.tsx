@@ -12,6 +12,10 @@ export function DeploymentsToolbar(props: {
   availability: DeploymentAvailabilityFilter
   onSearch: (search: string) => void
   onAvailability: (availability: DeploymentAvailabilityFilter) => void
+  refreshing: boolean
+  live: boolean
+  onRefresh: () => void
+  onOpenSettings: () => void
 }) {
   return (
     <div
@@ -48,23 +52,31 @@ export function DeploymentsToolbar(props: {
       </SegmentedControl>
 
       <div class="ml-auto flex items-center gap-1">
-        <Tooltip value={props.t("boc.deployments.action.unavailable")} placement="bottom">
+        <Tooltip
+          value={props.t(props.live ? "boc.deployments.toolbar.refresh" : "boc.deployments.action.unavailable")}
+          placement="bottom"
+        >
           <IconButton
             type="button"
             variant="ghost-muted"
             size="small"
             aria-label={props.t("boc.deployments.toolbar.refresh")}
-            disabled
-            icon={<Icon name="reset" />}
+            disabled={!props.live || props.refreshing}
+            onClick={props.onRefresh}
+            icon={<Icon name="reset" classList={{ "animate-spin motion-reduce:animate-none": props.refreshing }} />}
           />
         </Tooltip>
-        <Tooltip value={props.t("boc.deployments.action.unavailable")} placement="bottom">
+        <Tooltip
+          value={props.t(props.live ? "boc.deployments.toolbar.settings" : "boc.deployments.action.unavailable")}
+          placement="bottom"
+        >
           <IconButton
             type="button"
             variant="ghost-muted"
             size="small"
             aria-label={props.t("boc.deployments.toolbar.settings")}
-            disabled
+            disabled={!props.live}
+            onClick={props.onOpenSettings}
             icon={<Icon name="settings-gear" />}
           />
         </Tooltip>
