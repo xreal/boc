@@ -3,6 +3,7 @@ import { failJira, jiraErrorFromHttpStatus, readRetryAfterSeconds, type JiraClie
 import { isAllowedJiraCloudUrl, type JiraCloudOrigin } from "../domain/site"
 
 export type JiraFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
+export type JiraWait = (milliseconds: number, signal?: AbortSignal) => Promise<void>
 
 export type JiraUser = {
   accountId: string
@@ -12,6 +13,9 @@ export type JiraUser = {
 
 export type JiraMyselfResult = { ok: true; user: JiraUser } | JiraClientFailure
 export type JiraTextResult = { ok: true; text: string } | JiraClientFailure
+
+const MAX_SAFE_READ_RETRIES = 2
+const MAX_RETRY_AFTER_SECONDS = 30
 
 const JiraMyself = Schema.Struct({
   accountId: Schema.String,
@@ -26,10 +30,13 @@ export async function fetchJiraMyself(input: {
   email: string
   token: string
   fetch: JiraFetch
+  signal?: AbortSignal
+  wait?: JiraWait
 }): Promise<JiraMyselfResult> {
   const result = await jiraRequest({
     ...input,
     path: "/rest/api/3/myself",
+    retry: "safe-read",
   })
   if (!result.ok) return result
 
@@ -47,6 +54,9 @@ export async function jiraRequest(input: {
   method?: "GET" | "POST"
   query?: Record<string, string | number | undefined>
   body?: unknown
+  retry?: "safe-read"
+  signal?: AbortSignal
+  wait?: JiraWait
 }): Promise<JiraTextResult> {
   const request = jiraUrl(input.origin, input.path, input.query)
   if (!request || !isAllowedJiraCloudUrl(input.origin, request)) return failJira("invalid-site")
@@ -57,19 +67,35 @@ export async function jiraRequest(input: {
   }
   if (input.body !== undefined) headers["Content-Type"] = "application/json"
 
-  const response = await input
-    .fetch(request, {
-      method: input.method ?? "GET",
-      headers,
-      redirect: "error",
-      ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
-    })
-    .then(
-      (value) => value,
-      () => undefined,
+  for (let attempt = 0; attempt <= MAX_SAFE_READ_RETRIES; attempt++) {
+    if (input.signal?.aborted) return failJira("network")
+    const response = await input
+      .fetch(request, {
+        method: input.method ?? "GET",
+        headers,
+        redirect: "error",
+        signal: input.signal,
+        ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
+      })
+      .then(
+        (value) => value,
+        () => undefined,
+      )
+    if (!response) return failJira("network")
+
+    const result = await readJiraResponse(response)
+    if (result.ok || result.category !== "rate-limit") return result
+    if (input.retry !== "safe-read" || attempt === MAX_SAFE_READ_RETRIES) return result
+    if (result.retryAfterSeconds === undefined || result.retryAfterSeconds > MAX_RETRY_AFTER_SECONDS) return result
+
+    const waited = await (input.wait ?? waitForRetry)(result.retryAfterSeconds * 1000, input.signal).then(
+      () => true,
+      () => false,
     )
-  if (!response) return failJira("network")
-  return readJiraResponse(response)
+    if (!waited || input.signal?.aborted) return failJira("network")
+  }
+
+  return failJira("network")
 }
 
 export const decodeUnknownJson = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Unknown))
@@ -95,4 +121,20 @@ function jiraUrl(origin: JiraCloudOrigin, path: string, query?: Record<string, s
     url.searchParams.set(key, String(value))
   }
   return url
+}
+
+function waitForRetry(milliseconds: number, signal?: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal?.aborted) return reject(signal.reason)
+    const finish = () => {
+      signal?.removeEventListener("abort", abort)
+      resolve()
+    }
+    const abort = () => {
+      clearTimeout(timer)
+      reject(signal?.reason)
+    }
+    const timer = setTimeout(finish, milliseconds)
+    signal?.addEventListener("abort", abort, { once: true })
+  })
 }

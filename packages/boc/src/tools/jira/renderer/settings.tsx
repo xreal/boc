@@ -19,12 +19,12 @@ export function JiraSettingsDialog(props: {
   onChanged?: () => void
 }) {
   const t = createBocTranslator(props.locale)
+  let tokenInput: HTMLInputElement | undefined
   const [connection, { refetch }] = createResource(() => props.api.getConnectionStatus())
   const [preferences, { refetch: refetchPreferences }] = createResource(() => props.api.getPreferences())
   const [form, setForm] = createStore({
     site: "",
     email: "",
-    token: "",
     hydrated: false,
     busy: false as JiraConnectionBusy,
     savingPreferences: false,
@@ -60,7 +60,7 @@ export function JiraSettingsDialog(props: {
       setForm("site", result.site)
       setForm("email", result.email)
       if (action !== "save") return
-      setForm("token", "")
+      if (tokenInput) tokenInput.value = ""
       setForm("notice", "saved")
       void refetch()
       void refetchPreferences()
@@ -70,7 +70,6 @@ export function JiraSettingsDialog(props: {
     setForm({
       site: "",
       email: "",
-      token: "",
       notice: "disconnected",
       hydrated: true,
     })
@@ -116,6 +115,8 @@ export function JiraSettingsDialog(props: {
         <p
           data-boc-connection-message
           data-kind={messageKind()}
+          role="status"
+          aria-live="polite"
           class="text-[13px] leading-[var(--line-height-compact)]"
           classList={{
             "text-v2-text-text-muted": messageKind() === "muted",
@@ -129,6 +130,7 @@ export function JiraSettingsDialog(props: {
         <Show when={!encryptionAvailable()}>
           <p
             data-boc-encryption-warning
+            role="status"
             class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-warning"
           >
             {t("boc.jira.connection.encryption.warning")}
@@ -168,17 +170,16 @@ export function JiraSettingsDialog(props: {
             class="!w-full"
             name="jira-token"
             type="password"
-            autocomplete="off"
+            autocomplete="new-password"
             spellcheck={false}
             placeholder={t("boc.jira.connection.token.placeholder")}
-            value={form.token}
+            ref={(element) => (tokenInput = element)}
             disabled={busy()}
-            onInput={(event) => setForm("token", event.currentTarget.value)}
           />
           <Field.Prefix>
             <button
               type="button"
-              class="text-left text-v2-text-text-muted underline-offset-2 hover:text-v2-text-text-base hover:underline"
+              class="rounded-sm text-left text-v2-text-text-muted underline-offset-2 outline-none hover:text-v2-text-text-base hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
               onClick={() => props.openExternal(TOKEN_SETTINGS_URL)}
             >
               {t("boc.jira.connection.token.helpLink")}
@@ -187,7 +188,11 @@ export function JiraSettingsDialog(props: {
           </Field.Prefix>
         </Field>
         <Show when={configured()}>
-          <div data-boc-saved-boards class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
+          <div
+            data-boc-saved-boards
+            aria-busy={form.savingPreferences}
+            class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4"
+          >
             <h2 class="text-[13px] font-medium leading-[var(--line-height-compact)]">
               {t("boc.jira.board.savedBoards.title")}
             </h2>
@@ -218,6 +223,7 @@ export function JiraSettingsDialog(props: {
                             variant="ghost"
                             size="small"
                             disabled={busy()}
+                            aria-label={t("boc.jira.board.savedBoards.setDefaultLabel", { board: board.name })}
                             onClick={() => void savePreferences(preferences()?.savedBoards ?? [], board.id)}
                           >
                             {t("boc.jira.board.savedBoards.setDefault")}
@@ -231,6 +237,7 @@ export function JiraSettingsDialog(props: {
                         variant="ghost"
                         size="small"
                         disabled={busy()}
+                        aria-label={t("boc.jira.board.savedBoards.removeLabel", { board: board.name })}
                         onClick={() =>
                           void savePreferences(
                             (preferences()?.savedBoards ?? []).filter((entry) => entry.id !== board.id),
@@ -264,7 +271,9 @@ export function JiraSettingsDialog(props: {
           variant="outline"
           disabled={busy()}
           onClick={() =>
-            void run("test", () => props.api.testConnection({ site: form.site, email: form.email, token: form.token }))
+            void run("test", () =>
+              props.api.testConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
+            )
           }
         >
           {t("boc.jira.connection.test")}
@@ -274,7 +283,9 @@ export function JiraSettingsDialog(props: {
           variant="neutral"
           disabled={busy() || !encryptionAvailable()}
           onClick={() =>
-            void run("save", () => props.api.saveConnection({ site: form.site, email: form.email, token: form.token }))
+            void run("save", () =>
+              props.api.saveConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
+            )
           }
         >
           {t("boc.jira.connection.save")}

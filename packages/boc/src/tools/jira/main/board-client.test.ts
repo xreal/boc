@@ -21,7 +21,7 @@ import {
 const origin = parseJiraCloudSite("acme")!
 
 function auth(fetch: ReturnType<typeof fetchScript>) {
-  return { origin, email: EMAIL_FIXTURE, token: TOKEN_FIXTURE, fetch }
+  return { origin, email: EMAIL_FIXTURE, token: TOKEN_FIXTURE, fetch, wait: async () => undefined }
 }
 
 function boardCloudFetch() {

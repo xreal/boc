@@ -84,18 +84,28 @@ export type JiraConnectionFailure = typeof JiraConnectionFailure.Type
 export const JiraConnectionAttempt = Schema.Union([JiraConnectionSuccess, JiraConnectionFailure])
 export type JiraConnectionAttempt = typeof JiraConnectionAttempt.Type
 
+const JiraReadRequestId = Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(128))
+
 export const JiraBoardIdInput = Schema.Struct({
+  requestId: JiraReadRequestId,
   boardId: Schema.Number,
 })
 export type JiraBoardIdInput = typeof JiraBoardIdInput.Type
 
+export const JiraBoardReadInput = Schema.Struct({
+  requestId: JiraReadRequestId,
+})
+export type JiraBoardReadInput = typeof JiraBoardReadInput.Type
+
 export const JiraBoardIssuesInput = Schema.Struct({
+  requestId: JiraReadRequestId,
   boardId: Schema.Number,
   sprintId: Schema.optionalKey(Schema.Number),
 })
 export type JiraBoardIssuesInput = typeof JiraBoardIssuesInput.Type
 
 export const JiraIssueKeyInput = Schema.Struct({
+  requestId: JiraReadRequestId,
   issueKey: Schema.String,
 })
 export type JiraIssueKeyInput = typeof JiraIssueKeyInput.Type
@@ -155,6 +165,7 @@ export const BocJiraDisconnect = Rpc.make("BocJiraDisconnect", {
 })
 
 export const BocJiraListBoards = Rpc.make("BocJiraListBoards", {
+  payload: JiraBoardReadInput,
   success: JiraBoardsResult,
 })
 
@@ -171,6 +182,16 @@ export const BocJiraListIssues = Rpc.make("BocJiraListIssues", {
 export const BocJiraGetIssue = Rpc.make("BocJiraGetIssue", {
   payload: JiraIssueKeyInput,
   success: JiraIssueResult,
+})
+
+export const BocJiraCancelBoardRead = Rpc.make("BocJiraCancelBoardRead", {
+  payload: JiraBoardReadInput,
+  success: Schema.Void,
+})
+
+export const BocJiraCancelIssueRead = Rpc.make("BocJiraCancelIssueRead", {
+  payload: JiraBoardReadInput,
+  success: Schema.Void,
 })
 
 export const BocJiraGetPreferences = Rpc.make("BocJiraGetPreferences", {
@@ -191,6 +212,8 @@ export const JiraRpcs = RpcGroup.make(
   BocJiraGetBoard,
   BocJiraListIssues,
   BocJiraGetIssue,
+  BocJiraCancelBoardRead,
+  BocJiraCancelIssueRead,
   BocJiraGetPreferences,
   BocJiraSavePreferences,
 )

@@ -39,7 +39,13 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
   const called: string[] = []
   const invoke = (async (tag: string) => {
     called.push(tag)
-    if (tag === "BocJiraGetConnectionStatus" || tag === "BocJiraDisconnect") {
+    if (
+      tag === "BocJiraGetConnectionStatus" ||
+      tag === "BocJiraDisconnect" ||
+      tag === "BocJiraCancelBoardRead" ||
+      tag === "BocJiraCancelIssueRead"
+    ) {
+      if (tag.startsWith("BocJiraCancel")) return undefined
       return Schema.decodeUnknownSync(
         Schema.Struct({
           status: Schema.Literal("not-configured"),
@@ -126,10 +132,21 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     status: "not-configured",
     encryptionAvailable: true,
   })
-  await expect(api.jira.listBoards()).resolves.toEqual({ ok: true, boards: [] })
-  await expect(api.jira.getBoard({ boardId: 1 })).resolves.toEqual({ ok: false, category: "auth" })
-  await expect(api.jira.listIssues({ boardId: 1 })).resolves.toEqual({ ok: false, category: "auth" })
-  await expect(api.jira.getIssue({ issueKey: "PLAT-1" })).resolves.toEqual({ ok: false, category: "auth" })
+  await expect(api.jira.listBoards({ requestId: "boards" })).resolves.toEqual({ ok: true, boards: [] })
+  await expect(api.jira.getBoard({ requestId: "board", boardId: 1 })).resolves.toEqual({
+    ok: false,
+    category: "auth",
+  })
+  await expect(api.jira.listIssues({ requestId: "issues", boardId: 1 })).resolves.toEqual({
+    ok: false,
+    category: "auth",
+  })
+  await expect(api.jira.getIssue({ requestId: "issue", issueKey: "PLAT-1" })).resolves.toEqual({
+    ok: false,
+    category: "auth",
+  })
+  await expect(api.jira.cancelBoardRead({ requestId: "board" })).resolves.toBeUndefined()
+  await expect(api.jira.cancelIssueRead({ requestId: "issue" })).resolves.toBeUndefined()
   await expect(api.jira.getPreferences()).resolves.toEqual({ savedBoards: [] })
   await expect(api.jira.savePreferences({ savedBoards: [] })).resolves.toEqual({ savedBoards: [] })
   expect(called).toEqual([
@@ -141,6 +158,8 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     "BocJiraGetBoard",
     "BocJiraListIssues",
     "BocJiraGetIssue",
+    "BocJiraCancelBoardRead",
+    "BocJiraCancelIssueRead",
     "BocJiraGetPreferences",
     "BocJiraSavePreferences",
   ])

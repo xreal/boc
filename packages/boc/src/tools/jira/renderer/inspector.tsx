@@ -2,7 +2,7 @@ import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { IconButton } from "@opencode-ai/ui/icon-button"
 import { Loader } from "@opencode-ai/ui/loader"
-import { Show } from "solid-js"
+import { createEffect, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail } from "../domain/board"
 import type { JiraConnectionFailure } from "../rpcs"
@@ -10,6 +10,7 @@ import { jiraConnectionErrorKey } from "./status"
 
 export function JiraIssueInspector(props: {
   t: BocTranslator
+  issueKey: string
   issue?: JiraIssueDetail
   loading: boolean
   overlay: boolean
@@ -17,11 +18,21 @@ export function JiraIssueInspector(props: {
   onClose: () => void
   onOpenExternal: (url: string) => void
 }) {
+  let inspector: HTMLElement | undefined
+  createEffect(() => {
+    props.issueKey
+    queueMicrotask(() => inspector?.focus())
+  })
+
   return (
     <aside
+      ref={(element) => (inspector = element)}
+      id="boc-jira-issue-inspector"
       data-boc-issue-inspector
-      aria-label={props.issue?.key ?? props.t("boc.jira.board.loading")}
-      class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-v2-border-border-muted bg-v2-background-bg-base"
+      role={props.overlay ? "dialog" : "complementary"}
+      aria-labelledby="boc-jira-issue-inspector-title"
+      tabIndex={-1}
+      class="flex min-h-0 flex-col overflow-hidden rounded-lg border border-v2-border-border-muted bg-v2-background-bg-base outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
       classList={{
         "absolute inset-y-2 right-2 z-10 w-[min(22rem,calc(100%-1rem))] shadow-[var(--v2-elevation-floating)]":
           props.overlay,
@@ -33,7 +44,10 @@ export function JiraIssueInspector(props: {
           <Show
             when={props.issue}
             fallback={
-              <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+              <p
+                id="boc-jira-issue-inspector-title"
+                class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted"
+              >
                 {props.t("boc.jira.board.loading")}
               </p>
             }
@@ -43,7 +57,10 @@ export function JiraIssueInspector(props: {
                 <p class="text-[13px] font-medium leading-[var(--line-height-compact)] text-v2-text-text-muted">
                   {issue().key}
                 </p>
-                <h2 class="text-[16px] font-medium leading-[var(--line-height-base)] text-v2-text-text-base">
+                <h2
+                  id="boc-jira-issue-inspector-title"
+                  class="text-[16px] font-medium leading-[var(--line-height-base)] text-v2-text-text-base"
+                >
                   {issue().summary}
                 </h2>
               </>
@@ -60,7 +77,7 @@ export function JiraIssueInspector(props: {
       </div>
       <div class="min-h-0 flex-1 overflow-y-auto px-3 py-3 text-[13px] leading-[var(--line-height-compact)]">
         <Show when={props.loading}>
-          <div class="flex justify-center py-6">
+          <div role="status" aria-live="polite" class="flex justify-center py-6">
             <Loader />
           </div>
         </Show>

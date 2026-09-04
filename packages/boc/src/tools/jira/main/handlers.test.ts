@@ -31,6 +31,7 @@ function runtime(overrides?: Partial<JiraRuntime> & { encryptionAvailable?: bool
     store: overrides?.store ?? memoryJiraStore(),
     vault: overrides?.vault ?? memoryVault(overrides?.encryptionAvailable ?? true),
     fetch: overrides?.fetch ?? fetchScript(() => myselfSuccessResponse()),
+    wait: overrides?.wait ?? (async () => undefined),
   }
 }
 
@@ -257,9 +258,9 @@ describe("Jira board handlers", () => {
       jira,
       Effect.gen(function* () {
         const client = yield* RpcTest.makeClient(JiraRpcs)
-        const boards = yield* client.BocJiraListBoards()
-        const board = yield* client.BocJiraGetBoard({ boardId: 84 })
-        const issues = yield* client.BocJiraListIssues({ boardId: 84, sprintId: 37 })
+        const boards = yield* client.BocJiraListBoards({ requestId: "boards" })
+        const board = yield* client.BocJiraGetBoard({ requestId: "board", boardId: 84 })
+        const issues = yield* client.BocJiraListIssues({ requestId: "issues", boardId: 84, sprintId: 37 })
         return { boards, board, issues }
       }),
     )
@@ -280,7 +281,7 @@ describe("Jira board handlers", () => {
       runtime(),
       Effect.gen(function* () {
         const client = yield* RpcTest.makeClient(JiraRpcs)
-        return yield* client.BocJiraListBoards()
+        return yield* client.BocJiraListBoards({ requestId: "boards" })
       }),
     )
     expect(result).toEqual({ ok: false, category: "auth" })

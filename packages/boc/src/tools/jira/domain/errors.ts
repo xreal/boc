@@ -44,9 +44,9 @@ export function failJira(category: JiraErrorCategory, retryAfterSeconds?: number
 export function redactSecrets(text: string, secrets: readonly string[]) {
   const unique = [...new Set(secrets.filter((secret) => secret.length > 0))]
   const patterns = [
-    /Authorization:\s*Basic\s+\S+/gi,
-    /Authorization:\s*Bearer\s+\S+/gi,
+    /(["']?Authorization["']?\s*[:=]\s*["']?)(?:Basic|Bearer)\s+[^"',\s}]+/gi,
     /Basic\s+[A-Za-z0-9+/=]+/g,
+    /(["']?(?:api[_-]?token|token|tokenCiphertext)["']?\s*[:=]\s*["']?)[^"',\s}]+/gi,
     ...unique.map((secret) => new RegExp(escapeRegExp(secret), "g")),
   ]
   return patterns.reduce((body, pattern) => body.replace(pattern, REDACTED), text)

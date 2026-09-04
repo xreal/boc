@@ -20,10 +20,14 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
       saveConnection: (input: BocDesktopInvokeArgs<"BocJiraSaveConnection">[0]) =>
         invoke("BocJiraSaveConnection", input),
       disconnect: () => invoke("BocJiraDisconnect"),
-      listBoards: () => invoke("BocJiraListBoards"),
+      listBoards: (input: BocDesktopInvokeArgs<"BocJiraListBoards">[0]) => invoke("BocJiraListBoards", input),
       getBoard: (input: BocDesktopInvokeArgs<"BocJiraGetBoard">[0]) => invoke("BocJiraGetBoard", input),
       listIssues: (input: BocDesktopInvokeArgs<"BocJiraListIssues">[0]) => invoke("BocJiraListIssues", input),
       getIssue: (input: BocDesktopInvokeArgs<"BocJiraGetIssue">[0]) => invoke("BocJiraGetIssue", input),
+      cancelBoardRead: (input: BocDesktopInvokeArgs<"BocJiraCancelBoardRead">[0]) =>
+        invoke("BocJiraCancelBoardRead", input),
+      cancelIssueRead: (input: BocDesktopInvokeArgs<"BocJiraCancelIssueRead">[0]) =>
+        invoke("BocJiraCancelIssueRead", input),
       getPreferences: () => invoke("BocJiraGetPreferences"),
       savePreferences: (input: BocDesktopInvokeArgs<"BocJiraSavePreferences">[0]) =>
         invoke("BocJiraSavePreferences", input),

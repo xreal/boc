@@ -6,6 +6,7 @@ import {
   JiraRpcs,
   type JiraBoardIdInput,
   type JiraBoardIssuesInput,
+  type JiraBoardReadInput,
   type JiraBoardResult,
   type JiraBoardsResult,
   type JiraConnectionAttempt,
@@ -17,27 +18,32 @@ import {
   type JiraIssuesResult,
 } from "../rpcs"
 import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchJiraIssue, type JiraAuth } from "./board-client"
-import { fetchJiraMyself, type JiraFetch } from "./client"
+import { fetchJiraMyself, type JiraFetch, type JiraWait } from "./client"
 import { openToken, sealToken, type SecretVault } from "./credentials"
 import { readStoredConnection, readStoredPreferences, type JiraStore } from "./store"
+import { createJiraReadCoordinator, type JiraReadCoordinator } from "./read-coordinator"
 
 export type JiraRuntime = {
   store: JiraStore
   vault: SecretVault
   fetch: JiraFetch
+  wait?: JiraWait
 }
 
 export function createJiraHandlers(runtime: JiraRuntime) {
+  const reads = createJiraReadCoordinator()
   return JiraRpcs.toLayer(
     JiraRpcs.of({
       BocJiraGetConnectionStatus: () => Effect.sync(() => getConnectionStatus(runtime)),
       BocJiraTestConnection: (payload) => Effect.promise(() => testConnection(runtime, payload)),
       BocJiraSaveConnection: (payload) => Effect.promise(() => saveConnection(runtime, payload)),
       BocJiraDisconnect: () => Effect.sync(() => disconnect(runtime)),
-      BocJiraListBoards: () => Effect.promise(() => listBoards(runtime)),
-      BocJiraGetBoard: (payload) => Effect.promise(() => getBoard(runtime, payload)),
-      BocJiraListIssues: (payload) => Effect.promise(() => listIssues(runtime, payload)),
-      BocJiraGetIssue: (payload) => Effect.promise(() => getIssue(runtime, payload)),
+      BocJiraListBoards: (payload) => Effect.promise(() => listBoards(runtime, reads, payload)),
+      BocJiraGetBoard: (payload) => Effect.promise(() => getBoard(runtime, reads, payload)),
+      BocJiraListIssues: (payload) => Effect.promise(() => listIssues(runtime, reads, payload)),
+      BocJiraGetIssue: (payload) => Effect.promise(() => getIssue(runtime, reads, payload)),
+      BocJiraCancelBoardRead: (payload) => Effect.sync(() => reads.cancel("board", payload.requestId)),
+      BocJiraCancelIssueRead: (payload) => Effect.sync(() => reads.cancel("issue", payload.requestId)),
       BocJiraGetPreferences: () => Effect.sync(() => readStoredPreferences(runtime.store)),
       BocJiraSavePreferences: (payload) => Effect.sync(() => savePreferences(runtime, payload)),
     }),
@@ -98,28 +104,52 @@ export function disconnect(runtime: JiraRuntime): JiraConnectionStatus {
   return getConnectionStatus(runtime)
 }
 
-export async function listBoards(runtime: JiraRuntime): Promise<JiraBoardsResult> {
-  const auth = storedAuth(runtime)
-  if (!auth.ok) return auth
-  return fetchJiraBoards(auth)
+export async function listBoards(
+  runtime: JiraRuntime,
+  reads: JiraReadCoordinator,
+  payload: JiraBoardReadInput,
+): Promise<JiraBoardsResult> {
+  return reads.run("board", payload.requestId, (signal) => {
+    const auth = storedAuth(runtime, signal)
+    if (!auth.ok) return Promise.resolve(auth)
+    return fetchJiraBoards(auth)
+  })
 }
 
-export async function getBoard(runtime: JiraRuntime, payload: JiraBoardIdInput): Promise<JiraBoardResult> {
-  const auth = storedAuth(runtime)
-  if (!auth.ok) return auth
-  return fetchJiraBoard(auth, payload.boardId)
+export async function getBoard(
+  runtime: JiraRuntime,
+  reads: JiraReadCoordinator,
+  payload: JiraBoardIdInput,
+): Promise<JiraBoardResult> {
+  return reads.run("board", payload.requestId, (signal) => {
+    const auth = storedAuth(runtime, signal)
+    if (!auth.ok) return Promise.resolve(auth)
+    return fetchJiraBoard(auth, payload.boardId)
+  })
 }
 
-export async function listIssues(runtime: JiraRuntime, payload: JiraBoardIssuesInput): Promise<JiraIssuesResult> {
-  const auth = storedAuth(runtime)
-  if (!auth.ok) return auth
-  return fetchJiraBoardIssues(auth, payload)
+export async function listIssues(
+  runtime: JiraRuntime,
+  reads: JiraReadCoordinator,
+  payload: JiraBoardIssuesInput,
+): Promise<JiraIssuesResult> {
+  return reads.run("board", payload.requestId, (signal) => {
+    const auth = storedAuth(runtime, signal)
+    if (!auth.ok) return Promise.resolve(auth)
+    return fetchJiraBoardIssues(auth, payload)
+  })
 }
 
-export async function getIssue(runtime: JiraRuntime, payload: JiraIssueKeyInput): Promise<JiraIssueResult> {
-  const auth = storedAuth(runtime)
-  if (!auth.ok) return auth
-  return fetchJiraIssue(auth, payload.issueKey)
+export async function getIssue(
+  runtime: JiraRuntime,
+  reads: JiraReadCoordinator,
+  payload: JiraIssueKeyInput,
+): Promise<JiraIssueResult> {
+  return reads.run("issue", payload.requestId, (signal) => {
+    const auth = storedAuth(runtime, signal)
+    if (!auth.ok) return Promise.resolve(auth)
+    return fetchJiraIssue(auth, payload.issueKey)
+  })
 }
 
 export function savePreferences(runtime: JiraRuntime, payload: JiraPreferences) {
@@ -128,7 +158,7 @@ export function savePreferences(runtime: JiraRuntime, payload: JiraPreferences) 
   return preferences
 }
 
-function storedAuth(runtime: JiraRuntime): ({ ok: true } & JiraAuth) | JiraClientFailure {
+function storedAuth(runtime: JiraRuntime, signal?: AbortSignal): ({ ok: true } & JiraAuth) | JiraClientFailure {
   const stored = readStoredConnection(runtime.store)
   if (!stored) return failJira("auth")
   if (!runtime.vault.isEncryptionAvailable()) return failJira("encryption-unavailable")
@@ -136,7 +166,7 @@ function storedAuth(runtime: JiraRuntime): ({ ok: true } & JiraAuth) | JiraClien
   if (!token) return failJira("auth")
   const origin = parseJiraCloudSite(stored.site)
   if (!origin) return failJira("invalid-site")
-  return { ok: true, origin, email: stored.email, token, fetch: runtime.fetch }
+  return { ok: true, origin, email: stored.email, token, fetch: runtime.fetch, signal, wait: runtime.wait }
 }
 
 async function verifyConnection(runtime: JiraRuntime, payload: JiraConnectionInput) {
@@ -147,7 +177,7 @@ async function verifyConnection(runtime: JiraRuntime, payload: JiraConnectionInp
   const token = payload.token.trim()
   if (!email || !token) return failJira("auth")
 
-  const result = await fetchJiraMyself({ origin, email, token, fetch: runtime.fetch })
+  const result = await fetchJiraMyself({ origin, email, token, fetch: runtime.fetch, wait: runtime.wait })
   if (!result.ok) return result
 
   return {

@@ -54,8 +54,36 @@ describe("Jira RPC success schemas", () => {
       expect("token" in attempt).toBe(false)
     }
     for (const schema of schemas) {
-      expect(JSON.stringify(schema.ast)).not.toMatch(/apiToken|"token"/i)
+      expect(JSON.stringify(schema.ast)).not.toMatch(/apiToken|"token"|Authorization|rawBody|responseBody/i)
     }
+  })
+
+  test("strips unexpected Jira body and credential fields from decoded successes", () => {
+    const decoded = Schema.decodeUnknownSync(JiraIssueResult)({
+      ok: true,
+      issue: {
+        id: "10001",
+        key: "PLAT-1",
+        summary: "Safe summary",
+        labels: [],
+        url: "https://acme.atlassian.net/browse/PLAT-1",
+        token: TOKEN_FIXTURE,
+        Authorization: `Basic ${TOKEN_FIXTURE}`,
+      },
+      rawBody: `raw ${TOKEN_FIXTURE}`,
+    })
+
+    expect(decoded).toEqual({
+      ok: true,
+      issue: {
+        id: "10001",
+        key: "PLAT-1",
+        summary: "Safe summary",
+        labels: [],
+        url: "https://acme.atlassian.net/browse/PLAT-1",
+      },
+    })
+    expect(JSON.stringify(decoded)).not.toContain(TOKEN_FIXTURE)
   })
 
   test("registers connection and read-only board operations", () => {
@@ -68,6 +96,8 @@ describe("Jira RPC success schemas", () => {
       "BocJiraGetBoard",
       "BocJiraListIssues",
       "BocJiraGetIssue",
+      "BocJiraCancelBoardRead",
+      "BocJiraCancelIssueRead",
       "BocJiraGetPreferences",
       "BocJiraSavePreferences",
     ])

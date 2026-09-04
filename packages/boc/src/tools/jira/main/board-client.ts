@@ -22,7 +22,7 @@ import {
 } from "../domain/board"
 import { failJira, type JiraClientFailure } from "../domain/errors"
 import type { JiraCloudOrigin } from "../domain/site"
-import { decodeUnknownJson, jiraRequest, type JiraFetch } from "./client"
+import { decodeUnknownJson, jiraRequest, type JiraFetch, type JiraWait } from "./client"
 
 const BOARD_PAGE_SIZE = 50
 const MAX_BOARD_PAGES = 40
@@ -54,6 +54,8 @@ export type JiraAuth = {
   email: string
   token: string
   fetch: JiraFetch
+  signal?: AbortSignal
+  wait?: JiraWait
 }
 
 export async function fetchJiraBoards(auth: JiraAuth): Promise<{ ok: true; boards: JiraBoardSummary[] } | JiraClientFailure> {
@@ -65,6 +67,7 @@ export async function fetchJiraBoards(auth: JiraAuth): Promise<{ ok: true; board
       ...auth,
       path: "/rest/agile/1.0/board",
       query: { startAt, maxResults: BOARD_PAGE_SIZE, orderBy: "name" },
+      retry: "safe-read",
     })
     if (!result.ok) return result
     const decoded = Option.getOrUndefined(decodeAgilePage(result.text))
@@ -88,8 +91,8 @@ export async function fetchJiraBoard(auth: JiraAuth, boardId: number): Promise<{
   if (!Number.isSafeInteger(boardId) || boardId <= 0) return failJira("malformed")
 
   const [boardResult, configurationResult, sprintResult] = await Promise.all([
-    jiraRequest({ ...auth, path: `/rest/agile/1.0/board/${boardId}` }),
-    jiraRequest({ ...auth, path: `/rest/agile/1.0/board/${boardId}/configuration` }),
+    jiraRequest({ ...auth, path: `/rest/agile/1.0/board/${boardId}`, retry: "safe-read" }),
+    jiraRequest({ ...auth, path: `/rest/agile/1.0/board/${boardId}/configuration`, retry: "safe-read" }),
     fetchJiraSprints(auth, boardId),
   ])
   if (!boardResult.ok) return boardResult
@@ -137,6 +140,7 @@ export async function fetchJiraSprints(
       ...auth,
       path: `/rest/agile/1.0/board/${boardId}/sprint`,
       query: { startAt, maxResults: SPRINT_PAGE_SIZE, state: "active,future" },
+      retry: "safe-read",
     })
     if (!result.ok) return result
     const decoded = Option.getOrUndefined(decodeAgilePage(result.text))
@@ -168,6 +172,7 @@ export async function fetchJiraBoardIssues(
   const configurationResult = await jiraRequest({
     ...auth,
     path: `/rest/agile/1.0/board/${input.boardId}/configuration`,
+    retry: "safe-read",
   })
   if (!configurationResult.ok) return configurationResult
   const configuration = decodeUnknown(configurationResult.text)
@@ -202,6 +207,7 @@ export async function fetchJiraIssuesByJql(
         fields: ISSUE_FIELDS,
         ...(nextPageToken ? { nextPageToken } : {}),
       },
+      retry: "safe-read",
     })
     if (!result.ok) return result
     const decoded = Option.getOrUndefined(decodeSearchPage(result.text))
@@ -231,6 +237,7 @@ export async function fetchJiraIssue(
     ...auth,
     path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
     query: { fields: ISSUE_DETAIL_FIELDS.join(",") },
+    retry: "safe-read",
   })
   if (!result.ok) return result
 

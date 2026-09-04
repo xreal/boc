@@ -11,6 +11,8 @@ const jiraTags = [
   "BocJiraGetBoard",
   "BocJiraListIssues",
   "BocJiraGetIssue",
+  "BocJiraCancelBoardRead",
+  "BocJiraCancelIssueRead",
   "BocJiraGetPreferences",
   "BocJiraSavePreferences",
 ] as const

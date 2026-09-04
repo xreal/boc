@@ -21,3 +21,14 @@ test("keeps renderer source free of Electron imports", async () => {
     ),
   ).toBe(true)
 })
+
+test("keeps Jira main code silent so raw responses and credentials cannot reach logs", async () => {
+  const mainFiles = new Glob("src/tools/jira/main/*.{ts,tsx}").scanSync({ cwd: path.resolve(import.meta.dir, "../..") })
+  const sources = await Promise.all(
+    [...mainFiles].filter((file) => !file.endsWith(".test.ts")).map((file) => Bun.file(file).text()),
+  )
+
+  expect(sources.every((source) => !/\b(?:console|logger|log)\.(?:debug|error|info|log|warn)\s*\(/.test(source))).toBe(
+    true,
+  )
+})

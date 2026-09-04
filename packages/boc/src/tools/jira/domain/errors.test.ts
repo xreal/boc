@@ -28,10 +28,11 @@ describe("jira error normalization", () => {
 
 describe("secret redaction", () => {
   test("strips tokens and Authorization values from log text", () => {
-    const raw = `Authorization: Basic abcdef== failed for token ${TOKEN_FIXTURE}`
+    const raw = `Authorization: Basic abcdef== failed for token ${TOKEN_FIXTURE}; {"apiToken":"another-secret"}`
     const redacted = redactSecrets(raw, [TOKEN_FIXTURE])
     expect(containsSecret(redacted, [TOKEN_FIXTURE])).toBe(false)
     expect(redacted).toContain("[redacted]")
     expect(redacted).not.toContain("Basic abcdef==")
+    expect(redacted).not.toContain("another-secret")
   })
 })

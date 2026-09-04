@@ -22,13 +22,14 @@ import {
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
 import { JiraBoardColumns } from "./columns"
 import { JiraIssueInspector } from "./inspector"
+import { createLatestRequest, type LatestRequest } from "./latest-request"
 import { JiraSettingsDialog } from "./settings"
 import { jiraStatusLabel } from "./status"
 import { jiraBoardMessage, jiraBoardSurface } from "./surface"
 import { JiraBoardToolbar } from "./toolbar"
 
 type BoardLoadOptions = {
-  generation?: number
+  request?: LatestRequest
   keepSprint?: boolean
   resetView?: boolean
 }
@@ -37,8 +38,7 @@ export default function JiraScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
   const t = createBocTranslator(props.host.locale)
   const dialog = useDialog()
-  let boardGeneration = 0
-  let issueGeneration = 0
+  let inspectorReturnFocus: HTMLButtonElement | undefined
   const [view, setView] = createStore({
     online: true,
     wide: true,
@@ -83,16 +83,24 @@ export default function JiraScreen(props: BocScreenProps) {
       filtered: filtered(),
     })
 
-  const beginBoard = () => ++boardGeneration
-  const beginIssue = () => ++issueGeneration
-  const staleBoard = (generation: number) => generation !== boardGeneration
-  const staleIssue = (generation: number) => generation !== issueGeneration
+  const boardRequests = createLatestRequest({
+    prefix: "board",
+    cancel: (requestId) => void desktop.jira.cancelBoardRead({ requestId }).catch(() => undefined),
+  })
+  const issueRequests = createLatestRequest({
+    prefix: "issue",
+    cancel: (requestId) => void desktop.jira.cancelIssueRead({ requestId }).catch(() => undefined),
+  })
+  const beginBoardRequest = () => {
+    issueRequests.invalidate()
+    return boardRequests.begin()
+  }
 
   const bootstrap = async () => {
-    const generation = beginBoard()
+    const request = beginBoardRequest()
     setView({ loading: "workspace", failure: undefined, issueFailure: undefined })
     const connection = await desktop.jira.getConnectionStatus()
-    if (staleBoard(generation)) return
+    if (!boardRequests.isCurrent(request)) return
     setView("connection", connection)
     if (connection.status !== "connected") {
       setView({
@@ -105,13 +113,18 @@ export default function JiraScreen(props: BocScreenProps) {
         selectedIssueKey: undefined,
         issue: undefined,
       })
+      boardRequests.finish(request)
       return
     }
 
-    const [boardsResult, preferences] = await Promise.all([desktop.jira.listBoards(), desktop.jira.getPreferences()])
-    if (staleBoard(generation)) return
+    const [boardsResult, preferences] = await Promise.all([
+      desktop.jira.listBoards({ requestId: request.requestId }),
+      desktop.jira.getPreferences(),
+    ])
+    if (!boardRequests.isCurrent(request)) return
     if (!boardsResult.ok) {
       setView({ loading: false, failure: boardsResult, boards: [], board: undefined, issues: [] })
+      boardRequests.finish(request)
       return
     }
 
@@ -124,13 +137,14 @@ export default function JiraScreen(props: BocScreenProps) {
     })
     if (selectedBoardId === undefined) {
       setView({ loading: false, board: undefined, issues: [] })
+      boardRequests.finish(request)
       return
     }
-    await loadBoard(selectedBoardId, { generation, keepSprint: true, resetView: false })
+    await loadBoard(selectedBoardId, { request, keepSprint: true, resetView: false })
   }
 
   const loadBoard = async (boardId: number, options: BoardLoadOptions = {}) => {
-    const generation = options.generation ?? beginBoard()
+    const request = options.request ?? beginBoardRequest()
     const requestedSprint = options.keepSprint ? view.sprintId : undefined
     setView({
       selectedBoardId: boardId,
@@ -148,10 +162,11 @@ export default function JiraScreen(props: BocScreenProps) {
             priority: undefined,
           }),
     })
-    const result = await desktop.jira.getBoard({ boardId })
-    if (staleBoard(generation)) return
+    const result = await desktop.jira.getBoard({ requestId: request.requestId, boardId })
+    if (!boardRequests.isCurrent(request)) return
     if (!result.ok) {
       setView({ loading: false, failure: result, board: undefined, issues: [] })
+      boardRequests.finish(request)
       return
     }
 
@@ -159,12 +174,13 @@ export default function JiraScreen(props: BocScreenProps) {
     setView({ board: result.board, sprintId })
     if (result.board.type === "scrum" && sprintId === undefined) {
       setView({ loading: false, issues: [] })
+      boardRequests.finish(request)
       return
     }
-    await loadIssues(boardId, sprintId, generation)
+    await loadIssues(boardId, sprintId, request)
   }
 
-  const loadIssues = async (boardId: number, sprintId: number | undefined, generation = beginBoard()) => {
+  const loadIssues = async (boardId: number, sprintId: number | undefined, request = beginBoardRequest()) => {
     setView({
       loading: "issues",
       failure: undefined,
@@ -174,27 +190,33 @@ export default function JiraScreen(props: BocScreenProps) {
       issueFailure: undefined,
     })
     const result = await desktop.jira.listIssues({
+      requestId: request.requestId,
       boardId,
       ...(sprintId !== undefined ? { sprintId } : {}),
     })
-    if (staleBoard(generation)) return
+    if (!boardRequests.isCurrent(request)) return
     if (!result.ok) {
       setView({ loading: false, failure: result, issues: [] })
+      boardRequests.finish(request)
       return
     }
     setView({ loading: false, issues: result.issues, failure: undefined })
+    boardRequests.finish(request)
   }
 
-  const loadIssue = async (issueKey: string) => {
-    const generation = beginIssue()
+  const loadIssue = async (issueKey: string, returnFocus: HTMLButtonElement) => {
+    const request = issueRequests.begin()
+    inspectorReturnFocus = returnFocus
     setView({ selectedIssueKey: issueKey, loading: "issue", issue: undefined, issueFailure: undefined })
-    const result = await desktop.jira.getIssue({ issueKey })
-    if (staleIssue(generation)) return
+    const result = await desktop.jira.getIssue({ requestId: request.requestId, issueKey })
+    if (!issueRequests.isCurrent(request)) return
     if (!result.ok) {
       setView({ loading: false, issueFailure: result })
+      issueRequests.finish(request)
       return
     }
     setView({ loading: false, issue: result.issue, issueFailure: undefined })
+    issueRequests.finish(request)
   }
 
   const saveCurrentBoard = async () => {
@@ -222,7 +244,11 @@ export default function JiraScreen(props: BocScreenProps) {
     ))
   }
 
-  const closeInspector = () => setView({ selectedIssueKey: undefined, issue: undefined, issueFailure: undefined })
+  const closeInspector = () => {
+    issueRequests.invalidate()
+    setView({ selectedIssueKey: undefined, issue: undefined, issueFailure: undefined })
+    queueMicrotask(() => inspectorReturnFocus?.focus())
+  }
 
   onMount(() => {
     const wide = window.matchMedia("(min-width: 56rem)")
@@ -240,6 +266,8 @@ export default function JiraScreen(props: BocScreenProps) {
     window.addEventListener("keydown", onKeyDown)
     void bootstrap()
     onCleanup(() => {
+      boardRequests.invalidate()
+      issueRequests.invalidate()
       wide.removeEventListener("change", syncWide)
       window.removeEventListener("online", syncOnline)
       window.removeEventListener("offline", syncOnline)
@@ -249,7 +277,10 @@ export default function JiraScreen(props: BocScreenProps) {
 
   return (
     <main data-boc-screen="jira" class="relative flex min-h-0 flex-1 flex-col px-2 pb-2 pt-2 text-v2-text-text-base">
-      <section class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg bg-v2-background-bg-raised px-4 py-4">
+      <section
+        aria-busy={view.loading !== false}
+        class="flex min-h-0 flex-1 flex-col gap-3 overflow-hidden rounded-lg bg-v2-background-bg-raised px-4 py-4"
+      >
         <div class="flex flex-wrap items-center justify-between gap-3">
           <div class="flex flex-col gap-1">
             <h1 class="text-[16px] font-medium leading-[var(--line-height-base)]">{t("boc.jira.board.title")}</h1>
@@ -302,11 +333,12 @@ export default function JiraScreen(props: BocScreenProps) {
               t={t}
               groups={groups()}
               selectedIssueKey={view.selectedIssueKey}
-              onSelectIssue={(issue) => void loadIssue(issue.key)}
+              onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
             />
             <Show when={view.selectedIssueKey}>
               <JiraIssueInspector
                 t={t}
+                issueKey={view.selectedIssueKey!}
                 issue={view.issue}
                 loading={view.loading === "issue"}
                 overlay={!view.wide}
@@ -321,6 +353,8 @@ export default function JiraScreen(props: BocScreenProps) {
         <Show when={surface() !== "board"}>
           <div
             data-boc-board-surface={surface()}
+            role={surface() === "error" || surface() === "rate-limit" ? "alert" : "status"}
+            aria-live="polite"
             class="flex min-h-0 flex-1 flex-col items-start justify-center gap-3 text-[13px] leading-[var(--line-height-compact)]"
           >
             <Show when={view.loading}>

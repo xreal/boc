@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fetchJiraMyself } from "./client"
+import { fetchJiraMyself, jiraRequest } from "./client"
 import { parseJiraCloudSite } from "../domain/site"
 import { containsSecret } from "../domain/errors"
 import {
@@ -22,6 +22,7 @@ function callMyself(handler: (url: URL, init?: RequestInit) => Response | Promis
     email: EMAIL_FIXTURE,
     token: TOKEN_FIXTURE,
     fetch: fetchScript(handler),
+    wait: async () => undefined,
   })
 }
 
@@ -64,6 +65,7 @@ describe("fetchJiraMyself", () => {
       fetch: async () => {
         throw new Error(`network down ${TOKEN_FIXTURE}`)
       },
+      wait: async () => undefined,
     })
 
     expect(auth).toEqual({ ok: false, category: "auth" })
@@ -76,5 +78,79 @@ describe("fetchJiraMyself", () => {
     for (const result of [auth, permission, malformed, rateLimit, captcha, network]) {
       expect(containsSecret(JSON.stringify(result), [TOKEN_FIXTURE])).toBe(false)
     }
+  })
+
+  test("retries Retry-After responses twice before succeeding", async () => {
+    const waits: number[] = []
+    let attempts = 0
+    const result = await fetchJiraMyself({
+      origin,
+      email: EMAIL_FIXTURE,
+      token: TOKEN_FIXTURE,
+      fetch: fetchScript(() => {
+        attempts += 1
+        return attempts < 3 ? rateLimitResponse(2) : myselfSuccessResponse()
+      }),
+      wait: async (milliseconds) => {
+        waits.push(milliseconds)
+      },
+    })
+
+    expect(result.ok).toBe(true)
+    expect(attempts).toBe(3)
+    expect(waits).toEqual([2000, 2000])
+  })
+
+  test("does not retry an unsafe request or an excessive Retry-After delay", async () => {
+    let unsafeAttempts = 0
+    const unsafe = await jiraRequest({
+      origin,
+      email: EMAIL_FIXTURE,
+      token: TOKEN_FIXTURE,
+      fetch: fetchScript(() => {
+        unsafeAttempts += 1
+        return rateLimitResponse(1)
+      }),
+      method: "POST",
+      path: "/rest/api/3/example-mutation",
+    })
+    let boundedAttempts = 0
+    const bounded = await fetchJiraMyself({
+      origin,
+      email: EMAIL_FIXTURE,
+      token: TOKEN_FIXTURE,
+      fetch: fetchScript(() => {
+        boundedAttempts += 1
+        return rateLimitResponse(31)
+      }),
+      wait: async () => undefined,
+    })
+
+    expect(unsafe).toEqual({ ok: false, category: "rate-limit", retryAfterSeconds: 1 })
+    expect(unsafeAttempts).toBe(1)
+    expect(bounded).toEqual({ ok: false, category: "rate-limit", retryAfterSeconds: 31 })
+    expect(boundedAttempts).toBe(1)
+  })
+
+  test("passes cancellation to fetch and normalizes an aborted read", async () => {
+    const controller = new AbortController()
+    let fetchSignal: AbortSignal | null | undefined
+    const result = fetchJiraMyself({
+      origin,
+      email: EMAIL_FIXTURE,
+      token: TOKEN_FIXTURE,
+      signal: controller.signal,
+      fetch: async (_input, init) => {
+        fetchSignal = init?.signal
+        return new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(new Error(TOKEN_FIXTURE)), { once: true })
+        })
+      },
+    })
+
+    controller.abort()
+
+    expect(await result).toEqual({ ok: false, category: "network" })
+    expect(fetchSignal).toBe(controller.signal)
   })
 })

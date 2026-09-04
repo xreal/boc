@@ -82,6 +82,7 @@ export function JiraBoardToolbar(props: {
         </Show>
         <div class="min-w-[12rem] flex-1">
           <TextInput
+            aria-label={props.t("boc.jira.board.search.label")}
             class="!w-full"
             name="jira-board-search"
             autocomplete="off"
@@ -130,7 +131,12 @@ export function JiraBoardToolbar(props: {
         </Button>
       </div>
       <Show when={ui.filtersOpen}>
-        <div id="boc-jira-board-filters" data-boc-board-filters class="flex flex-wrap items-end gap-2">
+        <div
+          id="boc-jira-board-filters"
+          data-boc-board-filters
+          aria-label={props.t("boc.jira.board.filters")}
+          class="flex flex-wrap items-end gap-2"
+        >
           <FilterSelect
             label={props.t("boc.jira.board.filters.assignee")}
             value={props.assignee}
@@ -184,6 +190,7 @@ function FilterSelect(props: {
     <label class="flex min-w-[9rem] flex-col gap-1 text-[13px] leading-[var(--line-height-compact)]">
       <span class="text-v2-text-text-muted">{props.label}</span>
       <Select
+        aria-label={props.label}
         options={options()}
         current={current()}
         value={(option) => option.id}
