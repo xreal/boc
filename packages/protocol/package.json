@@ -26,7 +26,6 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@boc/extensions": "workspace:*",
     "@opencode-ai/schema": "workspace:*",
     "effect": "catalog:"
   },

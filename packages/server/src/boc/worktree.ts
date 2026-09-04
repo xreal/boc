@@ -1,6 +1,6 @@
-import { RIFT_BACKEND_VERSION, type RiftCapabilityResult } from "@boc/extensions/worktrees/shared"
 import { RiftBackendService } from "@boc/extensions/worktrees/server"
 import { Worktree } from "@opencode-ai/core/worktree"
+import { RIFT_BACKEND_VERSION, type RiftCapability as RiftCapabilityResult } from "@opencode-ai/schema/boc/rift"
 import { Effect } from "effect"
 import { HttpApiBuilder } from "effect/unstable/httpapi"
 import path from "node:path"

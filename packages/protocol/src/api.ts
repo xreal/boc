@@ -1,6 +1,6 @@
 import { Context } from "effect"
-import { BocWorktreeGroup } from "@boc/extensions/worktrees/shared"
 import { HttpApi, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/unstable/httpapi"
+import { BocWorktreeGroup } from "./boc/worktree.js"
 import { SchemaErrorMiddleware } from "./middleware/schema-error.js"
 import { GenerateGroup } from "./groups/generate.js"
 import { MessageGroup } from "./groups/message.js"

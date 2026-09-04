@@ -1,7 +1,7 @@
 import { Project } from "@opencode-ai/schema/project"
+import { RiftCapability } from "@opencode-ai/schema/boc/rift"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
 import { HttpApiEndpoint, HttpApiGroup, OpenApi } from "effect/unstable/httpapi"
-import { RiftCapability } from "./capability.js"
 
 export const BocWorktreeGroup = HttpApiGroup.make("server.boc.worktree")
   .add(

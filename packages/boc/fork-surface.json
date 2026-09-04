@@ -2,6 +2,8 @@
   "owned": [
     "packages/boc/**",
     "packages/app/src/boc/**",
+    "packages/schema/src/boc/**",
+    "packages/protocol/src/boc/**",
     "packages/server/src/boc/**",
     "packages/desktop/src/boc/**",
     "packages/desktop/icons/boc/**",
@@ -113,10 +115,6 @@
     {
       "path": "packages/server/src/handlers.ts",
       "reason": "Compose the generic Boc backend capability handler"
-    },
-    {
-      "path": "packages/protocol/package.json",
-      "reason": "Register the fork-owned Boc protocol group"
     },
     {
       "path": "packages/protocol/src/api.ts",
