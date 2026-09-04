@@ -1931,6 +1931,36 @@ export interface ReferenceApi<E = never> {
   readonly list: ReferenceListOperation<E>
 }
 
+export type ServerBocWorktreeRiftCapabilityInput = {
+  readonly projectID: Project.ID
+  readonly source: AbsolutePath
+  readonly directory: AbsolutePath
+}
+export type ServerBocWorktreeRiftCapabilityOutput =
+  | { readonly available: true; readonly backend: "boc/rift"; readonly version: "0.0.10"; readonly filesystem: string }
+  | {
+      readonly available: false
+      readonly backend: "boc/rift"
+      readonly version: "0.0.10"
+      readonly reason:
+        | "backend-unavailable"
+        | "binary-missing"
+        | "binary-unhealthy"
+        | "project-mismatch"
+        | "storage-inaccessible"
+        | "unsupported-architecture"
+        | "unsupported-filesystem"
+        | "unsupported-platform"
+      readonly message: string
+    }
+export type ServerBocWorktreeRiftCapabilityOperation<E = never> = (
+  input: ServerBocWorktreeRiftCapabilityInput,
+) => Effect.Effect<ServerBocWorktreeRiftCapabilityOutput, E>
+
+export interface ServerBocWorktreeApi<E = never> {
+  readonly riftCapability: ServerBocWorktreeRiftCapabilityOperation<E>
+}
+
 export type WorktreeListInput = { readonly projectID: Project.ID }
 export type WorktreeListOutput = Worktree.List
 export type WorktreeListOperation<E = never> = (input: WorktreeListInput) => Effect.Effect<WorktreeListOutput, E>
@@ -2119,6 +2149,7 @@ export interface AppApi<E = never> {
   readonly experimental: ExperimentalApi<E>
   readonly shell: ShellApi<E>
   readonly reference: ReferenceApi<E>
+  readonly "server.boc.worktree": ServerBocWorktreeApi<E>
   readonly worktree: WorktreeApi<E>
   readonly workspace: WorkspaceApi<E>
   readonly vcs: VcsApi<E>

@@ -2,6 +2,7 @@
   "owned": [
     "packages/boc/**",
     "packages/app/src/boc/**",
+    "packages/server/src/boc/**",
     "packages/desktop/src/boc/**",
     "packages/desktop/icons/boc/**",
     "BOC_*.md",
@@ -108,6 +109,34 @@
     {
       "path": "packages/server/src/routes.ts",
       "reason": "Decorate the Worktree service for Boc backends"
+    },
+    {
+      "path": "packages/server/src/handlers.ts",
+      "reason": "Compose the generic Boc backend capability handler"
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "reason": "Register the fork-owned Boc protocol group"
+    },
+    {
+      "path": "packages/protocol/src/api.ts",
+      "reason": "Compose the authenticated Boc backend capability group"
+    },
+    {
+      "path": "packages/client/src/effect/api/api.ts",
+      "reason": "Generate the typed Boc Rift capability client"
+    },
+    {
+      "path": "packages/client/src/effect/generated/client.ts",
+      "reason": "Generate the Effect Boc Rift capability client"
+    },
+    {
+      "path": "packages/client/src/promise/generated/client.ts",
+      "reason": "Generate the Promise Boc Rift capability client"
+    },
+    {
+      "path": "packages/client/src/promise/generated/types.ts",
+      "reason": "Generate the Promise Boc Rift capability types"
     }
   ]
 }

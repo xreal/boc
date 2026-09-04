@@ -238,6 +238,8 @@ import type {
   ShellRemoveOutput,
   ReferenceListInput,
   ReferenceListOutput,
+  ServerBocWorktreeRiftCapabilityInput,
+  ServerBocWorktreeRiftCapabilityOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1451,6 +1453,19 @@ const EndpointReferenceList = (raw: RawClient["server.reference"]) => (input?: R
 
 const adaptGroupReference = (raw: RawClient["server.reference"]) => ({ list: EndpointReferenceList(raw) })
 
+const EndpointServerBocWorktreeRiftCapability =
+  (raw: RawClient["server.boc.worktree"]) => (input: ServerBocWorktreeRiftCapabilityInput) =>
+    preserveEffect<ServerBocWorktreeRiftCapabilityOutput>()(
+      raw["boc.worktree.riftCapability"]({
+        params: { projectID: input["projectID"] },
+        query: { source: input["source"], directory: input["directory"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const adaptGroupServerBocWorktree = (raw: RawClient["server.boc.worktree"]) => ({
+  riftCapability: EndpointServerBocWorktreeRiftCapability(raw),
+})
+
 const EndpointWorktreeList = (raw: RawClient["server.worktree"]) => (input: WorktreeListInput) =>
   preserveEffect<WorktreeListOutput>()(
     raw["worktree.list"]({ params: { projectID: input["projectID"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1613,6 +1628,7 @@ const adaptClient = (raw: RawClient) => ({
   experimental: adaptGroupExperimental(raw["server.experimental"]),
   shell: adaptGroupShell(raw["server.shell"]),
   reference: adaptGroupReference(raw["server.reference"]),
+  "server.boc.worktree": adaptGroupServerBocWorktree(raw["server.boc.worktree"]),
   worktree: adaptGroupWorktree(raw["server.worktree"]),
   workspace: adaptGroupWorkspace(raw["server.workspace"]),
   vcs: adaptGroupVcs(raw["server.vcs"]),

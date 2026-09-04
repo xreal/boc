@@ -234,6 +234,8 @@ import type {
   ShellRemoveOutput,
   ReferenceListInput,
   ReferenceListOutput,
+  ServerBocWorktreeRiftCapabilityInput,
+  ServerBocWorktreeRiftCapabilityOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1960,6 +1962,20 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/reference`,
             query: { location: input?.["location"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+    },
+    "server.boc.worktree": {
+      riftCapability: (input: ServerBocWorktreeRiftCapabilityInput, requestOptions?: RequestOptions) =>
+        request<ServerBocWorktreeRiftCapabilityOutput>(
+          {
+            method: "GET",
+            path: `/api/boc/worktree/${encodeURIComponent(input.projectID)}/rift-capability`,
+            query: { source: input["source"], directory: input["directory"] },
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

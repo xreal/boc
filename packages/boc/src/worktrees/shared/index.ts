@@ -4,4 +4,5 @@ export {
   RiftCapabilityReason,
   type RiftCapability as RiftCapabilityResult,
   type RiftCapabilityReason as RiftCapabilityReasonCode,
-} from "./capability"
+} from "./capability.js"
+export { BocWorktreeGroup } from "./group.js"

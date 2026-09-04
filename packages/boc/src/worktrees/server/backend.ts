@@ -1,7 +1,7 @@
 import { Git } from "@opencode-ai/core/git"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Worktree } from "@opencode-ai/core/worktree"
-import { Effect } from "effect"
+import { Context, Effect } from "effect"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/util/global"
@@ -18,6 +18,14 @@ export type RiftBackendOptions = {
   arch?: string
   run?: CommandRunner
 }
+
+export interface RiftBackend {
+  readonly enabled: boolean
+  readonly strategy: Worktree.Strategy
+  readonly capability: (directory: string) => ReturnType<typeof inspectRiftCapability>
+}
+
+export class RiftBackendService extends Context.Service<RiftBackendService, RiftBackend>()("@boc/RiftBackend") {}
 
 class RiftOperationError extends Error {
   constructor(

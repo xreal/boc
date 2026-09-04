@@ -3,8 +3,10 @@ import { Schema } from "effect"
 export const RIFT_BACKEND_VERSION = "0.0.10"
 
 export const RiftCapabilityReason = Schema.Literals([
+  "backend-unavailable",
   "binary-missing",
   "binary-unhealthy",
+  "project-mismatch",
   "storage-inaccessible",
   "unsupported-architecture",
   "unsupported-filesystem",

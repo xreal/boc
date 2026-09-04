@@ -112,6 +112,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@opencode-ai/core": "workspace:*",
+        "@opencode-ai/schema": "workspace:*",
         "@opencode-ai/ui": "workspace:*",
         "@opencode-ai/util": "workspace:*",
         "@solid-primitives/i18n": "2.2.1",
@@ -650,6 +651,7 @@
       "name": "@opencode-ai/protocol",
       "version": "1.17.11",
       "dependencies": {
+        "@boc/extensions": "workspace:*",
         "@opencode-ai/schema": "workspace:*",
         "effect": "catalog:",
       },

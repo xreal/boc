@@ -6077,6 +6077,30 @@ export type ReferenceListOutput = {
   data: Array<ReferenceInfo>
 }
 
+export type ServerBocWorktreeRiftCapabilityInput = {
+  readonly projectID: { readonly projectID: string }["projectID"]
+  readonly source: { readonly source: string; readonly directory: string }["source"]
+  readonly directory: { readonly source: string; readonly directory: string }["directory"]
+}
+
+export type ServerBocWorktreeRiftCapabilityOutput =
+  | { available: true; backend: "boc/rift"; version: "0.0.10"; filesystem: string }
+  | {
+      available: false
+      backend: "boc/rift"
+      version: "0.0.10"
+      reason:
+        | "backend-unavailable"
+        | "binary-missing"
+        | "binary-unhealthy"
+        | "project-mismatch"
+        | "storage-inaccessible"
+        | "unsupported-architecture"
+        | "unsupported-filesystem"
+        | "unsupported-platform"
+      message: string
+    }
+
 export type WorktreeListInput = { readonly projectID: { readonly projectID: string }["projectID"] }
 
 export type WorktreeListOutput = WorktreeList
