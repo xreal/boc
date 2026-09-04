@@ -19,7 +19,7 @@ if (tailwindGenerate && typeof tailwindHotUpdate === "function") {
 
 export const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
-  if (raw === "local" || raw === "dev" || raw === "beta" || raw === "prod") return raw
+  if (raw === "local" || raw === "dev" || raw === "beta" || raw === "boc" || raw === "prod") return raw
   if (process.env.OPENCODE_CHANNEL === "latest") return "prod"
   return "dev"
 })()
