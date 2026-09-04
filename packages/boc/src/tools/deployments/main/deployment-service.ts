@@ -107,16 +107,20 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     | { generation: number; fetchedAt: number; ref?: string; targets: readonly GithubWorkflowTarget[] }
     | undefined
   const prepared = new Map<string, StoredPreparedPlan>()
+  const preparing = new Map<AllowedDevEnvironment, symbol>()
+  const dispatching = new Set<AllowedDevEnvironment>()
   let writes = Promise.resolve()
 
   const operations = () => readDeploymentOperations(runtime.store, now())
 
-  const persistOperations = (next: readonly DeploymentOperationSummary[]) => {
-    const pruned = pruneDeploymentHistory(next, now())
-    writes = writes.then(() => {
-      runtime.store.writeOperations(pruned)
+  const persistOperations = (
+    update: (current: readonly DeploymentOperationSummary[]) => readonly DeploymentOperationSummary[],
+  ) => {
+    const write = writes.then(() => {
+      runtime.store.writeOperations(pruneDeploymentHistory(update(operations()), now()))
     })
-    return writes
+    writes = write.catch(() => undefined)
+    return write
   }
 
   const blockingOperation = (environment: AllowedDevEnvironment) =>
@@ -254,6 +258,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
 
   const invalidatePrepared = () => {
     prepared.clear()
+    preparing.clear()
   }
 
   const invalidate = () => {
@@ -292,6 +297,8 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     draft: DeploymentDraft,
     signal?: AbortSignal,
   ): Promise<{ ok: true; plan: DeploymentPreparedPlan } | DeploymentFailure> => {
+    const request = Symbol()
+    preparing.set(draft.environment, request)
     for (const [preflightId, stored] of prepared) {
       if (stored.public.environment === draft.environment) prepared.delete(preflightId)
     }
@@ -306,7 +313,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     const ref = await validateGithubRef(github, draft.ref, signal)
     if (!ref.ok) return ref
 
-    if (blockingOperation(draft.environment)) {
+    if (dispatching.has(draft.environment) || blockingOperation(draft.environment)) {
       return deploymentFailure("conflict", {
         capability: "github_workflow_dispatch",
         context: { environment: draft.environment },
@@ -347,6 +354,9 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       })
     }
 
+    if (preparing.get(draft.environment) !== request) {
+      return deploymentFailure("cancelled", { capability: "github_workflow_dispatch" })
+    }
     const warnings = isReservedDevEnvironment(draft.environment) ? (["unsafe-target"] as const) : []
     const preflightId = createId()
     const expiresAt = now() + DEPLOYMENT_PREPARED_PLAN_TTL_MS
@@ -393,13 +403,21 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     const settings = readDeploymentSettings(runtime.store)
     const target = await verifyArgoDevTarget(argo, settings)
     if (!target.ok) return target.failure
-    if (blockingOperation(stored.public.environment)) {
+    if (dispatching.has(stored.public.environment) || blockingOperation(stored.public.environment)) {
       return deploymentFailure("conflict", {
         capability: "github_workflow_dispatch",
         context: { environment: stored.public.environment },
       })
     }
 
+    // Readiness checks yield; a concurrent dispatch or settings save may consume this plan.
+    if (prepared.get(preflightId) !== stored) {
+      return deploymentFailure("not-found", { capability: "github_workflow_dispatch" })
+    }
+    if (now() >= stored.expiresAt) {
+      prepared.delete(preflightId)
+      return deploymentFailure("timeout", { capability: "github_workflow_dispatch", context: { field: "preflight" } })
+    }
     prepared.delete(preflightId)
     const createdAt = new Date(now()).toISOString()
     const ticketKey = deploymentTicketKey(stored.public.ref)
@@ -416,7 +434,10 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       createdAt,
       updatedAt: createdAt,
     }
-    await persistOperations([...operations(), operation])
+    dispatching.add(operation.environment)
+    await persistOperations((current) => [...current, operation]).finally(() =>
+      dispatching.delete(operation.environment),
+    )
 
     const workflowResults = await stored.bound.reduce<Promise<DeploymentWorkflowOperation[]>>(
       async (previous, workflow) => {
@@ -427,7 +448,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
           inputs: workflow.inputs,
         })
         if (!dispatched.ok) {
-          const uncertain = dispatched.category === "timeout" || dispatched.category === "cancelled"
+          const uncertain = ["timeout", "cancelled", "unknown", "network", "malformed"].includes(dispatched.category)
           return [
             ...completed,
             {
@@ -458,7 +479,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       state: aggregateDispatchState(workflowResults.map((workflow) => workflow.state)),
       updatedAt: new Date(now()).toISOString(),
     }
-    await persistOperations(operations().map((item) => (item.id === operation.id ? next : item)))
+    await persistOperations((current) => current.map((item) => (item.id === operation.id ? next : item)))
     return { ok: true, operation: next }
   }
 
@@ -547,9 +568,9 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
 export type DeploymentService = ReturnType<typeof createDeploymentService>
 
 function aggregateDispatchState(states: readonly DeploymentOperationState[]): DeploymentOperationState {
-  if (states.some((state) => state === "failure")) return "failure"
   if (states.some((state) => state === "unknown")) return "unknown"
-  if (states.every((state) => state === "queued")) return "queued"
+  if (states.some((state) => state === "queued")) return "queued"
+  if (states.every((state) => state === "failure")) return "failure"
   return "unknown"
 }
 
