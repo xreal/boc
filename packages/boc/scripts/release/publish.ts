@@ -99,17 +99,20 @@ async function publishAsset(asset: ReleaseAsset) {
     console.log(`Reusing ${asset.name}`)
   } else {
     await upload(asset.path, asset.name, contentType(asset.name), "public, max-age=31536000, immutable", asset.sha512)
+    const stored = await inspect(asset.name)
+    if (!stored || stored.size !== asset.size || stored.sha512 !== asset.sha512) {
+      throw new Error(`Published R2 object does not match local asset: ${asset.name}`)
+    }
     console.log(`Uploaded ${asset.name}`)
   }
 
+  // The public endpoint can compress text assets, so its Content-Length is not
+  // an integrity boundary. The authenticated R2 metadata check above owns that.
   const response = await fetch(`${publicURL(asset.name)}?version=${values.version}`, {
     method: "HEAD",
     cache: "no-store",
   })
   if (!response.ok) throw new Error(`Published asset is unavailable: ${asset.name} (${response.status})`)
-  if (Number(response.headers.get("content-length")) !== asset.size) {
-    throw new Error(`Published asset has the wrong size: ${asset.name}`)
-  }
 }
 
 async function inspect(name: string) {
