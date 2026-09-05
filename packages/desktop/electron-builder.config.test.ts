@@ -212,8 +212,10 @@ test("packages Rift as an external Boc backend resource", () => {
 
 test("publishes Boc updates through versioned public R2 artifacts", async () => {
   const previousChannel = process.env.OPENCODE_CHANNEL
+  const previousSigning = process.env.OPENCODE_WINDOWS_SIGNING
   const previousPublisher = process.env.WINDOWS_PUBLISHER_NAME
   process.env.OPENCODE_CHANNEL = "boc"
+  delete process.env.OPENCODE_WINDOWS_SIGNING
   process.env.WINDOWS_PUBLISHER_NAME = "Boc Release Publisher"
   try {
     const module = await import("./electron-builder.config.ts?updates=boc")
@@ -230,6 +232,8 @@ test("publishes Boc updates through versioned public R2 artifacts", async () => 
   } finally {
     if (previousChannel === undefined) delete process.env.OPENCODE_CHANNEL
     else process.env.OPENCODE_CHANNEL = previousChannel
+    if (previousSigning === undefined) delete process.env.OPENCODE_WINDOWS_SIGNING
+    else process.env.OPENCODE_WINDOWS_SIGNING = previousSigning
     if (previousPublisher === undefined) delete process.env.WINDOWS_PUBLISHER_NAME
     else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
   }

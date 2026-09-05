@@ -211,11 +211,13 @@ function getConfig() {
         artifactName: "boc-desktop-${version}-${os}-${arch}.${ext}",
         protocols: { name: "Boc Beta", schemes: ["opencode"] },
         publish: { provider: "generic", url: "https://boc-updates.bergdev.de", channel: "latest" },
-        win: {
-          ...base.win,
-          publisherName: windowsSigning ? process.env.WINDOWS_PUBLISHER_NAME : undefined,
-          verifyUpdateCodeSignature: windowsSigning,
-        },
+        win: windowsSigning
+          ? {
+              ...base.win,
+              publisherName: process.env.WINDOWS_PUBLISHER_NAME,
+              verifyUpdateCodeSignature: true,
+            }
+          : base.win,
         deb: { fpm: [metainfoFpm(appId)] },
         rpm: { packageName: "boc-beta", fpm: [metainfoFpm(appId)] },
       }
