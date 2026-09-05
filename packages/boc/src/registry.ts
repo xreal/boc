@@ -24,7 +24,7 @@ export type BocExtension = {
   desktopOnly?: boolean
 }
 
-export const bocExtensions = [jiraExtension, deploymentsExtension] as const satisfies readonly BocExtension[]
+export const bocExtensions: readonly BocExtension[] = [jiraExtension, deploymentsExtension]
 
 export function byId(id: string): BocExtension | undefined {
   return bocExtensions.find((extension) => extension.id === id)
