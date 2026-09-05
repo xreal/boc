@@ -5,7 +5,7 @@ import { Effect, Layer } from "effect"
 import { bocDesktopHandlers, bocDesktopServices } from "@boc/extensions/desktop/main"
 import { RpcServer } from "effect/unstable/rpc"
 import { DesktopRpcs } from "../shared/ipc-rpc"
-import { IpcTransportPort } from "../shared/ipc-transport"
+import { DragCancelEvent, IpcTransportPort } from "../shared/ipc-transport"
 import { DesktopFiles, openExternalURL } from "./files"
 import { appHandlers } from "./ipc-handlers/app"
 import { eventHandlers } from "./ipc-handlers/events"
@@ -61,6 +61,10 @@ export const registerIpcHandlers = Effect.gen(function* () {
     relaunch: lifecycle.relaunch,
   }
   const wire = (_event: Electron.Event, win: BrowserWindow) => {
+    win.webContents.on("before-input-event", (_event, input) => {
+      if (input.type !== "keyDown" || input.key !== "Escape") return
+      win.webContents.send(DragCancelEvent)
+    })
     win.webContents.on("did-finish-load", () => {
       if (win.isDestroyed() || win.webContents.isDestroyed()) return
       const channel = new MessageChannelMain()

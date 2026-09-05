@@ -113,7 +113,6 @@ import { createDelayedPresence } from "../../util/delayed-presence"
 import { SessionLocationMissing } from "./location-missing"
 import { isRecord } from "../../util/record"
 import { createHistoryPrepend } from "./history"
-import { useSessionTerminals } from "../../context/session-terminals"
 
 addDefaultParsers(parsers.parsers)
 
@@ -161,6 +160,7 @@ export function Session(props: {
   sidebarVisible: boolean
   onToggleSidebar: () => void
   visibleTerminalID?: string
+  onTerminalPicker?: (show: (() => void) | undefined) => void
   width?: number
 }) {
   const setEpilogue = useEpilogue()
@@ -234,6 +234,8 @@ export function Session(props: {
     open: false,
     tab: undefined as string | undefined,
   })
+  props.onTerminalPicker?.(() => setComposer({ open: true, tab: "terminals" }))
+  onCleanup(() => props.onTerminalPicker?.(undefined))
   createEffect(() => {
     if (props.promptMuted && composer.open) setComposer("open", false)
   })
@@ -260,7 +262,6 @@ export function Session(props: {
 
   const scrollAcceleration = createMemo(() => getScrollAcceleration(config))
   const toast = useToast()
-  const terminalError = () => toast.show({ variant: "error", message: "Unable to load terminal" })
   const client = useClient()
   const autoApproved = new Set<string>()
   createEffect(() => {
@@ -295,7 +296,6 @@ export function Session(props: {
   const [firstJump, setFirstJump] = createSignal<() => void>()
   const [synced, setSynced] = createSignal(false)
   const sessionTabs = useSessionTabs()
-  const terminals = useSessionTerminals()
   const [awayFromBottom, setAwayFromBottom] = createSignal(false)
   const [latestHovered, setLatestHovered] = createSignal(false)
   let ensureAllRowsPending: (() => void)[] | undefined
@@ -949,13 +949,21 @@ export function Session(props: {
           dialog.clear()
           return
         }
-        void client.api.session.revert
-          .stage({ sessionID: route.sessionID, messageID: message.id })
-          .catch((error) => toast.show({ message: errorMessage(error), variant: "error", duration: 5000 }))
-        prompt()?.set({
-          ...projectedPromptInput(message),
-          pasted: [],
-        })
+        const sessionID = route.sessionID
+        const target = prompt()
+        void (async () => {
+          if (pendingDeliveries().has(message.id)) {
+            if (!(await mutatePending("cancel", message.id))) return
+          } else {
+            await client.api.session.interrupt({ sessionID })
+            await client.api.session.wait({ sessionID })
+            await client.api.session.revert.stage({ sessionID, messageID: message.id })
+          }
+          target?.set({
+            ...projectedPromptInput(message),
+            pasted: [],
+          })
+        })().catch((error) => toast.show({ message: errorMessage(error), variant: "error", duration: 5000 }))
         dialog.clear()
       },
     },
@@ -976,73 +984,6 @@ export function Session(props: {
         })()
       },
     },
-    {
-      title: props.sidebarVisible ? "Hide sidebar" : "Show sidebar",
-      id: "session.sidebar.toggle",
-      group: "Session",
-      run: () => {
-        props.onToggleSidebar()
-        dialog.clear()
-      },
-    },
-    ...(config.session.terminal
-      ? [
-          {
-            title: props.visibleTerminalID ? "Hide terminal pane" : "Show terminal pane",
-            id: "terminal.toggle",
-            group: "Session",
-            run: () => {
-              const sessionID = route.sessionID
-              if (props.visibleTerminalID) {
-                promptRef.current?.focus()
-                void terminals.selectTerminal(sessionID, null).catch(toast.error)
-              } else {
-                void terminals
-                  .refresh(sessionID)
-                  .then(async () => {
-                    const terminal = terminals.get(sessionID).terminals.at(-1)
-                    if (terminal) return terminals.selectTerminal(sessionID, terminal.id)
-                    await terminals.newTerminal(sessionID)
-                  })
-                  .catch(terminalError)
-              }
-              dialog.clear()
-            },
-          },
-          {
-            title: "Select terminal",
-            id: "terminal.select",
-            group: "Session",
-            run: () => {
-              promptRef.current?.focus()
-              setComposer({ open: true, tab: "terminals" })
-              void terminals.refresh(route.sessionID).catch(terminalError)
-              dialog.clear()
-            },
-          },
-          {
-            title: "Close terminal pane",
-            id: "terminal.close",
-            group: "Session",
-            enabled: props.visibleTerminalID !== undefined,
-            run: () => {
-              promptRef.current?.focus()
-              void terminals.selectTerminal(route.sessionID, null).catch(toast.error)
-              dialog.clear()
-            },
-          },
-          {
-            title: "New terminal",
-            id: "session.terminal",
-            group: "Session",
-            slash: { name: "terminal" },
-            run: async () => {
-              dialog.clear()
-              await terminals.newTerminal(route.sessionID).catch(terminalError)
-            },
-          },
-        ]
-      : []),
     {
       title: (() => {
         const next = nextThinkingMode(thinkingMode())
@@ -1507,7 +1448,6 @@ export function Session(props: {
                   <Prompt
                     visible={true}
                     ref={bind}
-                    disabled={false}
                     muted={props.promptMuted}
                     onSubmit={() => {
                       toBottom()
@@ -2522,12 +2462,24 @@ function QueuedPromptDock(props: { prompts: { id: string; text: string }[]; onOp
 
 function AssistantRetry(props: { retry: SessionMessageAssistant["retry"] }) {
   const theme = useTheme()
+  const [seconds, setSeconds] = createSignal(0)
+  createEffect(() => {
+    const at = props.retry?.at
+    if (at === undefined) return
+    const update = () => setSeconds(Math.max(0, Math.ceil((at - Date.now()) / 1_000)))
+    if (update() === 0) return
+    const timer = setInterval(() => {
+      if (update() === 0) clearInterval(timer)
+    }, 1_000)
+    onCleanup(() => clearInterval(timer))
+  })
   return (
     <Show when={props.retry}>
       {(retry) => (
         <box paddingLeft={3}>
           <text fg={theme.text.feedback.warning.default}>
-            ⚠ Retry attempt {retry().attempt} scheduled: {retry().error.message}
+            ⚠ {seconds() > 0 ? `Retrying in ${seconds()}s` : "Retry due"} · attempt {retry().attempt} ·{" "}
+            {retry().error.message}
           </text>
         </box>
       )}
@@ -2926,6 +2878,7 @@ function InlineTool(props: {
   pending: string
   failure?: string
   spinner?: boolean
+  running?: boolean
   status?: JSX.Element
   children: JSX.Element
   part: SessionMessageAssistantTool
@@ -2937,7 +2890,9 @@ function InlineTool(props: {
   const [errorExpanded, setErrorExpanded] = createSignal(false)
   const permission = useToolPermission(() => props.part)
 
-  const error = createMemo(() => (props.part.state.status === "error" ? props.part.state.error.message : undefined))
+  const error = createMemo(() =>
+    !props.running && props.part.state.status === "error" ? props.part.state.error.message : undefined,
+  )
 
   const denied = createMemo(
     () =>
@@ -3482,6 +3437,7 @@ function Subagent(props: ToolProps) {
     <InlineTool
       icon={continuation() ? "↳" : isRunning() ? "│" : props.part.state.status === "completed" ? "✓" : "│"}
       spinner={!continuation() && isRunning()}
+      running={isRunning()}
       complete={description()}
       pending="Delegating…"
       part={props.part}
