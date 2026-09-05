@@ -56,6 +56,7 @@ export function createMetadataStore(stateDirectory: string) {
       await Bun.write(temporary, `${JSON.stringify(record, undefined, 2)}\n`)
       await fs.rename(temporary, destination)
     },
+    remove: (records: readonly RiftCheckout[]) => Promise.all(records.map((record) => fs.rm(file(record.directory)))),
   }
 }
 

@@ -6101,6 +6101,12 @@ export type ServerBocWorktreeRiftCapabilityOutput =
       message: string
     }
 
+export type ServerBocWorktreeRiftTrashOutput = { checkouts: number }
+
+export type ServerBocWorktreeCleanupRiftTrashOutput =
+  | { completed: true; checkouts: number }
+  | { completed: false; checkouts: number }
+
 export type WorktreeListInput = { readonly projectID: { readonly projectID: string }["projectID"] }
 
 export type WorktreeListOutput = WorktreeList

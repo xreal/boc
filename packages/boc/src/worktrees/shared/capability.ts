@@ -1,1 +1,7 @@
-export { RIFT_BACKEND_VERSION, RiftCapability, RiftCapabilityReason } from "@opencode-ai/schema/boc/rift"
+export {
+  RIFT_BACKEND_VERSION,
+  RiftCapability,
+  RiftCapabilityReason,
+  RiftCleanupResult,
+  RiftTrashSummary,
+} from "@opencode-ai/schema/boc/rift"

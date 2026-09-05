@@ -240,6 +240,8 @@ import type {
   ReferenceListOutput,
   ServerBocWorktreeRiftCapabilityInput,
   ServerBocWorktreeRiftCapabilityOutput,
+  ServerBocWorktreeRiftTrashOutput,
+  ServerBocWorktreeCleanupRiftTrashOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1462,8 +1464,20 @@ const EndpointServerBocWorktreeRiftCapability =
       }).pipe(Effect.mapError(mapClientError)),
     )
 
+const EndpointServerBocWorktreeRiftTrash = (raw: RawClient["server.boc.worktree"]) => () =>
+  preserveEffect<ServerBocWorktreeRiftTrashOutput>()(
+    raw["boc.worktree.riftTrash"]({}).pipe(Effect.mapError(mapClientError)),
+  )
+
+const EndpointServerBocWorktreeCleanupRiftTrash = (raw: RawClient["server.boc.worktree"]) => () =>
+  preserveEffect<ServerBocWorktreeCleanupRiftTrashOutput>()(
+    raw["boc.worktree.cleanupRiftTrash"]({}).pipe(Effect.mapError(mapClientError)),
+  )
+
 const adaptGroupServerBocWorktree = (raw: RawClient["server.boc.worktree"]) => ({
   riftCapability: EndpointServerBocWorktreeRiftCapability(raw),
+  riftTrash: EndpointServerBocWorktreeRiftTrash(raw),
+  cleanupRiftTrash: EndpointServerBocWorktreeCleanupRiftTrash(raw),
 })
 
 const EndpointWorktreeList = (raw: RawClient["server.worktree"]) => (input: WorktreeListInput) =>

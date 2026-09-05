@@ -236,6 +236,8 @@ import type {
   ReferenceListOutput,
   ServerBocWorktreeRiftCapabilityInput,
   ServerBocWorktreeRiftCapabilityOutput,
+  ServerBocWorktreeRiftTrashOutput,
+  ServerBocWorktreeCleanupRiftTrashOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1976,6 +1978,28 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/boc/worktree/${encodeURIComponent(input.projectID)}/rift-capability`,
             query: { source: input["source"], directory: input["directory"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      riftTrash: (requestOptions?: RequestOptions) =>
+        request<ServerBocWorktreeRiftTrashOutput>(
+          {
+            method: "GET",
+            path: `/api/boc/worktree/rift-trash`,
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      cleanupRiftTrash: (requestOptions?: RequestOptions) =>
+        request<ServerBocWorktreeCleanupRiftTrashOutput>(
+          {
+            method: "POST",
+            path: `/api/boc/worktree/rift-trash/cleanup`,
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

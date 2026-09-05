@@ -11,21 +11,30 @@ export const BocWorktreeHandler = HttpApiBuilder.group(Api, "server.boc.worktree
     const rift = yield* RiftBackendService
     const worktrees = yield* Worktree.Service
 
-    return handlers.handle("boc.worktree.riftCapability", (context) =>
-      Effect.gen(function* () {
-        if (!rift.enabled) {
-          return unavailable("backend-unavailable", "This server does not provide Boc Rift checkouts.")
-        }
-        const directories = yield* worktrees.list(context.params.projectID)
-        if (!directories.some((item) => item.directory === context.query.source)) {
-          return unavailable("project-mismatch", "The selected source is not registered for this project.")
-        }
-        if (path.resolve(context.query.directory) !== path.dirname(context.query.source)) {
-          return unavailable("project-mismatch", "Rift checkouts must use the project's sibling storage location.")
-        }
-        return yield* Effect.promise(() => rift.capability(context.query.directory))
-      }),
-    )
+    return handlers
+      .handle("boc.worktree.riftCapability", (context) =>
+        Effect.gen(function* () {
+          if (!rift.enabled) {
+            return unavailable("backend-unavailable", "This server does not provide Boc Rift checkouts.")
+          }
+          const directories = yield* worktrees.list(context.params.projectID)
+          if (!directories.some((item) => item.directory === context.query.source)) {
+            return unavailable("project-mismatch", "The selected source is not registered for this project.")
+          }
+          if (path.resolve(context.query.directory) !== path.dirname(context.query.source)) {
+            return unavailable("project-mismatch", "Rift checkouts must use the project's sibling storage location.")
+          }
+          return yield* Effect.promise(() => rift.capability(context.query.directory))
+        }),
+      )
+      .handle("boc.worktree.riftTrash", () =>
+        rift.enabled ? Effect.promise(rift.trash) : Effect.succeed({ checkouts: 0 }),
+      )
+      .handle("boc.worktree.cleanupRiftTrash", () =>
+        rift.enabled
+          ? Effect.promise(rift.cleanup)
+          : Effect.succeed({ completed: false as const, checkouts: 0 }),
+      )
   }),
 )
 

@@ -13,10 +13,28 @@ it.live("exposes Rift capability only from a Boc backend and registered project"
 
     const boc = yield* requestCapability(tmp.path, "boc")
     expect(boc).toMatchObject({ available: false, backend: "boc/rift", reason: "project-mismatch" })
+
+    expect(yield* requestJson(tmp.path, "/api/boc/worktree/rift-trash")).toEqual({ checkouts: 0 })
+    expect(yield* requestJson(tmp.path, "/api/boc/worktree/rift-trash/cleanup", "POST")).toEqual({
+      completed: false,
+      checkouts: 0,
+    })
   }),
 )
 
 const requestCapability = Effect.fnUntraced(function* (directory: string, channel?: string) {
+  const url = new URL("/api/boc/worktree/project/rift-capability", "http://opencode.local")
+  url.searchParams.set("source", directory)
+  url.searchParams.set("directory", directory)
+  return yield* requestJson(directory, url, "GET", channel)
+})
+
+const requestJson = Effect.fnUntraced(function* (
+  directory: string,
+  target: string | URL,
+  method = "GET",
+  channel?: string,
+) {
   const context = yield* Layer.build(
     createRoutes({
       password: "secret",
@@ -28,12 +46,10 @@ const requestCapability = Effect.fnUntraced(function* (directory: string, channe
     }).pipe(Layer.provide(HttpServer.layerServices)),
   )
   const handler = Context.get(context, HttpRouter.HttpRouter).asHttpEffect().pipe(HttpEffect.toWebHandlerWith(context))
-  const url = new URL("/api/boc/worktree/project/rift-capability", "http://opencode.local")
-  url.searchParams.set("source", directory)
-  url.searchParams.set("directory", directory)
   const response = yield* Effect.promise((signal) =>
     handler(
-      new Request(url, {
+      new Request(new URL(target, "http://opencode.local"), {
+        method,
         headers: { authorization: `Basic ${btoa("opencode:secret")}` },
         signal,
       }),

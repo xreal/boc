@@ -23,6 +23,8 @@ export interface RiftBackend {
   readonly enabled: boolean
   readonly strategy: Worktree.Strategy
   readonly capability: (directory: string) => ReturnType<typeof inspectRiftCapability>
+  readonly trash: () => Promise<{ checkouts: number }>
+  readonly cleanup: () => Promise<{ completed: boolean; checkouts: number }>
 }
 
 export class RiftBackendService extends Context.Service<RiftBackendService, RiftBackend>()("@boc/RiftBackend") {}
@@ -83,7 +85,22 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
       }),
   }
 
-  return { strategy, capability }
+  const trash = async () => ({ checkouts: (await removedRecords()).length })
+  const cleanup = () =>
+    serialize(async () => {
+      const records = await removedRecords()
+      if (records.length === 0) return { completed: true as const, checkouts: 0 }
+      const cleaned = await rift(["gc"])
+      if (!cleaned.ok) return { completed: false as const, checkouts: records.length }
+      await metadata.remove(records)
+      return { completed: true as const, checkouts: records.length }
+    })
+
+  return { strategy, capability, trash, cleanup }
+
+  async function removedRecords() {
+    return (await metadata.list()).filter((record) => record.state === "removed")
+  }
 
   async function createCheckout(input: Parameters<Worktree.Strategy["create"]>[0]) {
     const availability = await capability(input.directory)

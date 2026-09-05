@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { NonNegativeInt } from "../schema.js"
 
 export const RIFT_BACKEND_VERSION = "0.0.10"
 
@@ -30,3 +31,12 @@ export const RiftCapability = Schema.Union([
   }),
 ])
 export type RiftCapability = typeof RiftCapability.Type
+
+export const RiftTrashSummary = Schema.Struct({ checkouts: NonNegativeInt })
+export type RiftTrashSummary = typeof RiftTrashSummary.Type
+
+export const RiftCleanupResult = Schema.Union([
+  Schema.Struct({ completed: Schema.Literal(true), checkouts: NonNegativeInt }),
+  Schema.Struct({ completed: Schema.Literal(false), checkouts: NonNegativeInt }),
+])
+export type RiftCleanupResult = typeof RiftCleanupResult.Type

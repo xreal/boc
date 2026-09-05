@@ -1957,8 +1957,21 @@ export type ServerBocWorktreeRiftCapabilityOperation<E = never> = (
   input: ServerBocWorktreeRiftCapabilityInput,
 ) => Effect.Effect<ServerBocWorktreeRiftCapabilityOutput, E>
 
+export type ServerBocWorktreeRiftTrashOutput = { readonly checkouts: number }
+export type ServerBocWorktreeRiftTrashOperation<E = never> = () => Effect.Effect<ServerBocWorktreeRiftTrashOutput, E>
+
+export type ServerBocWorktreeCleanupRiftTrashOutput =
+  | { readonly completed: true; readonly checkouts: number }
+  | { readonly completed: false; readonly checkouts: number }
+export type ServerBocWorktreeCleanupRiftTrashOperation<E = never> = () => Effect.Effect<
+  ServerBocWorktreeCleanupRiftTrashOutput,
+  E
+>
+
 export interface ServerBocWorktreeApi<E = never> {
   readonly riftCapability: ServerBocWorktreeRiftCapabilityOperation<E>
+  readonly riftTrash: ServerBocWorktreeRiftTrashOperation<E>
+  readonly cleanupRiftTrash: ServerBocWorktreeCleanupRiftTrashOperation<E>
 }
 
 export type WorktreeListInput = { readonly projectID: Project.ID }

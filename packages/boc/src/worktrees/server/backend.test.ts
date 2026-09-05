@@ -83,6 +83,9 @@ describe("Rift backend", () => {
 
         await Effect.runPromise(backend.strategy.remove({ directory: destination, force: true }))
         expect(await directoryExists(destination)).toBe(false)
+        expect(await backend.trash()).toEqual({ checkouts: 1 })
+        expect(await backend.cleanup()).toEqual({ completed: true, checkouts: 1 })
+        expect(await backend.trash()).toEqual({ checkouts: 0 })
         expect(await Effect.runPromise(backend.strategy.list(source))).not.toContainEqual({
           directory: destination,
           type: "worktree",
