@@ -17,7 +17,7 @@ import type { LocalProject } from "@/shell/state/layout"
 import { SettingsRow } from "@/settings/row"
 import { backendName, capabilityReason, type RiftCapability, type WorktreeProjectBackend } from "./policy"
 
-export function BocWorktreeDefaultSetting(props: { server?: ServerConnection.Any }) {
+export function BocWorktreeDefaultSetting() {
   const desktop = useBocDesktop()
   const language = useLanguage()
   const platform = usePlatform()
@@ -44,7 +44,6 @@ export function BocWorktreeDefaultSetting(props: { server?: ServerConnection.Any
     if (platform.platform === "desktop" && platform.os === "windows") {
       return t("boc.worktrees.method.windowsUnsupported")
     }
-    if (!props.server || !ServerConnection.local(props.server)) return t("boc.worktrees.method.localOnly")
   }
   const select = async (backend: "git" | "rift") => {
     if (!desktop || state.saving || state.backend === backend || (backend === "rift" && unavailable())) return

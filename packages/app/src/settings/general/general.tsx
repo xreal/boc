@@ -327,7 +327,7 @@ export const SettingsGeneral: Component<{
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
-        <BocWorktreeDefaultSetting server={props.server} />
+        <BocWorktreeDefaultSetting />
         <AutoApprovePermissionsSetting />
 
         <ShellSetting controller={shell} />
