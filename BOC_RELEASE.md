@@ -6,7 +6,7 @@ This runbook covers the private GitHub release archive and the public Electron u
 
 - GitHub remains private. Each successful run creates a private GitHub Release with the desktop installers, updater metadata, blockmaps, and SHA-256 checksums.
 - Cloudflare R2 serves only the public update files through `https://boc-updates.bergdev.de`.
-- Installer names contain the version and are immutable. The four `latest*.yml` files are the only mutable objects and are uploaded after every platform artifact has been built and validated.
+- Installer names contain the version and are immutable. The three `latest*.yml` files are the only mutable objects and are uploaded after every platform artifact has been built and validated.
 - The existing Electron updater reads the generic R2 feed. No GitHub token is shipped in the application.
 
 The release workflow is `.github/workflows/boc-release.yml`. Release preparation and R2 publishing live under `packages/boc/scripts/release/`.
@@ -39,14 +39,13 @@ The workflow deliberately verifies macOS signing and notarization before anythin
 1. Finish and verify the intended commit on `boc-beta`.
 2. Choose a new stable semantic version such as `0.1.0`. Prerelease versions are intentionally rejected because the desktop updater follows the stable `latest` channel.
 3. Open **Actions → Boc release → Run workflow**, select `boc-beta`, and enter the version without a leading `v`.
-4. Wait for all six desktop builds and the publish job. The workflow builds macOS, Windows, and Linux packages for x64 and arm64 on GitHub-hosted runners.
+4. Wait for all three desktop builds and the publish job. The initial release set is macOS Apple Silicon, Windows x64, and Linux x64 on GitHub-hosted runners. macOS Intel and Windows/Linux ARM are paused until they are needed.
 5. Confirm that the private GitHub Release `v<version>` is published and that the public update manifests return the same version:
 
    ```sh
    curl -fsS https://boc-updates.bergdev.de/latest.yml
    curl -fsS https://boc-updates.bergdev.de/latest-mac.yml
    curl -fsS https://boc-updates.bergdev.de/latest-linux.yml
-   curl -fsS https://boc-updates.bergdev.de/latest-linux-arm64.yml
    ```
 
 6. Install the package on each supported operating system. Starting with the second release, keep the previous version installed on at least one machine and confirm that **Check for Updates** downloads and installs the new version.

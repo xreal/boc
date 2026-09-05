@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(fixtures.splice(0).map((fixture) => rm(fixture, { recursive: true, force: true })))
 })
 
-test("merges architecture manifests and verifies versioned release assets", async () => {
+test("verifies the initial release targets and their versioned assets", async () => {
   const directory = await fixture("1.2.3")
   const release = await prepareRelease(directory, "1.2.3")
 
@@ -20,22 +20,18 @@ test("merges architecture manifests and verifies versioned release assets", asyn
     "latest.yml",
     "latest-mac.yml",
     "latest-linux.yml",
-    "latest-linux-arm64.yml",
   ])
-  expect(release.manifests.find((manifest) => manifest.name === "latest.yml")?.content).toContain(
-    "boc-desktop-1.2.3-win-arm64.exe",
-  )
   expect(release.manifests.find((manifest) => manifest.name === "latest.yml")?.content).toContain(
     "boc-desktop-1.2.3-win-x64.exe",
   )
-  expect(release.assets).toHaveLength(6)
+  expect(release.assets).toHaveLength(3)
   expect(release.assets.every((asset) => asset.name.includes("-1.2.3-"))).toBe(true)
 })
 
 test("rejects an incomplete platform set", async () => {
   const directory = await fixture("1.2.3")
-  await rm(path.join(directory, "linux-arm64", "latest-linux-arm64.yml"))
-  await expect(prepareRelease(directory, "1.2.3")).rejects.toThrow("Expected 1 latest-linux-arm64.yml file(s), found 0")
+  await rm(path.join(directory, "linux-x64", "latest-linux.yml"))
+  await expect(prepareRelease(directory, "1.2.3")).rejects.toThrow("Expected 1 latest-linux.yml file(s), found 0")
 })
 
 test("rejects a manifest built for another version", async () => {
@@ -80,17 +76,8 @@ async function fixture(version: string) {
   fixtures.push(directory)
   await Promise.all([
     writeManifest(directory, "windows-x64", "latest.yml", `boc-desktop-${version}-win-x64.exe`, version),
-    writeManifest(directory, "windows-arm64", "latest.yml", `boc-desktop-${version}-win-arm64.exe`, version),
-    writeManifest(directory, "mac-x64", "latest-mac.yml", `boc-desktop-${version}-mac-x64.zip`, version),
     writeManifest(directory, "mac-arm64", "latest-mac.yml", `boc-desktop-${version}-mac-arm64.zip`, version),
     writeManifest(directory, "linux-x64", "latest-linux.yml", `boc-desktop-${version}-linux-x64.AppImage`, version),
-    writeManifest(
-      directory,
-      "linux-arm64",
-      "latest-linux-arm64.yml",
-      `boc-desktop-${version}-linux-arm64.AppImage`,
-      version,
-    ),
   ])
   return directory
 }

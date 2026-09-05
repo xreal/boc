@@ -5,10 +5,9 @@ import path from "node:path"
 import { parse, stringify } from "yaml"
 
 const requiredManifests = new Map([
-  ["latest.yml", 2],
-  ["latest-mac.yml", 2],
+  ["latest.yml", 1],
+  ["latest-mac.yml", 1],
   ["latest-linux.yml", 1],
-  ["latest-linux-arm64.yml", 1],
 ])
 
 const releaseAssetPattern = /\.(?:exe|dmg|zip|appimage|deb|rpm)(?:\.blockmap)?$/i

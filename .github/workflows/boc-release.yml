@@ -117,10 +117,6 @@ jobs:
       fail-fast: false
       matrix:
         settings:
-          - runner: macos-15-intel
-            target: x86_64-apple-darwin
-            platform_flags: --mac --x64
-            install_flags: --os=darwin --cpu=x64
           - runner: macos-15
             target: aarch64-apple-darwin
             platform_flags: --mac --arm64
@@ -129,17 +125,9 @@ jobs:
             target: x86_64-pc-windows-msvc
             platform_flags: --win --x64
             install_flags: ""
-          - runner: windows-2025
-            target: aarch64-pc-windows-msvc
-            platform_flags: --win --arm64
-            install_flags: ""
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             platform_flags: --linux --x64
-            install_flags: ""
-          - runner: ubuntu-24.04-arm
-            target: aarch64-unknown-linux-gnu
-            platform_flags: --linux --arm64
             install_flags: ""
     runs-on: ${{ matrix.settings.runner }}
     env:
