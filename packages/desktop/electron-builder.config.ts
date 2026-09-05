@@ -18,6 +18,7 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
 const riftResource = path.join(packageDir, "resources", "rift", "rift")
+const windowsSigning = process.env.OPENCODE_WINDOWS_SIGNING !== "false"
 
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
@@ -25,6 +26,7 @@ const metainfoFpm = (appId: string) =>
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
   if (process.env.GITHUB_ACTIONS !== "true") return
+  if (!windowsSigning) return
 
   await execFileAsync(
     "pwsh",
@@ -211,8 +213,8 @@ function getConfig() {
         publish: { provider: "generic", url: "https://boc-updates.bergdev.de", channel: "latest" },
         win: {
           ...base.win,
-          publisherName: process.env.WINDOWS_PUBLISHER_NAME,
-          verifyUpdateCodeSignature: true,
+          publisherName: windowsSigning ? process.env.WINDOWS_PUBLISHER_NAME : undefined,
+          verifyUpdateCodeSignature: windowsSigning,
         },
         deb: { fpm: [metainfoFpm(appId)] },
         rpm: { packageName: "boc-beta", fpm: [metainfoFpm(appId)] },

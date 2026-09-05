@@ -234,3 +234,26 @@ test("publishes Boc updates through versioned public R2 artifacts", async () => 
     else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
   }
 })
+
+test("supports unsigned Boc Windows releases", async () => {
+  const previousChannel = process.env.OPENCODE_CHANNEL
+  const previousSigning = process.env.OPENCODE_WINDOWS_SIGNING
+  const previousPublisher = process.env.WINDOWS_PUBLISHER_NAME
+  process.env.OPENCODE_CHANNEL = "boc"
+  process.env.OPENCODE_WINDOWS_SIGNING = "false"
+  process.env.WINDOWS_PUBLISHER_NAME = "Boc Release Publisher"
+  try {
+    const module = await import("./electron-builder.config.ts?updates=boc-unsigned")
+    const config = module.default as Configuration
+
+    expect(config.win?.publisherName).toBeUndefined()
+    expect(config.win?.verifyUpdateCodeSignature).toBe(false)
+  } finally {
+    if (previousChannel === undefined) delete process.env.OPENCODE_CHANNEL
+    else process.env.OPENCODE_CHANNEL = previousChannel
+    if (previousSigning === undefined) delete process.env.OPENCODE_WINDOWS_SIGNING
+    else process.env.OPENCODE_WINDOWS_SIGNING = previousSigning
+    if (previousPublisher === undefined) delete process.env.WINDOWS_PUBLISHER_NAME
+    else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
+  }
+})

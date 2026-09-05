@@ -105,7 +105,6 @@ jobs:
     environment: release
     permissions:
       contents: read
-      id-token: write
     timeout-minutes: 75
     strategy:
       fail-fast: false
@@ -137,17 +136,11 @@ jobs:
             install_flags: ""
     runs-on: ${{ matrix.settings.runner }}
     env:
-      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-      AZURE_TRUSTED_SIGNING_ACCOUNT_NAME: ${{ secrets.AZURE_TRUSTED_SIGNING_ACCOUNT_NAME }}
-      AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE: ${{ secrets.AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE }}
-      AZURE_TRUSTED_SIGNING_ENDPOINT: ${{ secrets.AZURE_TRUSTED_SIGNING_ENDPOINT }}
-      WINDOWS_PUBLISHER_NAME: ${{ vars.WINDOWS_PUBLISHER_NAME }}
       OPENCODE_CHANNEL: boc
       OPENCODE_CLI_DIST: ${{ github.workspace }}/packages/cli/dist
       OPENCODE_CLI_TARGET: ${{ matrix.settings.target }}
       OPENCODE_VERSION: ${{ inputs.version }}
+      OPENCODE_WINDOWS_SIGNING: "false"
     steps:
       - uses: actions/checkout@f43a0e5ff2bd294095638e18286ca9a3d1956744 # v3.6.0
 
@@ -174,22 +167,6 @@ jobs:
         with:
           install-flags: ${{ matrix.settings.install_flags }}
 
-      - name: Validate Windows publisher identity
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          if ([string]::IsNullOrWhiteSpace($env:WINDOWS_PUBLISHER_NAME)) {
-            throw "WINDOWS_PUBLISHER_NAME must match the signing certificate subject common name"
-          }
-
-      - name: Sign in to Azure for Windows signing
-        if: runner.os == 'Windows'
-        uses: azure/login@a457da9ea143d694b1b9c7c869ebb04ebe844ef5 # v2.3.0
-        with:
-          client-id: ${{ env.AZURE_CLIENT_ID }}
-          tenant-id: ${{ env.AZURE_TENANT_ID }}
-          subscription-id: ${{ env.AZURE_SUBSCRIPTION_ID }}
-
       - name: Install Linux packaging dependencies
         if: runner.os == 'Linux'
         shell: bash
@@ -207,7 +184,7 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
-      - name: Package signed desktop application
+      - name: Package desktop application
         working-directory: packages/desktop
         run: bunx electron-builder ${{ matrix.settings.platform_flags }} --publish never --config electron-builder.config.ts
         timeout-minutes: 60
@@ -230,30 +207,6 @@ jobs:
           codesign --verify --deep --strict --verbose=4 "$app"
           spctl --assess --type execute --verbose=4 "$app"
           xcrun stapler validate "$app"
-
-      - name: Verify Windows signatures
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $files = @()
-          $files += Get-ChildItem "${{ github.workspace }}\packages\desktop\dist\*.exe" | Select-Object -ExpandProperty FullName
-          $files += Get-ChildItem "${{ github.workspace }}\packages\desktop\dist\*unpacked\*.exe" | Select-Object -ExpandProperty FullName
-          $files += Get-ChildItem "${{ github.workspace }}\packages\desktop\dist\*unpacked\resources\opencode-cli.exe" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty FullName
-          $files = @($files | Select-Object -Unique)
-          if ($files.Count -eq 0) { throw "No Windows executables found" }
-          foreach ($file in $files) {
-            $signature = Get-AuthenticodeSignature $file
-            if ($signature.Status -ne "Valid") {
-              throw "Invalid signature for ${file}: $($signature.Status)"
-            }
-            $publisher = $signature.SignerCertificate.GetNameInfo(
-              [System.Security.Cryptography.X509Certificates.X509NameType]::SimpleName,
-              $false
-            )
-            if ($publisher -ne $env:WINDOWS_PUBLISHER_NAME) {
-              throw "Unexpected publisher for ${file}: $publisher"
-            }
-          }
 
       - name: Verify updater metadata exists
         working-directory: packages/desktop

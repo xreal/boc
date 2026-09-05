@@ -103,11 +103,11 @@
     },
     {
       "path": "packages/desktop/electron-builder.config.test.ts",
-      "reason": "Verify Boc channel packaging identity and public R2 updater metadata"
+      "reason": "Verify Boc channel packaging identity, unsigned Windows releases, and public R2 updater metadata"
     },
     {
       "path": "packages/desktop/electron-builder.config.ts",
-      "reason": "Configure Boc channel packaging identity, versioned artifacts, and public R2 updates"
+      "reason": "Configure Boc channel packaging identity, optional Windows signing, versioned artifacts, and public R2 updates"
     },
     {
       "path": "packages/desktop/electron.vite.config.ts",
@@ -127,7 +127,7 @@
     },
     {
       "path": "packages/desktop/scripts/utils.ts",
-      "reason": "Describe the Boc release channel"
+      "reason": "Describe the Boc release channel and skip CLI signing for unsigned Boc Windows releases"
     },
     {
       "path": "packages/desktop/src/main/constants.ts",

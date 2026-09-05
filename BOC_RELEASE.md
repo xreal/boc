@@ -4,9 +4,9 @@ This runbook covers the private GitHub release archive and the public Electron u
 
 ## Delivery model
 
-- GitHub remains private. Each successful run creates a private GitHub Release with the signed installers, updater metadata, blockmaps, and SHA-256 checksums.
+- GitHub remains private. Each successful run creates a private GitHub Release with the desktop installers, updater metadata, blockmaps, and SHA-256 checksums.
 - Cloudflare R2 serves only the public update files through `https://boc-updates.bergdev.de`.
-- Installer names contain the version and are immutable. The four `latest*.yml` files are the only mutable objects and are uploaded after every platform artifact has been built, signed, and validated.
+- Installer names contain the version and are immutable. The four `latest*.yml` files are the only mutable objects and are uploaded after every platform artifact has been built and validated.
 - The existing Electron updater reads the generic R2 feed. No GitHub token is shipped in the application.
 
 The release workflow is `.github/workflows/boc-release.yml`. Release preparation and R2 publishing live under `packages/boc/scripts/release/`.
@@ -22,7 +22,6 @@ Create a GitHub environment named `release` and restrict deployment branches to 
 | Kind     | Name                                        | Purpose                                                     |
 | -------- | ------------------------------------------- | ----------------------------------------------------------- |
 | Variable | `CLOUDFLARE_ACCOUNT_ID`                     | Builds the account-scoped R2 S3 endpoint.                   |
-| Variable | `WINDOWS_PUBLISHER_NAME`                    | Exact certificate subject common name verified by Electron. |
 | Secret   | `R2_ACCESS_KEY_ID`                          | R2 S3-compatible access key.                                |
 | Secret   | `R2_SECRET_ACCESS_KEY`                      | R2 S3-compatible secret key.                                |
 | Secret   | `MACOS_CERTIFICATE_P12`                     | Base64-encoded Developer ID Application certificate export. |
@@ -30,16 +29,10 @@ Create a GitHub environment named `release` and restrict deployment branches to 
 | Secret   | `APPLE_API_KEY_P8_BASE64`                   | Base64-encoded App Store Connect API private key.           |
 | Secret   | `APPLE_API_KEY_ID`                          | App Store Connect API key ID.                               |
 | Secret   | `APPLE_API_ISSUER_ID`                       | App Store Connect API issuer ID.                            |
-| Secret   | `AZURE_CLIENT_ID`                           | Azure application used by GitHub OIDC.                      |
-| Secret   | `AZURE_SUBSCRIPTION_ID`                     | Azure subscription containing Artifact Signing.             |
-| Secret   | `AZURE_TENANT_ID`                           | Azure tenant used by GitHub OIDC.                           |
-| Secret   | `AZURE_TRUSTED_SIGNING_ACCOUNT_NAME`        | Artifact Signing account name.                              |
-| Secret   | `AZURE_TRUSTED_SIGNING_CERTIFICATE_PROFILE` | Public-trust certificate profile name.                      |
-| Secret   | `AZURE_TRUSTED_SIGNING_ENDPOINT`            | Regional Artifact Signing endpoint.                         |
 
-The Apple certificate must be valid for Developer ID distribution, and the API key must be allowed to submit notarization requests. The Azure application needs a federated credential restricted to this repository's `release` environment and the Artifact Signing Certificate Profile Signer role on the selected signing resource.
+The Apple certificate must be valid for Developer ID distribution, and the API key must be allowed to submit notarization requests.
 
-The workflow deliberately verifies macOS notarization and every Windows executable signature. Missing or incomplete signing configuration fails the release before anything becomes current in R2.
+The workflow deliberately verifies macOS signing and notarization before anything becomes current in R2. Windows packages are intentionally unsigned and can therefore trigger Microsoft Defender SmartScreen warnings; add a signing provider and re-enable update signature verification before distributing Boc broadly to Windows users.
 
 ## Create a release
 
@@ -56,7 +49,7 @@ The workflow deliberately verifies macOS notarization and every Windows executab
    curl -fsS https://boc-updates.bergdev.de/latest-linux-arm64.yml
    ```
 
-6. Install the signed package on each supported operating system. Starting with the second release, keep the previous version installed on at least one machine and confirm that **Check for Updates** downloads and installs the new version.
+6. Install the package on each supported operating system. Starting with the second release, keep the previous version installed on at least one machine and confirm that **Check for Updates** downloads and installs the new version.
 
 GitHub Actions usage in a private repository is billed against the account's included minutes and configured spending limits. macOS minutes are usually the largest part of one release.
 
@@ -64,7 +57,7 @@ GitHub Actions usage in a private repository is billed against the account's inc
 
 - A release tag may be retried only from the same commit. Prefer GitHub's **Re-run failed jobs** so the publish job reuses the original build artifacts.
 - Existing versioned R2 objects are reused only when their size and SHA-512 checksum match. A different file with the same name is rejected instead of overwritten.
-- A failed build or signing check never changes an updater manifest.
+- A failed build or macOS signing check never changes an updater manifest.
 - A publish interruption can be retried with the preserved artifacts. A complete rebuild can produce different signed bytes even from the same commit; in that case, use a new patch version rather than replacing immutable objects.
 - Do not delete old assets as part of a routine release. Ship a newer patch version to supersede a bad release.
 
