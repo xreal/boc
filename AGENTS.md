@@ -19,6 +19,10 @@
 - Never include personal names, email addresses, or user-specific absolute paths in repository files, plans, handovers, or prompts. Use role-based wording and repository-relative paths.
 - When the fork opens to other contributors, replace this policy with branch protection, required checks, and pull-request review before merging.
 
+## Fork integration map and upstream sync
+- `BOC_FORK.md` is the maintained map of implemented fork capabilities, upstream-owned seams, and upstream APIs Boc relies on. Read it before changing a fork integration or syncing upstream, and update it in the same commit whenever those facts change.
+- Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
+
 ---
 <!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->
 ---
