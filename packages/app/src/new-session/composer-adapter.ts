@@ -17,6 +17,7 @@ import { useSessionKey } from "@/session/session-layout"
 import { showToast } from "@/shell/notifications/toast"
 import { SessionRouteKey, SessionStateKey } from "@/runtime/server/scope"
 import { clearSessionMessageHandoff, setSessionMessageHandoff } from "@/session/handoff"
+import { useBocSessionLink } from "@/boc/session-links"
 import { useBocWorktreeStrategy } from "@/boc/worktrees/policy"
 
 export function createNewSessionComposerAdapter(props: {
@@ -36,6 +37,7 @@ export function createNewSessionComposerAdapter(props: {
   const location = useWorkspaceLocation()
   const language = useLanguage()
   const worktreeStrategy = useBocWorktreeStrategy()
+  const linkSession = useBocSessionLink()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
   const controls = createComposerControls({ sessionKey: route.sessionKey, model })
 
@@ -81,6 +83,10 @@ export function createNewSessionComposerAdapter(props: {
         },
         location: { directory: sessionDirectory },
       })
+      void created.request.then(
+        () => linkSession({ draftID, server: server.key, sessionID: created.id }),
+        () => undefined,
+      )
       const creation = created.request.then(
         () => ({ ok: true as const }),
         (error) => {

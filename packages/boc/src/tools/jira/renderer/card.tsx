@@ -25,7 +25,7 @@ export function JiraIssueCard(props: {
         data-selected={props.selected ? "" : undefined}
         aria-expanded={props.selected}
         aria-controls="boc-jira-issue-inspector"
-        class="flex w-full flex-col gap-1.5 rounded-[6px] bg-v2-background-bg-button-neutral px-3 py-2.5 text-left outline-none transition-[box-shadow,background-color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
+        class="flex w-full flex-col gap-1.5 rounded-[6px] bg-v2-background-bg-button-neutral hover:bg-[linear-gradient(var(--v2-overlay-simple-overlay-hover),var(--v2-overlay-simple-overlay-hover))] px-3 py-2.5 text-left outline-none transition-[box-shadow,background-color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
         classList={{
           "shadow-[0_0_0_0.5px_var(--v2-border-border-base)] hover:shadow-[0_0_0_0.5px_var(--v2-border-border-strong)]":
             !props.selected,

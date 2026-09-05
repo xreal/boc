@@ -88,6 +88,9 @@ describe("Jira RPC success schemas", () => {
 
   test("registers connection and read-only board operations", () => {
     expect([...JiraRpcs.requests.keys()]).toEqual([
+      "BocJiraListSessionLinks",
+      "BocJiraSaveSessionLink",
+      "BocJiraPromoteSessionLink",
       "BocJiraGetConnectionStatus",
       "BocJiraTestConnection",
       "BocJiraSaveConnection",

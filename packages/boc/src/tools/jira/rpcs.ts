@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { JiraSessionLink } from "./domain/sessions"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
 import {
   JiraBoardIssue,
@@ -203,7 +204,25 @@ export const BocJiraSavePreferences = Rpc.make("BocJiraSavePreferences", {
   success: JiraPreferences,
 })
 
+export const BocJiraListSessionLinks = Rpc.make("BocJiraListSessionLinks", {
+  payload: { issueUrl: Schema.String },
+  success: Schema.Array(JiraSessionLink),
+})
+
+export const BocJiraSaveSessionLink = Rpc.make("BocJiraSaveSessionLink", {
+  payload: JiraSessionLink,
+  success: Schema.Void,
+})
+
+export const BocJiraPromoteSessionLink = Rpc.make("BocJiraPromoteSessionLink", {
+  payload: { draftID: Schema.String, server: Schema.String, sessionID: Schema.String },
+  success: Schema.Void,
+})
+
 export const JiraRpcs = RpcGroup.make(
+  BocJiraListSessionLinks,
+  BocJiraSaveSessionLink,
+  BocJiraPromoteSessionLink,
   BocJiraGetConnectionStatus,
   BocJiraTestConnection,
   BocJiraSaveConnection,

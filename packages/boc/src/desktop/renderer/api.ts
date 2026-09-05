@@ -48,6 +48,12 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
         invoke("BocDeploymentsSetAutoSync", input),
     },
     jira: {
+      listSessionLinks: (input: BocDesktopInvokeArgs<"BocJiraListSessionLinks">[0]) =>
+        invoke("BocJiraListSessionLinks", input),
+      saveSessionLink: (input: BocDesktopInvokeArgs<"BocJiraSaveSessionLink">[0]) =>
+        invoke("BocJiraSaveSessionLink", input),
+      promoteSessionLink: (input: BocDesktopInvokeArgs<"BocJiraPromoteSessionLink">[0]) =>
+        invoke("BocJiraPromoteSessionLink", input),
       getConnectionStatus: () => invoke("BocJiraGetConnectionStatus"),
       testConnection: (input: BocDesktopInvokeArgs<"BocJiraTestConnection">[0]) =>
         invoke("BocJiraTestConnection", input),

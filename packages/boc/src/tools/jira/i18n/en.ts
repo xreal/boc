@@ -1,4 +1,17 @@
 export const jiraEnglish = {
+  "boc.jira.sessions.title": "Sessions",
+  "boc.jira.sessions.start": "Start session",
+  "boc.jira.sessions.instructions": "Optional instructions",
+  "boc.jira.sessions.before": "Before the ticket",
+  "boc.jira.sessions.after": "After the ticket",
+  "boc.jira.sessions.review": "Review the ticket prompt and choose a project and model before sending.",
+  "boc.jira.sessions.empty": "No sessions started from this ticket yet.",
+  "boc.jira.sessions.loadFailed": "Could not load linked sessions.",
+  "boc.jira.sessions.startFailed": "Could not prepare the session.",
+  "boc.jira.sessions.linkFailed": "The session is available, but its Jira link could not be saved.",
+  "boc.jira.sessions.noProject": "Open a project from Home before starting a ticket session.",
+  "boc.jira.sessions.unavailable": "This session or its server is no longer available.",
+
   "boc.jira.title": "Jira",
   "boc.jira.placeholder.title": "Jira board",
   "boc.jira.placeholder.description": "Connect a Jira Cloud site to browse a read-only board.",

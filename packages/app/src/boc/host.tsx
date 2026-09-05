@@ -1,3 +1,4 @@
+import { createBocSessions } from "./session-links"
 import { useLocation, useNavigate } from "@solidjs/router"
 import type { BocHost } from "@boc/extensions/renderer"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -11,7 +12,10 @@ export function createBocHost(): BocHost {
   const platform = usePlatform()
   const language = useLanguage()
 
+  const sessions = createBocSessions()
+
   return {
+    sessions,
     navigate,
     location: () => ({ pathname: location.pathname, search: location.search }),
     route: () => {

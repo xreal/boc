@@ -35,7 +35,7 @@
     },
     {
       "path": "packages/app/src/new-session/composer-adapter.ts",
-      "reason": "Apply the Boc checkout strategy when a new session creates a checkout"
+      "reason": "Apply the Boc checkout strategy and notify the Boc bridge after successful session creation"
     },
     {
       "path": "packages/app/src/new-session/view.tsx",

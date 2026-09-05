@@ -1,3 +1,4 @@
+import { JiraIssueSessions } from "./sessions"
 import { Avatar } from "@opencode-ai/ui/avatar"
 import { Badge } from "@opencode-ai/ui/badge"
 import { Button } from "@opencode-ai/ui/button"
@@ -147,6 +148,8 @@ export function JiraIssueInspector(props: {
                   <Text value={jiraRelativeTime(issue().updatedAt, props.locale)} />
                 </Property>
               </dl>
+
+              <JiraIssueSessions issue={issue()} t={props.t} />
 
               <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
                 <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">

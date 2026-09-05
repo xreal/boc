@@ -20,7 +20,14 @@ import {
 import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchJiraIssue, type JiraAuth } from "./board-client"
 import { fetchJiraMyself, type JiraFetch, type JiraWait } from "./client"
 import { openToken, sealToken, type SecretVault } from "./credentials"
-import { readStoredConnection, readStoredPreferences, type JiraStore } from "./store"
+import {
+  readStoredConnection,
+  readStoredPreferences,
+  readSessionLinks,
+  saveSessionLink,
+  promoteSessionLink,
+  type JiraStore,
+} from "./store"
 import { createJiraReadCoordinator, type JiraReadCoordinator } from "./read-coordinator"
 
 export type JiraRuntime = {
@@ -34,6 +41,12 @@ export function createJiraHandlers(runtime: JiraRuntime) {
   const reads = createJiraReadCoordinator()
   return JiraRpcs.toLayer(
     JiraRpcs.of({
+      BocJiraListSessionLinks: (payload) =>
+        Effect.sync(() =>
+          readSessionLinks(runtime.store).filter((link) => link.issueUrl === payload.issueUrl && link.sessionID),
+        ),
+      BocJiraSaveSessionLink: (payload) => Effect.sync(() => saveSessionLink(runtime.store, payload)),
+      BocJiraPromoteSessionLink: (payload) => Effect.sync(() => promoteSessionLink(runtime.store, payload)),
       BocJiraGetConnectionStatus: () => Effect.sync(() => getConnectionStatus(runtime)),
       BocJiraTestConnection: (payload) => Effect.promise(() => testConnection(runtime, payload)),
       BocJiraSaveConnection: (payload) => Effect.promise(() => saveConnection(runtime, payload)),

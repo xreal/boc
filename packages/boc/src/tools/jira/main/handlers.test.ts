@@ -320,3 +320,49 @@ describe("Jira board handlers", () => {
     expect(result.after).toEqual({ savedBoards: [] })
   })
 })
+
+test("keeps multiple ticket sessions across handler restarts and disconnects without exposing drafts or other sites", async () => {
+  const jira = runtime()
+  const issueUrl = `${SITE_FIXTURE}/browse/APP-42`
+  const draft = { issueUrl, title: "APP-42: Fix checkout", draftID: "draft-1", server: "server-a", createdAt: 1 }
+  const links = await runJira(
+    jira,
+    Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(JiraRpcs)
+      yield* client.BocJiraSaveSessionLink(draft)
+      expect(yield* client.BocJiraListSessionLinks({ issueUrl })).toEqual([])
+      yield* client.BocJiraPromoteSessionLink({ draftID: draft.draftID, server: "server-b", sessionID: "session-1" })
+      // A delayed save or repeated promotion must not turn a real session back into a draft or replace it.
+      yield* client.BocJiraSaveSessionLink(draft)
+      yield* client.BocJiraPromoteSessionLink({
+        draftID: draft.draftID,
+        server: "server-a",
+        sessionID: "session-other",
+      })
+      yield* client.BocJiraSaveSessionLink({ ...draft, draftID: "draft-2", createdAt: 2 })
+      yield* client.BocJiraPromoteSessionLink({ draftID: "draft-2", server: "server-a", sessionID: "session-2" })
+      yield* client.BocJiraSaveSessionLink({
+        ...draft,
+        draftID: "draft-3",
+        issueUrl: "https://other.atlassian.net/browse/APP-42",
+      })
+      yield* client.BocJiraPromoteSessionLink({ draftID: "draft-3", server: "server-a", sessionID: "session-3" })
+      yield* client.BocJiraSaveSessionLink({ ...draft, draftID: "abandoned" })
+      yield* client.BocJiraPromoteSessionLink({ draftID: "unrelated", server: "server-a", sessionID: "unrelated" })
+      return yield* client.BocJiraListSessionLinks({ issueUrl })
+    }),
+  )
+  expect(links).toEqual([
+    { ...draft, server: "server-b", sessionID: "session-1" },
+    { ...draft, draftID: "draft-2", sessionID: "session-2", createdAt: 2 },
+  ])
+  const restored = await runJira(
+    jira,
+    Effect.gen(function* () {
+      const client = yield* RpcTest.makeClient(JiraRpcs)
+      yield* client.BocJiraDisconnect()
+      return yield* client.BocJiraListSessionLinks({ issueUrl })
+    }),
+  )
+  expect(restored).toEqual(links)
+})

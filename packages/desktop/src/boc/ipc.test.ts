@@ -3,6 +3,9 @@ import { BocDesktopRpcs } from "@boc/extensions/desktop/shared"
 import { DesktopRpcs } from "../shared/ipc-rpc"
 
 const jiraTags = [
+  "BocJiraListSessionLinks",
+  "BocJiraSaveSessionLink",
+  "BocJiraPromoteSessionLink",
   "BocJiraGetConnectionStatus",
   "BocJiraTestConnection",
   "BocJiraSaveConnection",
