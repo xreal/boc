@@ -27,6 +27,7 @@ import {
 } from "./controllers"
 import "@/settings/settings.css"
 import { ServerConnection } from "@/runtime/server/registry"
+import { BocWorktreeDefaultSetting } from "@/boc/worktrees/settings"
 
 const schemeOptions: ("system" | "light" | "dark")[] = ["system", "light", "dark"]
 const fontSettings = {
@@ -326,6 +327,7 @@ export const SettingsGeneral: Component<{
         <LanguageSetting />
 
         <WorkspaceDestinationSetting />
+        <BocWorktreeDefaultSetting server={props.server} />
         <AutoApprovePermissionsSetting />
 
         <ShellSetting controller={shell} />

@@ -17,6 +17,7 @@ import { useSessionKey } from "@/session/session-layout"
 import { showToast } from "@/shell/notifications/toast"
 import { SessionRouteKey, SessionStateKey } from "@/runtime/server/scope"
 import { clearSessionMessageHandoff, setSessionMessageHandoff } from "@/session/handoff"
+import { useBocWorktreeStrategy } from "@/boc/worktrees/policy"
 
 export function createNewSessionComposerAdapter(props: {
   draftID: string
@@ -34,6 +35,7 @@ export function createNewSessionComposerAdapter(props: {
   const tabs = useTabs()
   const location = useWorkspaceLocation()
   const language = useLanguage()
+  const worktreeStrategy = useBocWorktreeStrategy()
   const model = createComposerModelSelection({ agent: () => local.agent.current() })
   const controls = createComposerControls({ sessionKey: route.sessionKey, model })
 
@@ -62,6 +64,7 @@ export function createNewSessionComposerAdapter(props: {
         data,
         serverSDK,
         language,
+        worktreeStrategy,
       })
       if (!sessionDirectory) {
         await pending?.rollback()
@@ -189,6 +192,7 @@ async function resolveSessionDirectory(input: {
   data: ReturnType<typeof useData>
   serverSDK: ReturnType<typeof useServerSDK>
   language: ReturnType<typeof useLanguage>
+  worktreeStrategy: ReturnType<typeof useBocWorktreeStrategy>
 }) {
   if (input.worktree === "main") return input.projectDirectory
   if (input.worktree !== "create") return input.worktree
@@ -199,6 +203,7 @@ async function resolveSessionDirectory(input: {
     directory: input.projectDirectory,
     project: input.data.location.info({ directory: input.projectDirectory })?.project,
     branch: input.branch,
+    strategy: input.worktreeStrategy,
   }).catch((error) => {
     showToast({
       title: input.language.t("prompt.toast.worktreeCreateFailed.title"),

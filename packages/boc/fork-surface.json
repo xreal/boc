@@ -33,6 +33,46 @@
       "reason": "Keep only the Boc channel identity string in upstream i18n"
     },
     {
+      "path": "packages/app/src/new-session/composer-adapter.ts",
+      "reason": "Apply the Boc checkout strategy when a new session creates a checkout"
+    },
+    {
+      "path": "packages/app/src/new-session/view.tsx",
+      "reason": "Supply project identity to the checkout method hint"
+    },
+    {
+      "path": "packages/app/src/new-session/workspace/controller.ts",
+      "reason": "Expose the selected project identity to the checkout method hint"
+    },
+    {
+      "path": "packages/app/src/new-session/workspace/selector.tsx",
+      "reason": "Show the effective Boc checkout method beside new checkout"
+    },
+    {
+      "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
+      "reason": "Apply and display the Boc checkout strategy when moving a session"
+    },
+    {
+      "path": "packages/app/src/settings/general/general.tsx",
+      "reason": "Mount the Boc checkout default setting"
+    },
+    {
+      "path": "packages/app/src/settings/workspaces/project-dialog.tsx",
+      "reason": "Mount the Boc project checkout override"
+    },
+    {
+      "path": "packages/app/src/settings/workspaces/workspaces.tsx",
+      "reason": "Display Rift ownership and cleanup in workspace management"
+    },
+    {
+      "path": "packages/app/src/workspaces/create.ts",
+      "reason": "Resolve an optional Boc checkout strategy before unchanged worktree creation"
+    },
+    {
+      "path": "packages/app/src/workspaces/create.test.ts",
+      "reason": "Verify the optional checkout strategy preserves creation and cache behavior"
+    },
+    {
       "path": "packages/app/src/shell/routes/routes.tsx",
       "reason": "Mount the generic BOC route and command bridges"
     },

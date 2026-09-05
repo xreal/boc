@@ -6,9 +6,11 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { getFilename } from "@opencode-ai/util/path"
 import { useLanguage } from "@/runtime/i18n/language"
 import { sameDirectory } from "@/workspaces/paths"
+import { BocWorktreeCreationBadge } from "@/boc/worktrees/settings"
 
 export function PromptWorkspaceSelector(props: {
   value: string
+  projectID?: string
   projectRoot: string
   workspaces: string[]
   branches: string[]
@@ -128,6 +130,7 @@ export function PromptWorkspaceSelector(props: {
                 <Menu.Item onSelect={() => select("create")}>
                   <Icon name="workspace-new" />
                   <span class="min-w-0 flex-1 truncate">{language.t("workspace.new")}</span>
+                  <BocWorktreeCreationBadge projectID={props.projectID} />
                   <Show when={selected() === "create"}>
                     <Icon name="check" size="small" class="shrink-0" />
                   </Show>

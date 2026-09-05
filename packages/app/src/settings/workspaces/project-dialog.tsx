@@ -16,6 +16,7 @@ import { ProjectIcon } from "@/shell/layout/project-icon"
 import { createEditProjectModel } from "./project-model"
 import { ProjectSettingsExtensions } from "./project-extensions"
 import { SettingsServerDataScope } from "@/settings/server-scope"
+import { BocWorktreeProjectSetting } from "@/boc/worktrees/settings"
 import "@/settings/settings.css"
 import "./project-dialog.css"
 
@@ -181,6 +182,8 @@ function ProjectSettingsDialog(props: { project: LocalProject; server: ServerCon
                   </div>
                 </div>
               </Show>
+
+              <BocWorktreeProjectSetting project={props.project} server={props.server} />
             </div>
             <Footer />
           </form>

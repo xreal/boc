@@ -1,4 +1,5 @@
 import type { Component } from "solid-js"
+import { createBocTranslator } from "@boc/extensions/renderer"
 import { For, Show, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { SessionInfo } from "@opencode-ai/client/promise"
@@ -32,10 +33,12 @@ import {
   managedWorkspaceDirectories,
   mergeWorkspaceSessionInventory,
   removeWorkspacesSequentially,
+  sameDirectory,
   sessionsForWorkspace,
   type WorkspaceDeleteInspection,
   workspaceInventory,
 } from "@/workspaces/paths"
+import { BocRiftBadge, BocRiftDeleteDetail } from "@/boc/worktrees/settings"
 import { listAllSessions } from "@/session/list"
 import type { ServerScope } from "@/runtime/server/scope"
 import { normalizeProjectInfo } from "@/runtime/server/global-sync/utils"
@@ -49,6 +52,7 @@ type Workspace = {
 export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (props) => {
   const dialog = useDialog()
   const language = useLanguage()
+  const boc = createBocTranslator(language.locale)
   const serverSDK = useServerSDK()
   const data = useData()
   const tabs = useTabs()
@@ -70,6 +74,12 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
           return normalizeProjectInfo({ ...project, worktrees })
         }),
       ),
+    refetchOnMount: "always",
+  }))
+  const trashQuery = useQuery(() => ({
+    queryKey: [serverSDK.scope, "boc-rift-trash"] as const,
+    enabled: serverSDK.connection.status() === "connected" && ServerConnection.local(serverSDK.server),
+    queryFn: () => serverSDK.api["server.boc.worktree"].riftTrash(),
     refetchOnMount: "always",
   }))
   const inventory = createMemo(() => (projectQuery.isPending ? [] : (projectQuery.data ?? [])))
@@ -137,6 +147,10 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
     if (!updated) return undefined
     return getRelativeTime(new Date(updated).toISOString(), language.t)
   }
+  const isRift = (workspace: Workspace) =>
+    workspace.project.worktrees.some(
+      (worktree) => worktree.strategy === "boc/rift" && sameDirectory(worktree.directory, workspace.directory),
+    )
   const sessionTime = (session: SessionInfo) => {
     if (!session.time.updated) return undefined
     return getRelativeTime(new Date(session.time.updated).toISOString(), language.t)
@@ -240,6 +254,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
           inspectionID={current}
           inspect={() => inspect(workspace, context)}
           inspectionMessages={inspectionMessages}
+          rift={isRift(workspace)}
           onDelete={() => transact(() => remove(workspace, true, context))}
         />
       ),
@@ -260,7 +275,40 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
         <DialogDeleteAllWorkspaces
           count={inventory.length}
           project={project}
+          rift={inventory.some(isRift)}
           onDelete={() => transact(() => removeAll(inventory, context))}
+        />
+      ),
+      releaseConfirmation,
+    )
+  }
+  const confirmCleanup = () => {
+    if (store.transaction || !trashQuery.data?.checkouts) return
+    const sdk = serverSDK
+    const count = trashQuery.data.checkouts
+    setStore("transaction", "confirm")
+    void dialog.push(
+      () => (
+        <DialogCleanupRiftTrash
+          count={count}
+          onCleanup={() =>
+            transact(async () => {
+              const result = await sdk.api["server.boc.worktree"].cleanupRiftTrash()
+              if (!result.completed) {
+                showToast({
+                  variant: "error",
+                  title: boc("boc.worktrees.cleanup.title"),
+                  description: boc("boc.worktrees.cleanup.failed"),
+                })
+                return
+              }
+              await trashQuery.refetch()
+              showToast({
+                title: boc("boc.worktrees.cleanup.title"),
+                description: boc("boc.worktrees.cleanup.succeeded"),
+              })
+            })
+          }
         />
       ),
       releaseConfirmation,
@@ -308,7 +356,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
                 </Menu.Portal>
               </Menu>
             </Show>
-            <Show when={filtered().length > 0}>
+            <Show when={filtered().length > 0 || !!trashQuery.data?.checkouts}>
               <Menu placement="bottom-end" gutter={4}>
                 <Menu.Trigger
                   as={IconButton}
@@ -321,9 +369,22 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
                 />
                 <Menu.Portal>
                   <Menu.Content>
-                    <Menu.Item onSelect={confirmDeleteAll}>
-                      <span class="settings-workspaces-delete-all">{language.t("settings.workspaces.deleteAll")}</span>
-                    </Menu.Item>
+                    <Show when={filtered().length > 0}>
+                      <Menu.Item onSelect={confirmDeleteAll}>
+                        <span class="settings-workspaces-delete-all">
+                          {language.t("settings.workspaces.deleteAll")}
+                        </span>
+                      </Menu.Item>
+                    </Show>
+                    <Show when={filtered().length > 0 && !!trashQuery.data?.checkouts}>
+                      <Menu.Separator />
+                    </Show>
+                    <Show when={trashQuery.data?.checkouts}>
+                      <Menu.Item onSelect={confirmCleanup}>
+                        <span>{boc("boc.worktrees.cleanup.title")}</span>
+                        <span class="ml-auto text-v2-text-text-muted">{trashQuery.data?.checkouts}</span>
+                      </Menu.Item>
+                    </Show>
                   </Menu.Content>
                 </Menu.Portal>
               </Menu>
@@ -369,6 +430,11 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
                                 {workspace.directory}
                               </span>
                             </Tooltip>
+                            <Show when={isRift(workspace)}>
+                              <span class="ml-2 shrink-0">
+                                <BocRiftBadge />
+                              </span>
+                            </Show>
                           </div>
                           <span class="settings-workspaces-meta">{sessionCount(workspace)}</span>
                         </div>
@@ -421,7 +487,48 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string }> = (prop
   )
 }
 
-function DialogDeleteAllWorkspaces(props: { count: number; project: string; onDelete: () => Promise<void> }) {
+function DialogCleanupRiftTrash(props: { count: number; onCleanup: () => Promise<void> }) {
+  const dialog = useDialog()
+  const language = useLanguage()
+  const t = createBocTranslator(language.locale)
+  const cleanup = () => {
+    const cleaning = props.onCleanup()
+    dialog.close()
+    void cleaning
+  }
+
+  return (
+    <Dialog fit>
+      <DialogHeader>
+        <DialogTitleGroup
+          title={t("boc.worktrees.cleanup.title")}
+          description={
+            <>
+              {t("boc.worktrees.cleanup.summary", { count: props.count })}
+              <br />
+              {t("boc.worktrees.cleanup.description")}
+            </>
+          }
+        />
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="button" variant="neutral" onClick={() => dialog.close()}>
+          {language.t("common.cancel")}
+        </Button>
+        <Button type="button" variant="danger" onClick={cleanup}>
+          {t("boc.worktrees.cleanup.action")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
+  )
+}
+
+function DialogDeleteAllWorkspaces(props: {
+  count: number
+  project: string
+  rift: boolean
+  onDelete: () => Promise<void>
+}) {
   const dialog = useDialog()
   const language = useLanguage()
   const remove = () => {
@@ -440,6 +547,9 @@ function DialogDeleteAllWorkspaces(props: { count: number; project: string; onDe
               {language.t("settings.workspaces.deleteAll.confirm", { count: props.count })}
               <br />
               {language.t("settings.workspaces.deleteAll.warning", { count: props.count, project: props.project })}
+              <Show when={props.rift}>
+                <BocRiftDeleteDetail all />
+              </Show>
             </>
           }
         />
@@ -462,6 +572,7 @@ function DialogDeleteWorkspace(props: {
   inspectionID: number
   inspect: () => Promise<{ result: WorkspaceDeleteInspection; sessions: SessionInfo[] }>
   inspectionMessages: (result: WorkspaceDeleteInspection) => string[]
+  rift: boolean
   onDelete: () => Promise<void>
 }) {
   const dialog = useDialog()
@@ -497,6 +608,9 @@ function DialogDeleteWorkspace(props: {
               </code>
               <br />
               {language.t("settings.workspaces.delete.warning")}
+              <Show when={props.rift}>
+                <BocRiftDeleteDetail />
+              </Show>
               <For each={descriptions()}>{(description) => <div>{description}</div>}</For>
             </>
           }

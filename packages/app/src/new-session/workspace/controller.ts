@@ -141,6 +141,7 @@ export function createNewSessionWorkspaceController(input: {
       },
     },
     project: {
+      id: () => currentProject()?.id,
       root: projectRoot,
       workspaces: () => {
         const project = currentProject()
