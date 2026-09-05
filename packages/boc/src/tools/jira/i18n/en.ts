@@ -1,4 +1,21 @@
 export const jiraEnglish = {
+  "boc.jira.settings.tab.connection": "Connection",
+  "boc.jira.settings.tab.boards": "Boards",
+  "boc.jira.settings.tab.prompts": "Session prompts",
+  "boc.jira.settings.boards.connect": "Connect Jira in the Connection tab to manage saved boards.",
+  "boc.jira.sessions.defaults.title": "Session prompt defaults",
+  "boc.jira.sessions.defaults.description":
+    "Applied to new ticket prompts. You can still edit or clear them for an individual ticket.",
+  "boc.jira.sessions.defaults.before":
+    "Work on the Jira ticket below. First understand its requirements and the relevant code, then implement the simplest complete solution that follows the project's conventions.",
+  "boc.jira.sessions.defaults.after":
+    "Before finishing, review your changes and run the relevant linting, type checks, and tests; report the results and anything you could not verify. Do not commit or push without my explicit approval.",
+  "boc.jira.sessions.defaults.save": "Save prompt defaults",
+  "boc.jira.sessions.defaults.reset": "Use suggested text",
+  "boc.jira.sessions.defaults.saved": "Prompt defaults saved.",
+  "boc.jira.sessions.defaults.loadFailed": "Could not load prompt defaults. Retry before starting a session.",
+  "boc.jira.sessions.defaults.saveFailed": "Could not save prompt defaults. Your edits are still here.",
+
   "boc.jira.sessions.title": "Sessions",
   "boc.jira.sessions.start": "Start session",
   "boc.jira.sessions.instructions": "Optional instructions",
@@ -20,10 +37,9 @@ export const jiraEnglish = {
   "boc.jira.connection.notConfigured": "Not configured",
   "boc.jira.connection.connected": "Connected",
   "boc.jira.connection.encryptionUnavailable": "Secure storage unavailable",
-  "boc.jira.connection.settings": "Connection settings",
-  "boc.jira.connection.settings.title": "Jira connection",
-  "boc.jira.connection.settings.description":
-    "Connect one Jira Cloud site with an Atlassian account email and API token.",
+  "boc.jira.connection.settings": "Settings",
+  "boc.jira.connection.settings.title": "Settings",
+  "boc.jira.connection.settings.description": "Manage your Jira connection, saved boards, and session prompts.",
   "boc.jira.connection.site.label": "Site",
   "boc.jira.connection.site.placeholder": "https://your-site.atlassian.net",
   "boc.jira.connection.email.label": "Email",

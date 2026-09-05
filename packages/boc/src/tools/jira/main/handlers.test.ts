@@ -366,3 +366,25 @@ test("keeps multiple ticket sessions across handler restarts and disconnects wit
   )
   expect(restored).toEqual(links)
 })
+
+
+test("persists prompt defaults independently of connection and board settings, including intentionally empty instructions", async () => {
+  const jira = runtime()
+  const custom = { before: "Investigate the ticket before changing code.", after: "Run relevant checks. Ask before committing." }
+  await runJira(jira, Effect.gen(function* () {
+    const client = yield* RpcTest.makeClient(JiraRpcs)
+    const defaults = yield* client.BocJiraGetSessionInstructions()
+    expect(defaults.before).toContain("Work on the Jira ticket below.")
+    expect(defaults.after).toContain("Do not commit or push without my explicit approval.")
+    yield* client.BocJiraSaveSessionInstructions(custom)
+  }))
+  await runJira(jira, Effect.gen(function* () {
+    const client = yield* RpcTest.makeClient(JiraRpcs)
+    expect(yield* client.BocJiraGetSessionInstructions()).toEqual(custom)
+    yield* client.BocJiraSavePreferences({ savedBoards: [] })
+    yield* client.BocJiraDisconnect()
+    expect(yield* client.BocJiraGetSessionInstructions()).toEqual(custom)
+    yield* client.BocJiraSaveSessionInstructions({ before: "", after: "" })
+    expect(yield* client.BocJiraGetSessionInstructions()).toEqual({ before: "", after: "" })
+  }))
+})

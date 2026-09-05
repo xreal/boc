@@ -18,6 +18,8 @@ function getStore() {
 
 const electronJiraRuntime: JiraRuntime = {
   store: {
+    readSessionInstructions: () => getStore().get("sessionInstructions"),
+    writeSessionInstructions: (value) => getStore().set("sessionInstructions", value),
     readSessions: () => getStore().get("sessions"),
     writeSessions: (value) => getStore().set("sessions", value),
     read: () => getStore().get("connection"),

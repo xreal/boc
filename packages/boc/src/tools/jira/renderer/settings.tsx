@@ -1,6 +1,8 @@
+import { JiraSessionDefaultsSettings } from "./session-defaults"
 import { Button } from "@opencode-ai/ui/button"
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/dialog"
+import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/dialog"
 import { Field } from "@opencode-ai/ui/field"
+import { Tabs } from "@opencode-ai/ui/tabs"
 import { TextInput } from "@opencode-ai/ui/text-input"
 import { createEffect, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
@@ -24,6 +26,7 @@ export function JiraSettingsDialog(props: {
   const [connection, { refetch }] = createResource(() => props.api.getConnectionStatus())
   const [preferences, { refetch: refetchPreferences }] = createResource(() => props.api.getPreferences())
   const [form, setForm] = createStore({
+    tab: "connection",
     site: "",
     email: "",
     hydrated: false,
@@ -110,193 +113,212 @@ export function JiraSettingsDialog(props: {
     })
 
   return (
-    <Dialog fit data-boc-dialog="jira-settings">
+    <Dialog
+      containerClass="!w-[min(34rem,calc(100vw-2rem))] !h-[min(34rem,calc(100dvh-2rem))]"
+      data-boc-dialog="jira-settings"
+    >
       <DialogHeader closeLabel={t("boc.jira.connection.close")}>
         <DialogTitleGroup
           title={t("boc.jira.connection.settings.title")}
           description={t("boc.jira.connection.settings.description")}
         />
       </DialogHeader>
-      <DialogBody class="flex flex-col gap-4 px-4 pb-4">
-        <p
-          data-boc-connection-message
-          data-kind={messageKind()}
-          role="status"
-          aria-live="polite"
-          class="text-[13px] leading-[var(--line-height-compact)]"
-          classList={{
-            "text-v2-text-text-muted": messageKind() === "muted",
-            "text-v2-state-fg-success": messageKind() === "success",
-            "text-v2-state-fg-danger": messageKind() === "danger",
-            "text-v2-state-fg-warning": messageKind() === "warning",
-          }}
-        >
-          {message()}
-        </p>
-        <Show when={!encryptionAvailable()}>
-          <p
-            data-boc-encryption-warning
-            role="status"
-            class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-warning"
-          >
-            {t("boc.jira.connection.encryption.warning")}
-          </p>
-        </Show>
-        <Field>
-          <Field.Label>{t("boc.jira.connection.site.label")}</Field.Label>
-          <TextInput
-            autofocus
-            class="!w-full"
-            name="jira-site"
-            autocomplete="off"
-            spellcheck={false}
-            placeholder={t("boc.jira.connection.site.placeholder")}
-            value={form.site}
-            disabled={busy()}
-            onInput={(event) => setForm("site", event.currentTarget.value)}
-          />
-        </Field>
-        <Field>
-          <Field.Label>{t("boc.jira.connection.email.label")}</Field.Label>
-          <TextInput
-            class="!w-full"
-            name="jira-email"
-            type="email"
-            autocomplete="off"
-            spellcheck={false}
-            placeholder={t("boc.jira.connection.email.placeholder")}
-            value={form.email}
-            disabled={busy()}
-            onInput={(event) => setForm("email", event.currentTarget.value)}
-          />
-        </Field>
-        <Field>
-          <Field.Label>{t("boc.jira.connection.token.label")}</Field.Label>
-          <TextInput
-            class="!w-full"
-            name="jira-token"
-            type="password"
-            autocomplete="new-password"
-            spellcheck={false}
-            placeholder={t("boc.jira.connection.token.placeholder")}
-            ref={(element) => (tokenInput = element)}
-            disabled={busy()}
-          />
-          <Field.Prefix>
-            <button
-              type="button"
-              class="rounded-sm text-left text-v2-text-text-muted underline underline-offset-2 outline-none hover:text-v2-text-text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
-              onClick={() => props.openExternal(TOKEN_SETTINGS_URL)}
-            >
-              {t("boc.jira.connection.token.helpLink")}
-            </button>
-            <span class="mt-1 block">{t("boc.jira.connection.token.help")}</span>
-          </Field.Prefix>
-        </Field>
-        <Show when={configured()}>
-          <div
-            data-boc-saved-boards
-            aria-busy={form.savingPreferences}
-            class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4"
-          >
-            <h2 class="text-[13px] font-medium leading-[var(--line-height-compact)]">
-              {t("boc.jira.board.savedBoards.title")}
-            </h2>
-            <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-              {t("boc.jira.board.savedBoards.description")}
-            </p>
+      <DialogBody class="min-h-0 px-4 pb-4">
+        <Tabs variant="line" value={form.tab} onChange={(tab) => setForm("tab", tab)} class="min-h-0">
+          <Tabs.List aria-label={t("boc.jira.connection.settings")} class="shrink-0">
+            <Tabs.Trigger value="connection">{t("boc.jira.settings.tab.connection")}</Tabs.Trigger>
+            <Tabs.Trigger value="boards">{t("boc.jira.settings.tab.boards")}</Tabs.Trigger>
+            <Tabs.Trigger value="prompts">{t("boc.jira.settings.tab.prompts")}</Tabs.Trigger>
+          </Tabs.List>
+          <Tabs.Content value="connection" forceMount class="pt-4" classList={{ hidden: form.tab !== "connection" }}>
+            <div class="flex flex-col gap-4">
+              <p
+                data-boc-connection-message
+                data-kind={messageKind()}
+                role="status"
+                aria-live="polite"
+                class="text-[13px] leading-[var(--line-height-compact)]"
+                classList={{
+                  "text-v2-text-text-muted": messageKind() === "muted",
+                  "text-v2-state-fg-success": messageKind() === "success",
+                  "text-v2-state-fg-danger": messageKind() === "danger",
+                  "text-v2-state-fg-warning": messageKind() === "warning",
+                }}
+              >
+                {message()}
+              </p>
+              <Show when={!encryptionAvailable()}>
+                <p
+                  data-boc-encryption-warning
+                  role="status"
+                  class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-warning"
+                >
+                  {t("boc.jira.connection.encryption.warning")}
+                </p>
+              </Show>
+              <Field>
+                <Field.Label>{t("boc.jira.connection.site.label")}</Field.Label>
+                <TextInput
+                  class="!w-full"
+                  name="jira-site"
+                  autocomplete="off"
+                  spellcheck={false}
+                  placeholder={t("boc.jira.connection.site.placeholder")}
+                  value={form.site}
+                  disabled={busy()}
+                  onInput={(event) => setForm("site", event.currentTarget.value)}
+                />
+              </Field>
+              <Field>
+                <Field.Label>{t("boc.jira.connection.email.label")}</Field.Label>
+                <TextInput
+                  class="!w-full"
+                  name="jira-email"
+                  type="email"
+                  autocomplete="off"
+                  spellcheck={false}
+                  placeholder={t("boc.jira.connection.email.placeholder")}
+                  value={form.email}
+                  disabled={busy()}
+                  onInput={(event) => setForm("email", event.currentTarget.value)}
+                />
+              </Field>
+              <Field>
+                <Field.Label>{t("boc.jira.connection.token.label")}</Field.Label>
+                <TextInput
+                  class="!w-full"
+                  name="jira-token"
+                  type="password"
+                  autocomplete="new-password"
+                  spellcheck={false}
+                  placeholder={t("boc.jira.connection.token.placeholder")}
+                  ref={(element) => (tokenInput = element)}
+                  disabled={busy()}
+                />
+                <Field.Prefix>
+                  <button
+                    type="button"
+                    class="rounded-sm text-left text-v2-text-text-muted underline underline-offset-2 outline-none hover:text-v2-text-text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus"
+                    onClick={() => props.openExternal(TOKEN_SETTINGS_URL)}
+                  >
+                    {t("boc.jira.connection.token.helpLink")}
+                  </button>
+                  <span class="mt-1 block">{t("boc.jira.connection.token.help")}</span>
+                </Field.Prefix>
+              </Field>
+
+              <div class="flex flex-wrap justify-end gap-2 pt-2">
+                <Show when={configured()}>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    disabled={busy()}
+                    onClick={() => void run("disconnect", () => props.api.disconnect())}
+                  >
+                    {t("boc.jira.connection.disconnect")}
+                  </Button>
+                </Show>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy()}
+                  onClick={() =>
+                    void run("test", () =>
+                      props.api.testConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
+                    )
+                  }
+                >
+                  {t("boc.jira.connection.test")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="neutral"
+                  disabled={busy() || !encryptionAvailable()}
+                  onClick={() =>
+                    void run("save", () =>
+                      props.api.saveConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
+                    )
+                  }
+                >
+                  {t("boc.jira.connection.save")}
+                </Button>
+              </div>
+            </div>
+          </Tabs.Content>
+          <Tabs.Content value="boards" forceMount class="pt-4" classList={{ hidden: form.tab !== "boards" }}>
             <Show
-              when={(preferences()?.savedBoards.length ?? 0) > 0}
+              when={configured()}
               fallback={
-                <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-                  {t("boc.jira.board.savedBoards.empty")}
+                <p class="text-[13px] leading-[var(--line-height-base)] text-v2-text-text-muted">
+                  {t("boc.jira.settings.boards.connect")}
                 </p>
               }
             >
-              <ul class="flex flex-col gap-2">
-                <For each={preferences()?.savedBoards ?? []}>
-                  {(board) => (
-                    <li
-                      data-boc-saved-board={board.id}
-                      class="flex flex-wrap items-center gap-2 text-[13px] leading-[var(--line-height-compact)]"
-                    >
-                      <span class="min-w-0 flex-1 truncate">{board.name}</span>
-                      <Show
-                        when={preferences()?.defaultBoardId === board.id}
-                        fallback={
+              <div data-boc-saved-boards aria-busy={form.savingPreferences} class="flex flex-col gap-3">
+                <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+                  {t("boc.jira.board.savedBoards.description")}
+                </p>
+                <Show
+                  when={(preferences()?.savedBoards.length ?? 0) > 0}
+                  fallback={
+                    <p class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+                      {t("boc.jira.board.savedBoards.empty")}
+                    </p>
+                  }
+                >
+                  <ul class="flex flex-col gap-2">
+                    <For each={preferences()?.savedBoards ?? []}>
+                      {(board) => (
+                        <li
+                          data-boc-saved-board={board.id}
+                          class="flex flex-wrap items-center gap-2 text-[13px] leading-[var(--line-height-compact)]"
+                        >
+                          <span class="min-w-0 flex-1 truncate">{board.name}</span>
+                          <Show
+                            when={preferences()?.defaultBoardId === board.id}
+                            fallback={
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="small"
+                                disabled={busy()}
+                                aria-label={t("boc.jira.board.savedBoards.setDefaultLabel", { board: board.name })}
+                                onClick={() => void savePreferences(preferences()?.savedBoards ?? [], board.id)}
+                              >
+                                {t("boc.jira.board.savedBoards.setDefault")}
+                              </Button>
+                            }
+                          >
+                            <span class="text-v2-text-text-muted">{t("boc.jira.board.savedBoards.default")}</span>
+                          </Show>
                           <Button
                             type="button"
                             variant="ghost"
                             size="small"
                             disabled={busy()}
-                            aria-label={t("boc.jira.board.savedBoards.setDefaultLabel", { board: board.name })}
-                            onClick={() => void savePreferences(preferences()?.savedBoards ?? [], board.id)}
+                            aria-label={t("boc.jira.board.savedBoards.removeLabel", { board: board.name })}
+                            onClick={() =>
+                              void savePreferences(
+                                (preferences()?.savedBoards ?? []).filter((entry) => entry.id !== board.id),
+                                preferences()?.defaultBoardId,
+                              )
+                            }
                           >
-                            {t("boc.jira.board.savedBoards.setDefault")}
+                            {t("boc.jira.board.savedBoards.remove")}
                           </Button>
-                        }
-                      >
-                        <span class="text-v2-text-text-muted">{t("boc.jira.board.savedBoards.default")}</span>
-                      </Show>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="small"
-                        disabled={busy()}
-                        aria-label={t("boc.jira.board.savedBoards.removeLabel", { board: board.name })}
-                        onClick={() =>
-                          void savePreferences(
-                            (preferences()?.savedBoards ?? []).filter((entry) => entry.id !== board.id),
-                            preferences()?.defaultBoardId,
-                          )
-                        }
-                      >
-                        {t("boc.jira.board.savedBoards.remove")}
-                      </Button>
-                    </li>
-                  )}
-                </For>
-              </ul>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+              </div>
             </Show>
-          </div>
-        </Show>
+          </Tabs.Content>
+          <Tabs.Content value="prompts" forceMount class="pt-4" classList={{ hidden: form.tab !== "prompts" }}>
+            <JiraSessionDefaultsSettings api={props.api} t={t} onSaved={props.onChanged} />
+          </Tabs.Content>
+        </Tabs>
       </DialogBody>
-      <DialogFooter>
-        <Show when={configured()}>
-          <Button
-            type="button"
-            variant="danger"
-            disabled={busy()}
-            onClick={() => void run("disconnect", () => props.api.disconnect())}
-          >
-            {t("boc.jira.connection.disconnect")}
-          </Button>
-        </Show>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={busy()}
-          onClick={() =>
-            void run("test", () =>
-              props.api.testConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
-            )
-          }
-        >
-          {t("boc.jira.connection.test")}
-        </Button>
-        <Button
-          type="button"
-          variant="neutral"
-          disabled={busy() || !encryptionAvailable()}
-          onClick={() =>
-            void run("save", () =>
-              props.api.saveConnection({ site: form.site, email: form.email, token: tokenInput?.value ?? "" }),
-            )
-          }
-        >
-          {t("boc.jira.connection.save")}
-        </Button>
-      </DialogFooter>
     </Dialog>
   )
 }

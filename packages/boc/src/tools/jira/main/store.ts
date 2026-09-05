@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import { JiraSessionLink } from "../domain/sessions"
+import { JiraSessionLink, JiraSessionInstructions, defaultJiraSessionInstructions } from "../domain/sessions"
 import { JiraPreferences, normalizeSavedBoards } from "../domain/board"
 
 export const JIRA_STORE_NAME = "boc.jira"
@@ -14,9 +14,12 @@ export type JiraStoredConnection = typeof JiraStoredConnection.Type
 
 const decodeStoredConnection = Schema.decodeUnknownOption(JiraStoredConnection)
 const decodePreferences = Schema.decodeUnknownOption(JiraPreferences)
+const decodeSessionInstructions = Schema.decodeUnknownOption(JiraSessionInstructions)
 const decodeSessionLinks = Schema.decodeUnknownOption(Schema.Array(JiraSessionLink))
 
 export type JiraStore = {
+  readSessionInstructions(): unknown
+  writeSessionInstructions(value: JiraSessionInstructions): void
   readSessions(): unknown
   writeSessions(value: readonly JiraSessionLink[]): void
   read(): unknown
@@ -38,8 +41,13 @@ export function readStoredPreferences(store: JiraStore): JiraPreferences {
 export function memoryJiraStore(initial?: JiraStoredConnection, preferences?: JiraPreferences): JiraStore {
   let connection: JiraStoredConnection | undefined = initial
   let storedPreferences: JiraPreferences = preferences ?? { savedBoards: [] }
+  let instructions: JiraSessionInstructions | undefined
   let sessions: readonly JiraSessionLink[] = []
   return {
+    readSessionInstructions: () => instructions,
+    writeSessionInstructions: (value) => {
+      instructions = value
+    },
     readSessions: () => sessions,
     writeSessions: (value) => {
       sessions = value
@@ -57,6 +65,13 @@ export function memoryJiraStore(initial?: JiraStoredConnection, preferences?: Ji
       storedPreferences = next
     },
   }
+}
+
+export function readSessionInstructions(store: JiraStore): JiraSessionInstructions {
+  return Option.getOrElse(
+    decodeSessionInstructions(store.readSessionInstructions()),
+    () => defaultJiraSessionInstructions,
+  )
 }
 
 export function readSessionLinks(store: JiraStore): readonly JiraSessionLink[] {

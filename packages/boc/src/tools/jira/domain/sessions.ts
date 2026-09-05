@@ -1,4 +1,13 @@
 import { Schema } from "effect"
+import { jiraEnglish } from "../i18n/en"
+
+export const JiraSessionInstructions = Schema.Struct({ before: Schema.String, after: Schema.String })
+export type JiraSessionInstructions = typeof JiraSessionInstructions.Type
+
+export const defaultJiraSessionInstructions: JiraSessionInstructions = {
+  before: jiraEnglish["boc.jira.sessions.defaults.before"],
+  after: jiraEnglish["boc.jira.sessions.defaults.after"],
+}
 
 export const JiraSessionLink = Schema.Struct({
   issueUrl: Schema.String,

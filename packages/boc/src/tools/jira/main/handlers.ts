@@ -23,6 +23,7 @@ import { openToken, sealToken, type SecretVault } from "./credentials"
 import {
   readStoredConnection,
   readStoredPreferences,
+  readSessionInstructions,
   readSessionLinks,
   saveSessionLink,
   promoteSessionLink,
@@ -41,6 +42,8 @@ export function createJiraHandlers(runtime: JiraRuntime) {
   const reads = createJiraReadCoordinator()
   return JiraRpcs.toLayer(
     JiraRpcs.of({
+      BocJiraGetSessionInstructions: () => Effect.sync(() => readSessionInstructions(runtime.store)),
+      BocJiraSaveSessionInstructions: (payload) => Effect.sync(() => runtime.store.writeSessionInstructions(payload)),
       BocJiraListSessionLinks: (payload) =>
         Effect.sync(() =>
           readSessionLinks(runtime.store).filter((link) => link.issueUrl === payload.issueUrl && link.sessionID),

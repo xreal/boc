@@ -1,16 +1,25 @@
 import { Button } from "@opencode-ai/ui/button"
-import { createResource, For, Show } from "solid-js"
+import { createEffect, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useBocDesktop } from "../../../renderer/desktop"
 import { useBocHost } from "../../../renderer/host"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail } from "../domain/board"
+import { JiraSessionInstructionFields } from "./session-instructions"
 import { jiraSessionPrompt } from "../domain/sessions"
 
 export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTranslator }) {
   const host = useBocHost()
   const desktop = useBocDesktop()
   const [form, setForm] = createStore({ before: "", after: "", busy: false, error: "" })
+  const [defaults, { refetch: retryDefaults }] = createResource(() =>
+    desktop?.jira.getSessionInstructions().catch(() => undefined),
+  )
+  createEffect(() => {
+    const value = defaults()
+    if (value) setForm(value)
+  })
+  const disabled = () => form.busy || defaults.loading || !defaults()
   const [sessions, { refetch }] = createResource(
     () => props.issue.url,
     async (issueUrl) => {
@@ -23,7 +32,7 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTransla
   )
 
   async function start() {
-    if (form.busy || !host.sessions) return
+    if (disabled() || !host.sessions) return
     setForm({ busy: true, error: "" })
     await host.sessions
       .start({
@@ -43,31 +52,23 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTransla
         <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.sessions.title")}</h3>
         <details>
           <summary class="cursor-pointer text-v2-text-text-muted">{props.t("boc.jira.sessions.instructions")}</summary>
-          <div class="mt-2 flex flex-col gap-2">
-            <label class="flex flex-col gap-1">
-              {props.t("boc.jira.sessions.before")}
-              <textarea
-                rows={2}
-                value={form.before}
-                onInput={(event) => setForm("before", event.currentTarget.value)}
-                class="resize-y rounded border border-v2-border-border-base bg-v2-background-bg-base p-2 text-v2-text-text-base"
-              />
-            </label>
-            <label class="flex flex-col gap-1">
-              {props.t("boc.jira.sessions.after")}
-              <textarea
-                rows={2}
-                value={form.after}
-                onInput={(event) => setForm("after", event.currentTarget.value)}
-                class="resize-y rounded border border-v2-border-border-base bg-v2-background-bg-base p-2 text-v2-text-text-base"
-              />
-            </label>
-          </div>
+          <JiraSessionInstructionFields
+            t={props.t}
+            value={form}
+            disabled={disabled()}
+            onChange={(field, value) => setForm(field, value)}
+          />
         </details>
-        <Button size="small" variant="neutral" disabled={form.busy} onClick={() => void start()}>
+        <Button size="small" variant="neutral" disabled={disabled()} onClick={() => void start()}>
           {props.t("boc.jira.sessions.start")}
         </Button>
         <p class="text-[12px] text-v2-text-text-faint">{props.t("boc.jira.sessions.review")}</p>
+        <Show when={!defaults.loading && !defaults()}>
+          <p role="alert">{props.t("boc.jira.sessions.defaults.loadFailed")}</p>
+          <Button size="small" variant="ghost-muted" onClick={() => void retryDefaults()}>
+            {props.t("boc.jira.board.refresh")}
+          </Button>
+        </Show>
         <Show when={form.error}>
           <p role="alert" class="text-v2-state-fg-danger">
             {form.error}

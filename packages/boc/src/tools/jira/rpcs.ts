@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { JiraSessionLink } from "./domain/sessions"
+import { JiraSessionLink, JiraSessionInstructions } from "./domain/sessions"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
 import {
   JiraBoardIssue,
@@ -219,7 +219,18 @@ export const BocJiraPromoteSessionLink = Rpc.make("BocJiraPromoteSessionLink", {
   success: Schema.Void,
 })
 
+export const BocJiraGetSessionInstructions = Rpc.make("BocJiraGetSessionInstructions", {
+  success: JiraSessionInstructions,
+})
+
+export const BocJiraSaveSessionInstructions = Rpc.make("BocJiraSaveSessionInstructions", {
+  payload: JiraSessionInstructions,
+  success: Schema.Void,
+})
+
 export const JiraRpcs = RpcGroup.make(
+  BocJiraGetSessionInstructions,
+  BocJiraSaveSessionInstructions,
   BocJiraListSessionLinks,
   BocJiraSaveSessionLink,
   BocJiraPromoteSessionLink,
