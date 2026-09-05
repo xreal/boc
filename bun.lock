@@ -112,6 +112,7 @@
       "version": "0.0.0",
       "dependencies": {
         "@opencode-ai/core": "workspace:*",
+        "@opencode-ai/plugin": "workspace:*",
         "@opencode-ai/schema": "workspace:*",
         "@opencode-ai/ui": "workspace:*",
         "@opencode-ai/util": "workspace:*",

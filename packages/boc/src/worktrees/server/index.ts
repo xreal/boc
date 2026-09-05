@@ -6,4 +6,5 @@ export {
   type RiftBackendOptions,
 } from "./backend"
 export { inspectRiftCapability } from "./capability"
-export { RIFT_STRATEGY, withRiftStrategy } from "./registration"
+export { RIFT_STRATEGY, riftPlugin } from "./registration"
+export { BocWorktrees } from "./runtime"

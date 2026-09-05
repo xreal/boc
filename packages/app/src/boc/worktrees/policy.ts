@@ -1,6 +1,7 @@
 import { createBocTranslator, useBocDesktop, type BocTranslator } from "@boc/extensions/renderer"
 import type { ServerBocWorktreeRiftCapabilityOutput } from "@opencode-ai/client/promise"
 import { Project } from "@opencode-ai/schema/project"
+import { getDirectory } from "@opencode-ai/util/path"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
 import { showToast } from "@/shell/notifications/toast"
@@ -32,13 +33,16 @@ export function useBocWorktreeStrategy(): WorktreeStrategyResolver {
       return
     }
 
-    const capability = await input.api["server.boc.worktree"].riftCapability({
-      projectID: input.project.id,
-      source: input.project.canonical,
-      directory: input.directory,
-    }).catch(() => undefined)
+    const directory = getDirectory(input.project.canonical)
+    const capability = await input.api["server.boc.worktree"]
+      .riftCapability({
+        projectID: input.project.id,
+        source: input.project.canonical,
+        directory,
+      })
+      .catch(() => undefined)
 
-    if (capability?.available) return "boc/rift"
+    if (capability?.available) return { strategy: "boc/rift", directory }
 
     showFallback(t, capabilityReason(t, capability?.reason ?? "backend-unavailable"))
   }
@@ -51,10 +55,7 @@ function showFallback(t: BocTranslator, reason: string) {
   })
 }
 
-export function capabilityReason(
-  t: BocTranslator,
-  reason: Exclude<RiftCapability, { available: true }>["reason"],
-) {
+export function capabilityReason(t: BocTranslator, reason: Exclude<RiftCapability, { available: true }>["reason"]) {
   return t(`boc.worktrees.method.unavailable.${reason}`)
 }
 

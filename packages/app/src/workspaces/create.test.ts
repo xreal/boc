@@ -143,8 +143,8 @@ describe("worktree creation", () => {
           project,
           strategy: async (input) => {
             expect(input.project).toEqual(project)
-            expect(input.directory).toBe("/copies/")
-            return "boc/rift"
+            expect(input.directory).toBe(project.directory)
+            return { strategy: "boc/rift", directory: "/copies/" }
           },
         })
 

@@ -1,4 +1,4 @@
-import type { LocationGetOutput, OpenCodeClient } from "@opencode-ai/client/promise"
+import type { LocationGetOutput, OpenCodeClient, WorktreeCreateInput } from "@opencode-ai/client/promise"
 import type { Data } from "@opencode-ai/client/solid"
 
 type WorktreeCreation = {
@@ -8,7 +8,9 @@ type WorktreeCreation = {
   directory: string
 }
 
-export type WorktreeStrategyResolver = (input: WorktreeCreation) => Promise<string | undefined>
+export type WorktreeStrategyResolver = (
+  input: WorktreeCreation,
+) => Promise<Pick<WorktreeCreateInput, "strategy" | "directory"> | undefined>
 
 export async function createWorktree(input: {
   api: Pick<OpenCodeClient, "location" | "server.boc.worktree" | "worktree">
@@ -19,13 +21,13 @@ export async function createWorktree(input: {
   strategy?: WorktreeStrategyResolver
 }) {
   const project = input.project ?? (await input.api.location.get({ location: { directory: input.directory } })).project
-  const strategy =
-    (await input.strategy?.({ api: input.api, project, branch: input.branch, directory: input.directory })) ?? "git"
+  const strategy = await input.strategy?.({ api: input.api, project, branch: input.branch, directory: input.directory })
   const created = await input.api.worktree.create({
     location: { directory: input.directory },
-    strategy,
+    strategy: "git",
     from: project.canonical,
     branch: input.branch,
+    ...strategy,
   })
   // Populate the client cache before the destination session mounts.
   await input.data.location.syncInfo({ directory: created.directory })

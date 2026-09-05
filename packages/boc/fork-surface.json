@@ -158,7 +158,7 @@
     },
     {
       "path": "packages/server/src/routes.ts",
-      "reason": "Decorate the Worktree service for Boc backends"
+      "reason": "Register the Boc host service and its managed worktree plugin"
     },
     {
       "path": "packages/server/src/handlers.ts",
