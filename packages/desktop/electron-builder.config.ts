@@ -206,8 +206,14 @@ function getConfig() {
         ...base,
         appId,
         productName: "Boc Beta",
+        artifactName: "boc-desktop-${version}-${os}-${arch}.${ext}",
         protocols: { name: "Boc Beta", schemes: ["opencode"] },
-        publish: { provider: "github", owner: "BergDevOrg", repo: "boc", channel: "latest" },
+        publish: { provider: "generic", url: "https://boc-updates.bergdev.de", channel: "latest" },
+        win: {
+          ...base.win,
+          publisherName: process.env.WINDOWS_PUBLISHER_NAME,
+          verifyUpdateCodeSignature: true,
+        },
         deb: { fpm: [metainfoFpm(appId)] },
         rpm: { packageName: "boc-beta", fpm: [metainfoFpm(appId)] },
       }

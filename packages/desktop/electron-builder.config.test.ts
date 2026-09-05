@@ -209,3 +209,28 @@ test("packages Rift as an external Boc backend resource", () => {
   ])
   expect(packagedResources(false)).toHaveLength(1)
 })
+
+test("publishes Boc updates through versioned public R2 artifacts", async () => {
+  const previousChannel = process.env.OPENCODE_CHANNEL
+  const previousPublisher = process.env.WINDOWS_PUBLISHER_NAME
+  process.env.OPENCODE_CHANNEL = "boc"
+  process.env.WINDOWS_PUBLISHER_NAME = "Boc Release Publisher"
+  try {
+    const module = await import("./electron-builder.config.ts?updates=boc")
+    const config = module.default as Configuration
+
+    expect(config.artifactName).toBe("boc-desktop-${version}-${os}-${arch}.${ext}")
+    expect(config.publish).toEqual({
+      provider: "generic",
+      url: "https://boc-updates.bergdev.de",
+      channel: "latest",
+    })
+    expect(config.win?.publisherName).toBe("Boc Release Publisher")
+    expect(config.win?.verifyUpdateCodeSignature).toBe(true)
+  } finally {
+    if (previousChannel === undefined) delete process.env.OPENCODE_CHANNEL
+    else process.env.OPENCODE_CHANNEL = previousChannel
+    if (previousPublisher === undefined) delete process.env.WINDOWS_PUBLISHER_NAME
+    else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
+  }
+})

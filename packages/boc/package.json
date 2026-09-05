@@ -14,7 +14,7 @@
   "scripts": {
     "rift:fetch": "bun run scripts/rift/fetch.ts",
     "typecheck": "tsgo --noEmit",
-    "test": "bun test --conditions=solid --preload ./happydom.ts ./src"
+    "test": "bun test --conditions=solid --preload ./happydom.ts ./src ./scripts"
   },
   "dependencies": {
     "@opencode-ai/core": "workspace:*",
