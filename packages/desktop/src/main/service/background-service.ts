@@ -1,5 +1,6 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
+import { connectBocService, inspectBocService } from "../../boc/background-service"
 import { resolveRiftEnvironment } from "../../boc/rift"
 import type { ServerReadyData } from "../../shared/ipc-contract"
 import { CHANNEL } from "../constants"
@@ -39,16 +40,36 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode-ai/client/service"))
-  const service = yield* Effect.tryPromise(() =>
-    client.Service.ensure({
-      file: serviceFile(path, isolated),
-      version,
-      command: [...cli.command, "serve", "--service", ...(isolated ? ["--port", "0"] : [])],
-      env: rift,
-      onStart: (reason, previousVersion) =>
-        runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
-    }),
-  )
+  const options = (isolatedService: boolean) => ({
+    file: serviceFile(path, isolatedService),
+    version,
+    command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--port", "0"] : [])],
+    env: {
+      ...rift,
+      ...(CHANNEL === "boc" && isolatedService
+        ? {
+            XDG_STATE_HOME: app.getPath("userData"),
+            OPENCODE_DB: path.join(app.getPath("userData"), "opencode.db"),
+          }
+        : {}),
+    },
+    onStart: (reason: "missing" | "version-mismatch", previousVersion?: string) =>
+      runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
+  })
+  const service = yield* Effect.tryPromise(() => {
+    if (CHANNEL !== "boc" || isolated) return client.Service.ensure(options(isolated))
+    return connectBocService({
+      version: cli.version,
+      mode,
+      discoverShared: () => client.Service.discover(),
+      discoverIsolated: () => client.Service.discover({ file: serviceFile(path, true) }),
+      inspect: (endpoint) =>
+        inspectBocService(endpoint, app.getPath("home"), client.Service.headers(endpoint)),
+      ensureShared: () => client.Service.ensure(options(false)),
+      ensureIsolated: () => client.Service.ensure(options(true)),
+      stopShared: () => client.Service.stop({ pty: "handoff" }),
+    })
+  })
   if (service.auth?.type !== "basic") throw new Error("V2 CLI background service did not provide authentication")
   const url = new URL(service.url)
   if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1"
@@ -64,7 +85,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
 })
 
 function serviceFile(path: Path.Path, isolated: boolean) {
-  if (CHANNEL === "boc") return path.join(app.getPath("userData"), "opencode", "service-boc.json")
+  if (CHANNEL === "boc" && isolated) return path.join(app.getPath("userData"), "opencode", "service.json")
   if (isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
     return path.join(app.getPath("userData"), "opencode", "service-local.json")
   }

@@ -242,6 +242,12 @@ import type {
   ServerBocWorktreeRiftCapabilityOutput,
   ServerBocWorktreeRiftTrashOutput,
   ServerBocWorktreeCleanupRiftTrashOutput,
+  ServerBocEnvironmentInspectInput,
+  ServerBocEnvironmentInspectOutput,
+  ServerBocEnvironmentRunInput,
+  ServerBocEnvironmentRunOutput,
+  ServerBocEnvironmentCancelInput,
+  ServerBocEnvironmentCancelOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1480,6 +1486,45 @@ const adaptGroupServerBocWorktree = (raw: RawClient["server.boc.worktree"]) => (
   cleanupRiftTrash: EndpointServerBocWorktreeCleanupRiftTrash(raw),
 })
 
+const EndpointServerBocEnvironmentInspect =
+  (raw: RawClient["server.boc.environment"]) => (input: ServerBocEnvironmentInspectInput) =>
+    preserveEffect<ServerBocEnvironmentInspectOutput>()(
+      raw["boc.environment.inspect"]({
+        params: { projectID: input["projectID"] },
+        query: { directory: input["directory"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointServerBocEnvironmentRun =
+  (raw: RawClient["server.boc.environment"]) => (input: ServerBocEnvironmentRunInput) =>
+    preserveEffect<ServerBocEnvironmentRunOutput>()(
+      raw["boc.environment.run"]({
+        params: { projectID: input["projectID"] },
+        payload: {
+          directory: input["directory"],
+          sessionID: input["sessionID"],
+          action: input["action"],
+          domain: input["domain"],
+          confirmation: input["confirmation"],
+        },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointServerBocEnvironmentCancel =
+  (raw: RawClient["server.boc.environment"]) => (input: ServerBocEnvironmentCancelInput) =>
+    preserveEffect<ServerBocEnvironmentCancelOutput>()(
+      raw["boc.environment.cancel"]({
+        params: { projectID: input["projectID"] },
+        payload: { directory: input["directory"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const adaptGroupServerBocEnvironment = (raw: RawClient["server.boc.environment"]) => ({
+  inspect: EndpointServerBocEnvironmentInspect(raw),
+  run: EndpointServerBocEnvironmentRun(raw),
+  cancel: EndpointServerBocEnvironmentCancel(raw),
+})
+
 const EndpointWorktreeList = (raw: RawClient["server.worktree"]) => (input?: WorktreeListInput) =>
   preserveEffect<WorktreeListOutput>()(
     raw["worktree.list"]({ query: { location: input?.["location"] } }).pipe(Effect.mapError(mapClientError)),
@@ -1643,6 +1688,7 @@ const adaptClient = (raw: RawClient) => ({
   shell: adaptGroupShell(raw["server.shell"]),
   reference: adaptGroupReference(raw["server.reference"]),
   "server.boc.worktree": adaptGroupServerBocWorktree(raw["server.boc.worktree"]),
+  "server.boc.environment": adaptGroupServerBocEnvironment(raw["server.boc.environment"]),
   worktree: adaptGroupWorktree(raw["server.worktree"]),
   workspace: adaptGroupWorkspace(raw["server.workspace"]),
   vcs: adaptGroupVcs(raw["server.vcs"]),

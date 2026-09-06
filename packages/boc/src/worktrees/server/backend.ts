@@ -25,6 +25,7 @@ export interface RiftBackend {
   readonly capability: (directory: string) => ReturnType<typeof inspectRiftCapability>
   readonly trash: () => Promise<{ checkouts: number }>
   readonly cleanup: () => Promise<{ completed: boolean; checkouts: number }>
+  readonly ownership: (directory: string) => Promise<{ sourceDirectory: string } | undefined>
 }
 
 export class RiftBackendService extends Context.Service<RiftBackendService, RiftBackend>()("@boc/RiftBackend") {}
@@ -96,7 +97,27 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
       return { completed: true as const, checkouts: records.length }
     })
 
-  return { strategy, capability, trash, cleanup }
+  const ownership = async (input: string) => {
+    const record = await metadata.read(input)
+    if (!record || record.state !== "active") return
+    if (record.registry !== registry) return
+    const directory = await fs.realpath(input).catch(() => undefined)
+    if (!directory || directory !== record.directory) return
+    if (record.marker && record.marker !== (await readMarker(directory).catch(() => undefined))) return
+    const ancestors = await rift(["ancestors", directory])
+    if (!ancestors.ok || lines(ancestors.stdout)[0] !== record.templateDirectory) return
+    const listed = await rift(["list", record.templateDirectory])
+    if (
+      !listed.ok ||
+      !lines(listed.stdout)
+        .map((value) => path.resolve(value))
+        .includes(directory)
+    )
+      return
+    return { sourceDirectory: record.sourceDirectory }
+  }
+
+  return { strategy, capability, trash, cleanup, ownership }
 
   async function removedRecords() {
     return (await metadata.list()).filter((record) => record.state === "removed")

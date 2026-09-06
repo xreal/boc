@@ -1,7 +1,9 @@
 import { expect } from "bun:test"
+import { $ } from "bun"
 import { SdkPlugins } from "@opencode-ai/core/plugin/sdk"
 import { Project } from "@opencode-ai/core/project"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
+import { BocEnvironments } from "@boc/extensions/environments/server"
 import path from "node:path"
 import { Context, Effect, Layer } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/unstable/http"
@@ -26,6 +28,9 @@ it.live("exposes Rift capability only from a Boc backend and registered project"
       backend: "boc/rift",
       reason: "project-mismatch",
     })
+    expect(yield* boc.request(environmentUrl(tmp.path, "project"))).toMatchObject({
+      availability: { available: false, reason: "checkout-not-registered" },
+    })
 
     yield* Effect.promise(() => initRepo(tmp.path))
     const project = yield* boc.projects.resolve(AbsolutePath.make(tmp.path))
@@ -35,6 +40,22 @@ it.live("exposes Rift capability only from a Boc backend and registered project"
     const capability = yield* boc.request(url)
     expect(capability).toMatchObject({ backend: "boc/rift" })
     expect(capability).not.toMatchObject({ reason: "project-mismatch" })
+
+    expect(yield* boc.request(environmentUrl(tmp.path, project.id))).toMatchObject({
+      availability: { available: false, reason: "checkout-not-isolated" },
+    })
+    const linked = path.join(path.dirname(tmp.path), `${path.basename(tmp.path)}-linked`)
+    yield* Effect.promise(() => $`git worktree add --detach ${linked}`.cwd(tmp.path).quiet())
+    yield* Effect.addFinalizer(() =>
+      Effect.promise(() => $`git worktree remove --force ${linked}`.cwd(tmp.path).quiet()),
+    )
+    const linkedProject = yield* boc.projects.resolve(AbsolutePath.make(linked))
+    expect(linkedProject.id).toBe(project.id)
+    expect(yield* boc.request(environmentUrl(linked, project.id))).toMatchObject({
+      directory: linked,
+      availability: { available: true, strategy: "git" },
+      stack: { status: "unconfigured" },
+    })
 
     expect(yield* upstream.request("/api/boc/worktree/rift-trash")).toEqual({ checkouts: 0 })
     expect(yield* upstream.request("/api/boc/worktree/rift-trash/cleanup", "POST")).toEqual({
@@ -51,16 +72,37 @@ function capabilityUrl(directory: string, projectID = "project") {
   return url
 }
 
+function environmentUrl(directory: string, projectID: string) {
+  const url = new URL(`/api/boc/environment/${projectID}`, "http://opencode.local")
+  url.searchParams.set("directory", directory)
+  return url
+}
+
 const backend = Effect.fnUntraced(function* (directory: string, channel?: string) {
   const context = yield* Layer.build(
-    createRoutes({
-      password: "secret",
-      app: { channel, version: "test-version" },
-      database: { path: ":memory:" },
-      config: { directory, project: false },
-      fs: { filewatcher: false },
-      models: { fetch: false },
-    }).pipe(Layer.provide(HttpServer.layerServices)),
+    createRoutes(
+      {
+        password: "secret",
+        app: { channel, version: "test-version" },
+        database: { path: ":memory:" },
+        config: { directory, project: false },
+        fs: { filewatcher: false },
+        models: { fetch: false },
+      },
+      () => [],
+      [
+        BocEnvironments.node.replace(
+          BocEnvironments.configured({
+            installation: async () => ({
+              executable: path.join(directory, "devenv"),
+              root: directory,
+              setup: path.join(directory, "scripts", "worktree-setup.sh"),
+              environment: {},
+            }),
+          }),
+        ),
+      ],
+    ).pipe(Layer.provide(HttpServer.layerServices)),
   )
   const handler = Context.get(context, HttpRouter.HttpRouter).asHttpEffect().pipe(HttpEffect.toWebHandlerWith(context))
   expect(

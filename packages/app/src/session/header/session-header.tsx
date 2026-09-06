@@ -6,6 +6,7 @@ import { useSessionLayout } from "@/session/session-layout"
 import { StatusPopover } from "@/shell/status/status-popover"
 import { TitlebarRight } from "@/shell/titlebar/right-slot"
 import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { BocEnvironmentSessionControl } from "@/boc/environments/session"
 
 export function SessionHeader() {
   const language = useLanguage()
@@ -17,6 +18,7 @@ export function SessionHeader() {
   return (
     <>
       <TitlebarRight>
+        <BocEnvironmentSessionControl />
         <Show when={isDesktop() && settings.visibility.status()}>
           <Tooltip appearance="standard" placement="bottom" value={language.t("status.popover.trigger")}>
             <StatusPopover />

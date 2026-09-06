@@ -18,6 +18,7 @@ import { useSettings } from "@/settings/model"
 import { canOpenTabRename, forwardTabRef } from "./tab-gesture"
 import { TabPreviewPopover } from "./tab-popover"
 import "./tab-nav.css"
+import { BocEnvironmentTabMenu } from "@/boc/environments/tab-menu"
 
 // MouseEvent.button uses 1 for the middle/wheel button.
 const MIDDLE_MOUSE_BUTTON = 1
@@ -360,6 +361,14 @@ export function TabNavItem(props: {
           <Menu.Item disabled={!props.session || rename.isPending} onSelect={() => setMenu("rename", true)}>
             {language.t("common.rename")}
           </Menu.Item>
+          <Show when={menu.open}>
+            <BocEnvironmentTabMenu
+              server={servers.list.find((item) => ServerConnection.key(item) === props.server)}
+              session={props.session}
+              project={project()}
+              returnFocus={() => tabRoot.querySelector<HTMLElement>("[data-titlebar-tab-link]")?.focus()}
+            />
+          </Show>
           <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
         </Menu.Context.Content>
       </Menu.Context.Portal>

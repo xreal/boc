@@ -1974,6 +1974,253 @@ export interface ServerBocWorktreeApi<E = never> {
   readonly cleanupRiftTrash: ServerBocWorktreeCleanupRiftTrashOperation<E>
 }
 
+export type ServerBocEnvironmentInspectInput = { readonly projectID: Project.ID; readonly directory: AbsolutePath }
+export type ServerBocEnvironmentInspectOutput = {
+  readonly backend: "local"
+  readonly projectID: Project.ID
+  readonly directory: AbsolutePath
+  readonly availability:
+    | { readonly available: true; readonly strategy: "git" | "boc/rift" }
+    | {
+        readonly available: false
+        readonly reason:
+          | "backend-unavailable"
+          | "unsupported-platform"
+          | "checkout-unavailable"
+          | "checkout-not-registered"
+          | "checkout-not-isolated"
+          | "checkout-ownership-mismatch"
+          | "devenv-unavailable"
+          | "devenv-preflight-failed"
+      }
+  readonly stack:
+    | { readonly status: "unconfigured" }
+    | { readonly status: "invalid" }
+    | {
+        readonly status: "configured"
+        readonly stackID: string
+        readonly composeProject: string
+        readonly infrastructureProject: string
+        readonly host: string
+        readonly url: string
+        readonly sourceDirectory: AbsolutePath
+      }
+  readonly containers: {
+    readonly status: "unknown" | "absent" | "stopped" | "running" | "partial"
+    readonly total: number
+    readonly running: number
+  }
+  readonly http:
+    | { readonly status: "unknown" }
+    | { readonly status: "ready"; readonly checkedAt: number; readonly statusCode: number }
+    | { readonly status: "unreachable"; readonly checkedAt: number }
+  readonly latestRun?:
+    | {
+        readonly id: string
+        readonly action: "setup" | "start" | "stop" | "remove"
+        readonly status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
+        readonly startedAt: number
+        readonly endedAt?: number | undefined
+        readonly exitCode?: number | undefined
+        readonly log: string
+        readonly truncated: boolean
+      }
+    | undefined
+}
+export type ServerBocEnvironmentInspectOperation<E = never> = (
+  input: ServerBocEnvironmentInspectInput,
+) => Effect.Effect<ServerBocEnvironmentInspectOutput, E>
+
+export type ServerBocEnvironmentRunInput = {
+  readonly projectID: Project.ID
+  readonly directory: AbsolutePath
+  readonly sessionID: Session.ID
+  readonly action: "setup" | "start" | "stop" | "remove"
+  readonly domain?: string | undefined
+  readonly confirmation?: "remove-environment" | undefined
+}
+export type ServerBocEnvironmentRunOutput =
+  | {
+      readonly accepted: true
+      readonly environment: {
+        readonly backend: "local"
+        readonly projectID: Project.ID
+        readonly directory: AbsolutePath
+        readonly availability:
+          | { readonly available: true; readonly strategy: "git" | "boc/rift" }
+          | {
+              readonly available: false
+              readonly reason:
+                | "backend-unavailable"
+                | "unsupported-platform"
+                | "checkout-unavailable"
+                | "checkout-not-registered"
+                | "checkout-not-isolated"
+                | "checkout-ownership-mismatch"
+                | "devenv-unavailable"
+                | "devenv-preflight-failed"
+            }
+        readonly stack:
+          | { readonly status: "unconfigured" }
+          | { readonly status: "invalid" }
+          | {
+              readonly status: "configured"
+              readonly stackID: string
+              readonly composeProject: string
+              readonly infrastructureProject: string
+              readonly host: string
+              readonly url: string
+              readonly sourceDirectory: AbsolutePath
+            }
+        readonly containers: {
+          readonly status: "unknown" | "absent" | "stopped" | "running" | "partial"
+          readonly total: number
+          readonly running: number
+        }
+        readonly http:
+          | { readonly status: "unknown" }
+          | { readonly status: "ready"; readonly checkedAt: number; readonly statusCode: number }
+          | { readonly status: "unreachable"; readonly checkedAt: number }
+        readonly latestRun?:
+          | {
+              readonly id: string
+              readonly action: "setup" | "start" | "stop" | "remove"
+              readonly status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
+              readonly startedAt: number
+              readonly endedAt?: number | undefined
+              readonly exitCode?: number | undefined
+              readonly log: string
+              readonly truncated: boolean
+            }
+          | undefined
+      }
+    }
+  | {
+      readonly accepted: false
+      readonly reason: "operation-running" | "not-available" | "not-configured" | "confirmation-required"
+      readonly environment: {
+        readonly backend: "local"
+        readonly projectID: Project.ID
+        readonly directory: AbsolutePath
+        readonly availability:
+          | { readonly available: true; readonly strategy: "git" | "boc/rift" }
+          | {
+              readonly available: false
+              readonly reason:
+                | "backend-unavailable"
+                | "unsupported-platform"
+                | "checkout-unavailable"
+                | "checkout-not-registered"
+                | "checkout-not-isolated"
+                | "checkout-ownership-mismatch"
+                | "devenv-unavailable"
+                | "devenv-preflight-failed"
+            }
+        readonly stack:
+          | { readonly status: "unconfigured" }
+          | { readonly status: "invalid" }
+          | {
+              readonly status: "configured"
+              readonly stackID: string
+              readonly composeProject: string
+              readonly infrastructureProject: string
+              readonly host: string
+              readonly url: string
+              readonly sourceDirectory: AbsolutePath
+            }
+        readonly containers: {
+          readonly status: "unknown" | "absent" | "stopped" | "running" | "partial"
+          readonly total: number
+          readonly running: number
+        }
+        readonly http:
+          | { readonly status: "unknown" }
+          | { readonly status: "ready"; readonly checkedAt: number; readonly statusCode: number }
+          | { readonly status: "unreachable"; readonly checkedAt: number }
+        readonly latestRun?:
+          | {
+              readonly id: string
+              readonly action: "setup" | "start" | "stop" | "remove"
+              readonly status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
+              readonly startedAt: number
+              readonly endedAt?: number | undefined
+              readonly exitCode?: number | undefined
+              readonly log: string
+              readonly truncated: boolean
+            }
+          | undefined
+      }
+    }
+export type ServerBocEnvironmentRunOperation<E = never> = (
+  input: ServerBocEnvironmentRunInput,
+) => Effect.Effect<ServerBocEnvironmentRunOutput, E>
+
+export type ServerBocEnvironmentCancelInput = { readonly projectID: Project.ID; readonly directory: AbsolutePath }
+export type ServerBocEnvironmentCancelOutput = {
+  readonly cancelled: boolean
+  readonly environment: {
+    readonly backend: "local"
+    readonly projectID: Project.ID
+    readonly directory: AbsolutePath
+    readonly availability:
+      | { readonly available: true; readonly strategy: "git" | "boc/rift" }
+      | {
+          readonly available: false
+          readonly reason:
+            | "backend-unavailable"
+            | "unsupported-platform"
+            | "checkout-unavailable"
+            | "checkout-not-registered"
+            | "checkout-not-isolated"
+            | "checkout-ownership-mismatch"
+            | "devenv-unavailable"
+            | "devenv-preflight-failed"
+        }
+    readonly stack:
+      | { readonly status: "unconfigured" }
+      | { readonly status: "invalid" }
+      | {
+          readonly status: "configured"
+          readonly stackID: string
+          readonly composeProject: string
+          readonly infrastructureProject: string
+          readonly host: string
+          readonly url: string
+          readonly sourceDirectory: AbsolutePath
+        }
+    readonly containers: {
+      readonly status: "unknown" | "absent" | "stopped" | "running" | "partial"
+      readonly total: number
+      readonly running: number
+    }
+    readonly http:
+      | { readonly status: "unknown" }
+      | { readonly status: "ready"; readonly checkedAt: number; readonly statusCode: number }
+      | { readonly status: "unreachable"; readonly checkedAt: number }
+    readonly latestRun?:
+      | {
+          readonly id: string
+          readonly action: "setup" | "start" | "stop" | "remove"
+          readonly status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
+          readonly startedAt: number
+          readonly endedAt?: number | undefined
+          readonly exitCode?: number | undefined
+          readonly log: string
+          readonly truncated: boolean
+        }
+      | undefined
+  }
+}
+export type ServerBocEnvironmentCancelOperation<E = never> = (
+  input: ServerBocEnvironmentCancelInput,
+) => Effect.Effect<ServerBocEnvironmentCancelOutput, E>
+
+export interface ServerBocEnvironmentApi<E = never> {
+  readonly inspect: ServerBocEnvironmentInspectOperation<E>
+  readonly run: ServerBocEnvironmentRunOperation<E>
+  readonly cancel: ServerBocEnvironmentCancelOperation<E>
+}
+
 export type WorktreeListInput = {
   readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
 }
@@ -2167,6 +2414,7 @@ export interface AppApi<E = never> {
   readonly shell: ShellApi<E>
   readonly reference: ReferenceApi<E>
   readonly "server.boc.worktree": ServerBocWorktreeApi<E>
+  readonly "server.boc.environment": ServerBocEnvironmentApi<E>
   readonly worktree: WorktreeApi<E>
   readonly workspace: WorkspaceApi<E>
   readonly vcs: VcsApi<E>

@@ -22,6 +22,18 @@
       "reason": "Lock the BOC workspace and its app and desktop dependency edges"
     },
     {
+      "path": "packages/cli/src/server-process.ts",
+      "reason": "Use the standard session database when the Boc superset server owns the shared service"
+    },
+    {
+      "path": "packages/cli/src/services/service-config.ts",
+      "reason": "Map the Boc channel to the compatible standard service registration and port"
+    },
+    {
+      "path": "packages/cli/test/service.test.ts",
+      "reason": "Verify the Boc channel shares the standard managed service identity"
+    },
+    {
       "path": "packages/app/package.json",
       "reason": "Register the BOC workspace dependency"
     },
@@ -50,6 +62,10 @@
       "reason": "Show the effective Boc checkout method beside new checkout"
     },
     {
+      "path": "packages/app/src/session/header/session-header.tsx",
+      "reason": "Mount the Boc environment control inside the existing right titlebar slot"
+    },
+    {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
       "reason": "Apply and display the Boc checkout strategy when moving a session"
     },
@@ -59,7 +75,7 @@
     },
     {
       "path": "packages/app/src/settings/workspaces/project-dialog.tsx",
-      "reason": "Mount the Boc project checkout override"
+      "reason": "Mount Boc checkout and environment project settings and allow direct Scripts-tab entry"
     },
     {
       "path": "packages/app/src/settings/workspaces/workspaces.tsx",
@@ -84,6 +100,10 @@
     {
       "path": "packages/app/src/shell/titlebar/titlebar.tsx",
       "reason": "Mount the generic BOC navigation bridge"
+    },
+    {
+      "path": "packages/app/src/shell/titlebar/tab-nav.tsx",
+      "reason": "Mount Boc environment actions for the explicitly targeted session tab"
     },
     {
       "path": "packages/app/vite.js",
@@ -143,7 +163,7 @@
     },
     {
       "path": "packages/desktop/src/main/service/background-service.ts",
-      "reason": "Start the Boc backend with its isolated service registration and staged Rift runtime"
+      "reason": "Negotiate the shared compatible Boc backend with PTY handoff and an isolated version-mismatch fallback"
     },
     {
       "path": "packages/desktop/src/renderer/desktop-app.tsx",
@@ -155,35 +175,39 @@
     },
     {
       "path": "packages/server/package.json",
-      "reason": "Register the BOC server-side worktree implementation"
+      "reason": "Register the BOC server-side worktree and environment implementations"
     },
     {
       "path": "packages/server/src/routes.ts",
-      "reason": "Register the Boc host service and its managed worktree plugin"
+      "reason": "Register the Boc host services for managed worktrees and development environments"
     },
     {
       "path": "packages/server/src/handlers.ts",
-      "reason": "Compose the generic Boc backend capability handler"
+      "reason": "Compose the generic Boc backend capability handlers"
     },
     {
       "path": "packages/protocol/src/api.ts",
-      "reason": "Compose the authenticated Boc backend capability group"
+      "reason": "Compose the authenticated Boc backend capability groups"
     },
     {
       "path": "packages/client/src/effect/api/api.ts",
-      "reason": "Generate the typed Boc Rift capability client"
+      "reason": "Generate the typed Boc Rift and environment capability client"
     },
     {
       "path": "packages/client/src/effect/generated/client.ts",
-      "reason": "Generate the Effect Boc Rift capability client"
+      "reason": "Generate the Effect Boc Rift and environment capability client"
     },
     {
       "path": "packages/client/src/promise/generated/client.ts",
-      "reason": "Generate the Promise Boc Rift capability client"
+      "reason": "Generate the Promise Boc Rift and environment capability client"
     },
     {
       "path": "packages/client/src/promise/generated/types.ts",
-      "reason": "Generate the Promise Boc Rift capability types"
+      "reason": "Generate the Promise Boc Rift and environment capability types"
+    },
+    {
+      "path": "packages/client/test/promise.test.ts",
+      "reason": "Verify the generated Promise client exposes the Boc capability groups"
     }
   ]
 }

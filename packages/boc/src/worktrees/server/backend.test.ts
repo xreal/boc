@@ -56,6 +56,7 @@ describe("Rift backend", () => {
           directory: destination,
           type: "worktree",
         })
+        expect(await backend.ownership(destination)).toEqual({ sourceDirectory: source })
 
         await Bun.write(path.join(destination, "untracked.txt"), "keep me\n")
         const protectedRemoval = await Effect.runPromise(
@@ -82,6 +83,7 @@ describe("Rift backend", () => {
         expect(await directoryExists(destination)).toBe(true)
 
         await Effect.runPromise(backend.strategy.remove({ directory: destination, force: true }))
+        expect(await backend.ownership(destination)).toBeUndefined()
         expect(await directoryExists(destination)).toBe(false)
         expect(await backend.trash()).toEqual({ checkouts: 1 })
         expect(await backend.cleanup()).toEqual({ completed: true, checkouts: 1 })

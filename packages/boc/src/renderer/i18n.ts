@@ -2,6 +2,7 @@ import { resolveTemplate, translator } from "@solid-primitives/i18n"
 import { deploymentsEnglish } from "../tools/deployments/i18n/en"
 import { jiraEnglish } from "../tools/jira/i18n/en"
 import { worktreesEnglish } from "../worktrees/i18n/en"
+import { environmentsEnglish } from "../environments/i18n/en"
 
 export const bocEnglish = {
   "boc.title": "Boc",
@@ -14,6 +15,7 @@ export const bocEnglish = {
   ...deploymentsEnglish,
   ...jiraEnglish,
   ...worktreesEnglish,
+  ...environmentsEnglish,
 } as const
 
 export type BocI18nKey = keyof typeof bocEnglish

@@ -1,6 +1,7 @@
 import { Context } from "effect"
 import { HttpApi, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/unstable/httpapi"
 import { BocWorktreeGroup } from "./boc/worktree.js"
+import { BocEnvironmentGroup } from "./boc/environment.js"
 import { SchemaErrorMiddleware } from "./middleware/schema-error.js"
 import { GenerateGroup } from "./groups/generate.js"
 import { MessageGroup } from "./groups/message.js"
@@ -91,6 +92,7 @@ type ApiGroups<
   | typeof DebugGroup
   | typeof MigrationGroup
   | typeof BocWorktreeGroup
+  | typeof BocEnvironmentGroup
   | typeof WorkspaceGroup
   | typeof GenerateGroup
   | typeof PersistentPtyGroup
@@ -179,6 +181,7 @@ const makeApiFromGroup = <
     .add(ShellGroup.middleware(locationMiddleware))
     .add(ReferenceGroup.middleware(locationMiddleware))
     .add(BocWorktreeGroup)
+    .add(BocEnvironmentGroup)
     .add(WorktreeGroup.middleware(locationMiddleware))
     .add(WorkspaceGroup)
     .add(VcsGroup.middleware(locationMiddleware))

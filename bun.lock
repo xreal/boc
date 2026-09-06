@@ -117,6 +117,7 @@
         "@opencode-ai/ui": "workspace:*",
         "@opencode-ai/util": "workspace:*",
         "@solid-primitives/i18n": "2.2.1",
+        "drizzle-orm": "catalog:",
         "effect": "catalog:",
         "electron-store": "11.0.2",
         "marked": "catalog:",

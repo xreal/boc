@@ -8,6 +8,10 @@ on:
         description: "Stable semantic version, for example 0.1.0"
         required: true
         type: string
+      server_version:
+        description: "Exact compatible official opencode2 version, for example 0.0.0-beta-19059"
+        required: true
+        type: string
 
 concurrency:
   group: boc-release
@@ -28,6 +32,7 @@ jobs:
         shell: bash
         env:
           VERSION: ${{ inputs.version }}
+          SERVER_VERSION: ${{ inputs.server_version }}
         run: |
           if [[ "$GITHUB_REF_NAME" != "boc-beta" ]]; then
             echo "Boc releases must run from boc-beta"
@@ -35,6 +40,10 @@ jobs:
           fi
           if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Version must be a stable semantic version"
+            exit 1
+          fi
+          if [[ ! "$SERVER_VERSION" =~ ^[0-9A-Za-z][0-9A-Za-z.+-]*$ ]]; then
+            echo "Server version must be an exact opencode2 version"
             exit 1
           fi
           tag="v${VERSION}"
@@ -98,7 +107,7 @@ jobs:
           BUN_COMPILE_RELEASE: bun-v1.4.1
           GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_CHANNEL: boc
-          OPENCODE_VERSION: ${{ inputs.version }}
+          OPENCODE_VERSION: ${{ inputs.server_version }}
 
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
