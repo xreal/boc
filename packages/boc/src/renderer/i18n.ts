@@ -5,6 +5,8 @@ import { worktreesEnglish } from "../worktrees/i18n/en"
 
 export const bocEnglish = {
   "boc.title": "Boc",
+  "boc.projectTabs.reorder": "Drag to reorder projects, or use Alt+Arrow Up/Down. Click to collapse or expand.",
+  "boc.projectTabs.newSession": "Create session in {{project}}",
   "boc.opened.description": "Boc fork extension point. This button and command are owned by the boc fork.",
   "boc.extension.loading": "Loading extension…",
   "boc.extension.notFound.title": "Extension not found",

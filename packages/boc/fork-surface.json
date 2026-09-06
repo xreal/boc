@@ -99,6 +99,10 @@
       "reason": "Mount the generic BOC navigation bridge"
     },
     {
+      "path": "packages/app/src/shell/titlebar/tab-strip.tsx",
+      "reason": "Delegate vertical tab grouping, collapse filtering, and navigation order to Boc; retain group priority during upstream session dragging"
+    },
+    {
       "path": "packages/app/vite.js",
       "reason": "Recognize the Boc release channel"
     },
