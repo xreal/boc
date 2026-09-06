@@ -1,6 +1,6 @@
 # BOC: Entwicklungsumgebungen für Worktree- und Rift-Sessions
 
-Stand: 2026-09-06. Status: Schritt A statisch abgeschlossen; kontrollierte Laufzeit- und Cache-Korrektheitsprüfungen stehen aus.
+Stand: 2026-09-06. Status: Schritt A abgeschlossen und Builder-Scope festgelegt; gezielte Korrektheits- und Plattformprüfungen begleiten beziehungsweise folgen der Umsetzung.
 
 Dieses Dokument ist ein eigenständiger, versionierter Arbeitsplan. Es implementiert keine Funktion und erteilt keine Freigabe, bestehende Umgebungen zu verändern. Statische Befunde sind von historischen Messwerten, noch offenen Laufzeitprüfungen und Produktvorschlägen getrennt.
 
@@ -20,6 +20,11 @@ Aus einer Session in einem isolierten Checkout soll sich mit einer klaren Aktion
 | Zunächst manuelle Aktionen auf einem lokalen BOC-Backend                                     | MVP-Vorschlag; Plattformumfang noch prüfen             |
 | BOC steuert Ausführung und Darstellung; devenv besitzt Docker-/Installationslogik            | Architekturvorschlag                                   |
 | Key-adressierte, private Dependency-Snapshots mit Copy-on-write, wo verfügbar                | Begründete Empfehlung aus Schritt A; nicht beschlossen |
+| MVP verwendet den festen devenv-Vertrag statt beliebiger Projekt-Scripts                     | Bestätigte Entscheidung 2026-09-06                     |
+| MVP bietet Setup, Start, Stop, URL und validiertes Stack-Entfernen                           | Bestätigte Entscheidung 2026-09-06                     |
+| Datenbanken, Redis/PHP-Sessions und RabbitMQ dürfen im MVP geteilt bleiben                   | Bestätigte Entscheidung 2026-09-06; klar kennzeichnen  |
+| MVP unterstützt macOS und Linux; Windows/WSL bleibt außerhalb                                | Bestätigte Entscheidung 2026-09-06                     |
+| Lokale Cache-Löschung ist zulässig; Korrektheit geht vor einem vermiedenen Rebuild           | Bestätigte Entscheidung 2026-09-06                     |
 
 Nicht Teil des ersten Schritts: Dashboard, eigener Paketmanager, pnpm-Migration, Remote-/SSH-Ausführung, allgemeines Plugin-System, automatische Datenbankkopien, neue Session-Core-Domäne oder unbedingtes automatisches Setup/Teardown.
 
@@ -27,7 +32,7 @@ Nicht Teil des ersten Schritts: Dashboard, eigener Paketmanager, pnpm-Migration,
 
 Die ursprüngliche BOC-/Emdash-Recherche wurde in Schritt A gegen die aktuellen lokalen Quellen geprüft. BOC stand bei `5ca616b9361a` auf `boc-beta`, Emdash bei `ca2d1c1737a4` und devenv bei `c3575c0d2cff` auf dessen Worktree-PoC-Zweig. Eine vorhandene, sachfremde Emdash-Arbeitsänderung blieb unangetastet. Das aktive `devenv`-Kommando löst auf `devenv.sh` dieses devenv-Checkouts auf.
 
-Es wurden keine Setup-, Installations-, Start-, Stop-, Migrations-, Prune- oder Cache-Clear-Kommandos ausgeführt. Die Prüfung umfasste Quellen, Shell-Syntax, anonymisierte generierte Metadaten, historische Benchmark-Dateien sowie rein lesende Docker-/Runtime-Abfragen. Ein aktueller Benchmark war nicht zulässig: Es existierte kein aktiver Benchmark-Stack, und der Setup-Ablauf löscht den gemeinsam gemounteten Load-Balancer-Dateicache.
+Die erste Quellenprüfung führte keine Setup-, Installations-, Start-, Stop-, Migrations-, Prune- oder Cache-Clear-Kommandos aus. Sie umfasste Quellen, Shell-Syntax, anonymisierte generierte Metadaten, historische Benchmark-Dateien sowie rein lesende Docker-/Runtime-Abfragen. Anschließend wurde lokale Cache-Löschung ausdrücklich freigegeben und das dafür vorgesehene Disposable-Benchmark-Script verwendet; dessen aktuelle Ergebnisse stehen in Abschnitt 6.
 
 Alle Quellen sind repository-relativ: BOC-Pfade beziehen sich auf dieses Repository, `devenv:` auf den devenv-Checkout und `emdash:` auf den Emdash-Checkout; `D/` steht weiterhin für `apps/emdash-desktop/`. Alte lokale BOC-Unterlagen liegen unter `tmp/` und werden nicht automatisch auf einen anderen Rechner übertragen. Wenn vorhanden: zuerst `tmp/BOC_HANDOVER.md`, dann `tmp/BOC_EXTENSIONS_JIRA_PLAN.md` und den Rift-Plan lesen. Fehlen sie, für diese neue Funktion den aktuellen Code und dieses Dokument verwenden; die abgeschlossenen Jira-Arbeitspakete nicht erneut ausführen.
 
@@ -244,7 +249,7 @@ Ob lokale Projektsettings allein reichen oder eine versionierbare Projektdatei s
 - URL und Stack-ID aus der strikt als Daten geparsten Zuordnungsdatei übernehmen. Branch oder Session-Titel sind keine Identität. Zusätzlich die registrierte BOC-Checkout-Zuordnung und vorhandene Compose-Projektbelegung validieren, damit ein wiederverwendeter Pfad keinen alten Stack übernimmt.
 - Setup-Erfolg schließt bereits eine HTTP-/Stack-Header-Prüfung ein. Start und Status nach einem späteren Stop brauchen dieselbe oder eine gleichwertige gezielte Prüfung; Exit-Code 0 von `devenv start` genügt nicht.
 - Stop ist `devenv stop`; Remove ist die getrennte, validierte Folge `devenv down` und danach `devenv stack clear`. Diese Aktionen dürfen nie auf `clean`, `reset`, `destroy` oder ein beliebiges Fallback-Arbeitsverzeichnis abgebildet werden.
-- Vor Start muss BOC erkennen, ob Shared Networks, vorbereitete Konfiguration und nichtinteraktive Credentials vorhanden sind. Wie diese Capability ohne Secret-Zugriff geprüft wird, bleibt eine Produktentscheidung für Schritt C.
+- Vor Start prüft BOC mindestens ausführbares devenv, registrierten Checkout und vorhandene Shared Networks. Fehlende vorbereitete Konfiguration beziehungsweise ein unerwarteter interaktiver Prompt endet als nachvollziehbarer Setup-Fehler mit erreichbarem Log; BOC liest dafür keine Secrets.
 
 ## 6. Performance-Plan
 
@@ -310,7 +315,7 @@ Damit bleibt die schnellste bestätigte Technik erhalten, ohne BOC an APFS zu ko
 
 Mindestens drei vergleichbare Warm-Läufe, Median und Spannweite sowie Hardware, Dateisystem, Image-/Runtime-Versionen und Dependency-Größe dokumentieren. Kalte Läufe nur mit separatem Testcache herstellen, nicht durch Löschen des normalen Caches. Die konkreten Warm-Setup-Zeitbudgets werden erst nach Baseline festgelegt; bis dahin keine Sekundenversprechen oder erfundenen Beschleunigungsfaktoren.
 
-### Vorhandene Messwerte und Grenzen
+### Vorhandene und aktuelle Messwerte
 
 Unter `devenv:.devenv/benchmarks/results/` lagen zwölf historische Ergebnisdateien: elf erfolgreiche und ein fehlgeschlagener Lauf. Neun erfolgreiche Läufe meldeten für Composer, Node und Frontend keinen Miss, Disable- oder Dirty-Bypass-Status:
 
@@ -325,7 +330,24 @@ Unter `devenv:.devenv/benchmarks/results/` lagen zwölf historische Ergebnisdate
 
 Alle neun meldeten sechs App-Container und keine neue Image-ID. Zwei weitere erfolgreiche Läufe mit mindestens einem Artifact-Miss benötigten 139 beziehungsweise 159 Sekunden bis Readiness. Das deutet auf hohen Nutzen der Artefaktwiederverwendung hin, ist aber kein belastbarer Beschleunigungsfaktor: Die Ergebnisdateien enthalten weder Source-Commit noch CPU/RAM, Dateisystem, Docker-/Compose-Versionen, genaue Image-Digests oder Runtime-Patchversionen. Acht der neun Warm-Läufe melden `target-present`; deren Logs zeigen zuvor jeweils erfolgreiche Prefetches aller drei passenden Keys. Das Label belegt daher nicht, dass der Stale-Target-Fehler in diesen Läufen auftrat, kann aber frisch restaurierte und ungeprüft vorhandene Ziele nicht unterscheiden. Zusätzlich stammen acht der zwölf Ergebnisdateien aus dem älteren `.devenv/stacks`-Vertrag und nur vier aus dem aktuellen `.devenv/worktrees`-Vertrag; beide Miss-Läufe gehören zur älteren Gruppe. Die Kohorten sind deshalb nur historische Richtwerte.
 
-Der aktuell geprüfte Host ist Apple Silicon/arm64 mit APFS, Bash 5.3.15, Docker Client/Engine 29.7.2 und Compose 5.5.0; der Docker-Server läuft als Linux/arm64. Diese aktuellen Systemwerte dürfen den älteren Ergebnisdateien nicht nachträglich als Benchmark-Metadaten zugeschrieben werden. Ein neuer Lauf unterblieb, weil kein aktiver Benchmark-Stack vorhanden war und Setup sowohl den gemeinsamen LB-Cache leert als auch alte Artifact-Cache-Einträge prunen kann. Kalt-, Parallel-, Lockfile-Miss-, Watcher-, CPU- und I/O-Messungen bleiben offen.
+Der aktuell geprüfte Host ist Apple Silicon/arm64 mit APFS, Bash 5.3.15, Docker Client/Engine 29.7.2 und Compose 5.5.0; der Docker-Server läuft als Linux/arm64. Diese aktuellen Systemwerte dürfen den älteren Ergebnisdateien nicht nachträglich als Benchmark-Metadaten zugeschrieben werden.
+
+Nach ausdrücklicher Freigabe lokaler Cache-Löschung wurden mit `devenv:scripts/worktree-lifecycle-benchmark.sh` vier Disposable-Läufe gegen devenv `c3575c0d2cff` und Projekt-Source `f37d3e34d319` ausgeführt. Das Script erzeugte jeweils einen eigenen Branch, Checkout und Compose-Stack und entfernte diese wieder. Danach verblieben weder Benchmark-Container/-Projekte noch Benchmark-Worktrees oder -Branches.
+
+Der erste aktuelle Lauf baute fehlende Composer- und Frontend-Artefakte auf; Node wurde passend prefetched. Die folgenden drei Läufe nutzten für alle drei Artefakte den passenden Prefetch und bilden die aktuelle Warm-Baseline:
+
+| Messgröße               |  Median |   Spannweite |
+| ----------------------- | ------: | -----------: |
+| Git-Worktree erstellen  |     3 s |        3–3 s |
+| Setup bis HTTP-ready    |    24 s |      22–26 s |
+| Verifikation            |     1 s |        0–1 s |
+| Cleanup                 |     9 s |       8–10 s |
+| Gesamtlauf              |    41 s |      35–42 s |
+| Logische Checkout-Größe | 1,91 GB | 1,91–1,91 GB |
+
+Alle vier aktuellen Läufe endeten erfolgreich, meldeten sechs App-Container, verwendeten ausschließlich vorhandene Images und hinterließen laut Ergebnisdatei keine Cleanup-Warnung. Der Artifact-Aufbau benötigte 143 Sekunden bis HTTP-ready und 155 Sekunden insgesamt; darin entfielen 22 Sekunden auf Composer, 86 Sekunden auf den Frontend-Build und 12 Sekunden auf Readiness. Die warmen Setups benötigten 22, 24 und 26 Sekunden.
+
+Diese Baseline belegt den aktuellen Happy Path und die sichere, stackeigene Cleanup-Kette. Sie belegt noch nicht Lockfile-/Image-Misses, ungeprüft kopierte `target-present`-Verzeichnisse, parallele Setups, Linux, CPU/I/O/Watcher oder Queue-/Worker-Isolation. Diese Prüfungen können mit der gebauten Integration gezielter und näher am echten Vertrag erfolgen.
 
 ## 7. Antworten auf Q01–Q12 und offene Restpunkte
 
@@ -359,7 +381,7 @@ Die Statusangabe „statisch beantwortet“ bestätigt den aktuellen Quellvertra
 
 **Teilbeantwortet.** Route, URL-Schema und Setup-Prüfung sind belegt. Es gibt keine Compose-Healthchecks; HTTP-Status plus korrekter Stack-Header ist die vorhandene Readiness-Definition. Emdashs „configured“ bedeutet dagegen nur, dass eine passende Konfigurationsdatei existiert.
 
-**Offen:** Kosten und Aussagekraft einer späteren Statusprüfung nach `start`, SSR/API-/DB-/Redis-/Rabbit-Ausfälle sowie TLS ohne `-k`. UI darf bis dahin nur „URL vorhanden“ beziehungsweise „vom Setup als HTTP-ready gemeldet“ anzeigen.
+Vier aktuelle Disposable-Läufe bestätigten HTTP 200 mit korrektem Stack-Header. **Offen:** Kosten und Aussagekraft einer späteren Statusprüfung nach `start`, SSR/API-/DB-/Redis-/Rabbit-Ausfälle sowie TLS ohne `-k`. UI darf bis dahin nur „URL vorhanden“ beziehungsweise „vom Setup als HTTP-ready gemeldet“ anzeigen.
 
 ### Q06 — Konfiguration und Teilbarkeit
 
@@ -381,7 +403,7 @@ Emdash bestätigt nur ein Konzept: phasenstabile Lifecycle-PTYs, In-Memory-Dedup
 
 ### Q08 — Stop und Cleanup
 
-**Statisch beantwortet.** `stop` stoppt nur Projektcontainer. `down` entfernt Container und projektlokale Compose-Ressourcen ohne `-v`; `stack clear` entfernt anschließend nur die Zuordnung. Geteilte Infrastruktur und Dependency-/Log-/Cache-Dateien bleiben. Bei fehlendem Checkout oder nicht beweisbarer Zuordnung ist automatisches Cleanup nicht sicher. Zwei aktuell beobachtete unzugeordnete Worktree-Compose-Projekte bestätigen den Orphan-Fall.
+**Für zugeordnete Stacks beantwortet.** `stop` stoppt nur Projektcontainer. `down` entfernt Container und projektlokale Compose-Ressourcen ohne `-v`; `stack clear` entfernt anschließend nur die Zuordnung. Geteilte Infrastruktur und Dependency-/Log-/Cache-Dateien bleiben. Vier aktuelle Disposable-Läufe bestätigten diese Cleanup-Kette ohne verbleibende Benchmark-Projekte, Worktrees oder Branches. Bei fehlendem Checkout oder nicht beweisbarer Zuordnung ist automatisches Cleanup nicht sicher. Zwei zuvor beobachtete unzugeordnete Worktree-Compose-Projekte bestätigen den Orphan-Fall.
 
 **Offen:** Fehlerfälle von `down`/`stack clear` und ein sicherer, expliziter Orphan-Cleanup-Einstieg. Automatisches Cleanup vor Checkout-Löschung bleibt außerhalb des manuellen MVP.
 
@@ -393,15 +415,15 @@ Emdash bestätigt nur ein Konzept: phasenstabile Lifecycle-PTYs, In-Memory-Dedup
 
 ### Q10 — Laufzeit und Optimierungsreihenfolge
 
-**Nur historisch beantwortet.** Die vorhandenen Messwerte stehen in Abschnitt 6. Der gemischte historische Warm-Median bis HTTP-ready beträgt 31 Sekunden; zwei erfolgreiche Miss-Läufe des älteren Stack-Vertrags benötigten 139 beziehungsweise 159 Sekunden. Wegen fehlender Benchmark-Metadaten, gemischter Setup-Versionen und des mehrdeutigen `target-present`-Labels sind dies Richtwerte, keine Baseline oder Abnahme.
+**Aktuelle Happy-Path-Baseline vorhanden.** Drei kontrollierte aktuelle Warm-Läufe erreichten HTTP-Readiness in 22, 24 und 26 Sekunden; Median 24 Sekunden. Ein aktueller Artifact-Aufbau benötigte 143 Sekunden. Die älteren gemischten Werte bleiben nur historische Richtwerte.
 
-**Offen:** ein freigegebener Test-Stack ohne Eingriff in gemeinsame Caches, mindestens drei kontrollierte Warm-Läufe, separater Kaltcache, parallele Setups, CPU/I/O/Watcher und Zeitanteile je Phase. Erst danach ein verbindliches Warm-Zeitbudget festlegen.
+**Offen, aber nicht Builder-blockierend:** kontrollierter vollständiger Kaltcache, parallele Setups, Lockfile-/Image-Miss, CPU/I/O/Watcher und automatisierte Phasenwerte. Vorläufiges Regressionsbudget für denselben Host und identische Inputs: Warm-Median höchstens 30 Sekunden bis HTTP-ready; nach drei Vergleichsläufen neu bewerten statt als plattformübergreifendes SLA behandeln.
 
 ### Q11 — Plattformen und Speicherorte
 
-**Teilbeantwortet.** Aktuell ist nur macOS auf Apple Silicon mit APFS praktisch belegt. Der Cache probiert dort `cp -cR`, auf Linux `cp -a --reflink=always` und fällt bei anderer oder getrennter Filesystem-Unterstützung auf eine normale Kopie zurück (`devenv:scripts/lib/rift-artifact-cache.sh:47-140`). Devenv verlangt Bash 4+, aktuell ist 5.3.15 installiert. Docker läuft als Linux/arm64; Node/SSR erzwingen amd64.
+**Teilbeantwortet.** Aktuell ist macOS auf Apple Silicon mit APFS praktisch belegt. Der Cache probiert dort `cp -cR`, auf Linux `cp -a --reflink=always` und fällt bei anderer oder getrennter Filesystem-Unterstützung auf eine normale Kopie zurück (`devenv:scripts/lib/rift-artifact-cache.sh:47-140`). Devenv verlangt Bash 4+, aktuell ist 5.3.15 installiert. Docker läuft als Linux/arm64; Node/SSR erzwingen amd64.
 
-**Offen:** Linux-Reflink, Cross-Filesystem-Copy, WSL/Windows, Compose-`!reset`-Mindestversion und Performance ohne Copy-on-write. MVP-Support daher zunächst nur für den nachgewiesenen lokalen macOS-/Docker-Pfad vorschlagen; nicht als endgültige Produktentscheidung festschreiben.
+**Bestätigte Produktentscheidung:** Der MVP unterstützt macOS und Linux; Windows/WSL bleibt außerhalb. Linux-Reflink, Cross-Filesystem-Copy, Compose-`!reset`-Mindestversion und Performance ohne Copy-on-write werden nach dem Bau auf Linux abgenommen. Fehlt Reflink, muss der korrekte Copy-/Install-Fallback funktionieren, auch wenn er langsamer ist.
 
 ### Q12 — Vorhandenes Startup-Script
 
@@ -411,21 +433,39 @@ Eine rein lesende lokale Datenbankabfrage fand keine konfigurierten Startup-Komm
 
 **Offen:** tatsächliche Zielprojektwerte vor Einführung prüfen. Ist `commands.start` bereits das devenv-Setup, darf BOC nicht ein zweites Mal ausführen; andernfalls bleibt der bestehende Hook unverändert und die manuelle Environment-Aktion erhält eine getrennte Konfiguration.
 
-### Freigegebene Restprüfung für Schritt C/D
+### Builder-fertiger Auftrag
 
-Laufzeit- und Benchmark-Prüfungen nur in einem ausdrücklich als Test vorgesehenen Checkout/Stack mit eigenem Cache. Vorher den gemeinsamen LB-Cache aus `clear-cache` entkoppeln; im aktuellen Auftrag ist dessen Löschung auch für einen Test nicht freigegeben. Keine Live-DB-Kopien, Migrationen, globalen Stops, Prunes oder Löschungen bestehender/geteilter Caches. Benötigt werden danach insbesondere:
+Der nächste Builder-Agent kann ohne weitere Architektur-Recherche mit folgendem bestätigten Scope beginnen:
 
-- Erfolgs-, Fehler-, Retry- und Prozessbaum-Abbruchlauf mit wiedererreichbaren Logs.
-- Zwei Checkouts desselben Branches und zwei Sessions desselben Checkouts.
-- Lockfile-/Image-Miss, Rift-`--copy-all`, native Module, Composer-Autoload und echte App-Ausführung.
-- Gemeinsamer DB-/Redis-/RabbitMQ-Betrieb mit kontrollierter Queue-/Worker-Beobachtung.
-- Warm/Kalt/Parallel-Messung mit Source-Commit, Hardware, Dateisystem, Images, Runtime-Versionen und Phasenwerten.
+1. **Ziel und Plattform:** lokale registrierte Git-Worktrees und Rift-Checkouts auf macOS und Linux. Hauptcheckout, Remote-/SSH-Location und nicht registrierte Pfade bleiben ausgeschlossen. Windows/WSL und Dashboard bleiben außerhalb.
+2. **Fester Adapter:** hostlokalen devenv-Root auflösen und ausschließlich den bestätigten `scripts/worktree-setup.sh`-/`devenv.sh`-Vertrag verwenden. Keine freien Shell-Scripts und keine Umdeutung von `commands.start`.
+3. **Environment-Identität:** Backend, Projekt und kanonischen registrierten Checkout-Pfad verwenden. Generierte Zuordnung strikt als Daten lesen und zusätzlich Stack-ID, Compose-Projekt, Host, Quellpfad sowie BOC-Checkout-Eigentum validieren.
+4. **Operationen:** Setup, Start, Stop, URL öffnen/kopieren und Stack entfernen. Entfernen verlangt eine klare Bestätigung und führt nur bei verifizierter Zuordnung `down` und danach `stack clear` aus. Unzugeordnete Orphans werden angezeigt, aber im MVP nicht automatisch entfernt.
+5. **Runner:** genau eine kollidierende Operation pro Environment, unabhängig von der Session. UI-Unmount darf den Lauf nicht abbrechen. Prozesshalter/Reconnect auf Basis des Persistent PTY prüfen; Environment-eigener letzter Lauf, Endstatus und begrenztes Log bleiben unabhängig vom normalen Terminal sichtbar. Keine automatische Wiederholung nach unbekanntem Abbruch.
+6. **Status:** Setup-Lauf, Stack-Konfiguration, Containerzustand und HTTP-Readiness getrennt darstellen. Nach Setup die vorhandene HTTP-/Header-Prüfung übernehmen; nach Start gezielt prüfen. Keine dauerhafte globale Docker-Abfrage und kein Polling pro Tab.
+7. **Geteilte Infrastruktur:** Datenbanken, Redis/PHP-Sessions und RabbitMQ dürfen im MVP geteilt bleiben. Dies in Settings/Status klar, aber nicht alarmistisch kennzeichnen. Stop/Remove darf diese Dienste und ihre Volumes nicht treffen.
+8. **Cache:** Cache bleibt devenv-eigen. Bei fehlendem oder abweichendem Ziel-Key lieber checkout-lokale Dependencies/Dist löschen und korrekt restaurieren beziehungsweise neu bauen als einen unsicheren Warm-Hit akzeptieren. APFS-Clone, Linux-Reflink und normale Copy/Installation sind die abgestufte Strategie.
+9. **UI:** vorhandener rechter Session-Slot, Session-Kontextmenü und Projekt-Scripts-Tab als additive Einhängestellen; ein gemeinsamer Environment-Store je Backend/Checkout. Zustände, Fokus, Tastatur, kleine Fenster, Live-Ausgabe und Fehler/Retry mit Fixtures zuerst absichern.
+10. **Upstream-Budget:** Produktlogik unter den BOC-Verzeichnissen; upstream-eigene Dateien nur für additive Mounts/Registrierung. Öffentliche API nur über Schema → Protocol → Server und generierten Client. `BOC_FORK.md` und `packages/boc/fork-surface.json` bei tatsächlichen Integrationsänderungen aktualisieren.
+
+### Nach dem Bau gezielt prüfen
+
+Diese Punkte sind keine weitere Vorab-Recherche, sondern Akzeptanz- und Härtungsprüfungen am gebauten Ablauf:
+
+- Erfolgs-, Fehler-, Retry- und Prozessbaum-Abbruchlauf; Dialog/Fenster schließen, Backend-Handoff und wiedererreichbare Logs.
+- Zwei Checkouts desselben Branches, zwei Sessions desselben Checkouts und zwei parallele unterschiedliche Environments.
+- Lockfile-/Image-Miss, ein bereits kopiertes falsches `target-present`, Rift-`--copy-all`, native Module, Composer-Autoload und echte App-Ausführung.
+- Gemeinsamer DB-/Redis-/RabbitMQ-Betrieb mit kontrollierter Queue-/Worker-Beobachtung; Uploads und Search-Indizes.
+- Linux-Reflink und Copy-Fallback; macOS-Warm-Baseline gegen das vorläufige 30-Sekunden-Budget.
+- Remove-Bestätigung, partieller `down`-Fehler, fehlender Checkout und unveränderte gemeinsame Infrastruktur.
+
+Benchmarks weiterhin nur in Disposable-Test-Stacks. Lokale Cache-Löschung und Rebuilds sind ausdrücklich zulässig und sollen zugunsten der Korrektheit eher einmal zu viel erfolgen. Unverändert verboten bleiben Datenbankmigrationen, Volume-Löschungen, globale Prunes, Stops bestehender Stacks sowie Neustarts der laufenden App oder des Servers.
 
 ## 8. Umsetzung in überprüfbaren Schritten
 
 | Schritt                    | Arbeit                                                                                                                                       | Abschlusskriterium                                                                                                                          |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| A: devenv-Vertrag klären   | Q01–Q06 und Q08–Q12 untersuchen; vorhandene Messwerte einordnen, Q07 anhand BOC prüfen                                                       | **Statisch abgeschlossen 2026-09-06:** Evidenz, historische Werte, Cache-Empfehlung und offene Laufzeitprüfungen dokumentiert               |
+| A: devenv-Vertrag klären   | Q01–Q06 und Q08–Q12 untersuchen; aktuelle Baseline aufnehmen, Q07 anhand BOC prüfen                                                          | **Abgeschlossen 2026-09-06:** Evidenz, Produktentscheidungen, aktuelle Messwerte, Builder-Scope und spätere Härtungsprüfungen dokumentiert  |
 | B: UI/UX mit Fixtures      | BOC-eigene Zustandsdarstellung, Hauptaktion/Menü, Settings und begrenzte Ausgabe mit realistischer Fixtures                                  | Alle UI-Zustände, schmale/breite Fenster, horizontale/vertikale Tabs, Tastatur und Fokus geprüft; keine echten Scripts nötig                |
 | C: manueller Ablauf        | Runner und gespeicherte Konfiguration, registrierten Checkout prüfen, ein Lauf pro Umgebung, Endstatus und Logs, bestehendes devenv anbinden | Reales Setup im Test-Checkout; doppelte Sessions, Fehler, Wiederholung und UI-Wechsel korrekt; Capability verbirgt nicht unterstützte Ziele |
 | D: Dependency-Optimierung  | Die gemessene Cache-Strategie im passenden devenv-/Adapter-Bereich umsetzen                                                                  | Warm/Kalt-Messung, Cache-Miss bei geänderten Inputs und tatsächliche Anwendung mit isolierten Dependency-Schreibzugriffen geprüft           |
@@ -465,20 +505,22 @@ Fertig ist das Feature erst, wenn:
 ```text
 Wir planen BOC-Entwicklungsumgebungen für Git-Worktree- und Rift-Sessions.
 Lies BOC_ENVIRONMENTS_PLAN.md und die gültigen AGENTS.md-Anweisungen. Schritt A
-ist statisch abgeschlossen; behandle die dortigen Laufzeit- und Cache-Prüfungen
-weiterhin als offen. Dashboard bleibt außerhalb des Auftrags.
+und die aktuelle Happy-Path-Baseline sind abgeschlossen. Behandle nur die unter
+„Nach dem Bau gezielt prüfen“ genannten Härtungspunkte als offen. Dashboard
+bleibt außerhalb des Auftrags.
 
-Beginne den ausdrücklich beauftragten nächsten Schritt mit der kleinsten
-verantwortbaren Änderung. Vor einem realen Setup oder Benchmark muss ein
-eindeutig freigegebener Test-Checkout/-Stack mit eigenem Cache existieren und
-der gemeinsame Load-Balancer-Dateicache aus dem Setup entkoppelt sein. Keine
-bestehenden Container stoppen, Datenbanken migrieren, bestehende/geteilte
-Caches oder Volumes löschen oder laufende App beziehungsweise Server neu starten.
+Setze den Abschnitt „Builder-fertiger Auftrag“ in kleinen, überprüfbaren
+Schritten um. Reale Setups und Benchmarks ausschließlich in Disposable-
+Test-Stacks. Lokale Cache-Löschung ist zugunsten der Korrektheit erlaubt;
+keine bestehenden Stacks stoppen, Datenbanken migrieren, Volumes löschen,
+globale Prunes ausführen oder laufende App beziehungsweise Server neu starten.
 
 Erhalte die Trennung zwischen Anforderungen, Vorschlägen und bestätigten
 Entscheidungen. Erstklassige UI/UX, messbare Performance und wenige additive
 Upstream-Eingriffe bleiben verbindlich. Cache-Korrektheit geht vor einer warmen
-Benchmark-Zahl; `commands.start` bleibt ein unveränderter separater Hook.
+Benchmark-Zahl; `commands.start` bleibt ein unveränderter separater Hook. Die
+offenen Punkte aus „Nach dem Bau gezielt prüfen“ sind Abnahmekriterien, keine
+Einladung zu spekulativer Vorab-Architektur.
 
 Nutze ausschließlich repository-relative Pfade und anonymisierte Beispiele
 in Plänen und Handovers. Versionierte Änderungen gemäß Repository-Workflow
@@ -500,7 +542,8 @@ Diese Quellen wurden während der vorangegangenen Recherche geprüft. Sie erklä
 
 Neue Befunde hier datiert ergänzen; die Fragen in Abschnitt 7 nur bei belegter Antwort schließen.
 
-| Datum      | Schritt           | Ergebnis                                                                                                                                                                                                  | Noch offen                                                                                                              |
-| ---------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| 2026-09-05 | Recherche / Plan  | BOC- und Emdash-Einhängestellen geprüft; Architektur, UI-Zustände, Messmatrix und Prüffragen festgehalten. Keine Feature-Implementierung oder Setup-Ausführung.                                           | Q01–Q12; nächster Schritt A auf vollständigem devenv-Rechner                                                            |
-| 2026-09-06 | A: Quellenprüfung | Aktuelles devenv, Projekt-Mounts/Runtime, Emdash und BOC-Prozesspfade statisch geprüft; zwölf historische Messdateien eingeordnet; Cache-Empfehlung formuliert. Keine Feature- oder Lifecycle-Ausführung. | Kontrollierter Test-Stack; Cache-Key-Korrektheit, Queue-/Worker-Isolation, Runner-Abbruch/Reconnect und neue Benchmarks |
+| Datum      | Schritt                        | Ergebnis                                                                                                                                                                                                  | Noch offen                                                                                                              |
+| ---------- | ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Recherche / Plan               | BOC- und Emdash-Einhängestellen geprüft; Architektur, UI-Zustände, Messmatrix und Prüffragen festgehalten. Keine Feature-Implementierung oder Setup-Ausführung.                                           | Q01–Q12; nächster Schritt A auf vollständigem devenv-Rechner                                                            |
+| 2026-09-06 | A: Quellenprüfung              | Aktuelles devenv, Projekt-Mounts/Runtime, Emdash und BOC-Prozesspfade statisch geprüft; zwölf historische Messdateien eingeordnet; Cache-Empfehlung formuliert. Keine Feature- oder Lifecycle-Ausführung. | Kontrollierter Test-Stack; Cache-Key-Korrektheit, Queue-/Worker-Isolation, Runner-Abbruch/Reconnect und neue Benchmarks |
+| 2026-09-06 | A: Entscheidungen und Baseline | Fester devenv-Adapter, Setup/Start/Stop/URL/Remove, geteilte DB/Redis/RabbitMQ sowie macOS/Linux bestätigt. Vier Disposable-Läufe erfolgreich; aktuelle Warm-Baseline 24 s bis HTTP-ready.                | Builder-Auftrag in Abschnitt 7; Korrektheits-, Reconnect-, Parallelitäts- und Linux-Prüfungen nach dem Bau              |
