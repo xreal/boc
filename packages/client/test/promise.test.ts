@@ -30,6 +30,7 @@ test("exposes every standard HTTP API group", () => {
     "experimental",
     "shell",
     "reference",
+    "server.boc.worktree",
     "worktree",
     "workspace",
     "vcs",
@@ -673,6 +674,31 @@ test("event.subscribe ignores server heartbeat comments", async () => {
   const received = []
   for await (const item of client.event.subscribe()) received.push(item)
   expect(received).toEqual([event])
+})
+
+test("event.subscribe reports heartbeat comments as stream activity", async () => {
+  const event = { id: "evt_sentinel", created: 1, type: "server.connected", data: {} }
+  const encoder = new TextEncoder()
+  const client = OpenCode.make({
+    baseUrl: "http://localhost:3000",
+    fetch: async () =>
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(encoder.encode(": heartbeat\n\n"))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`))
+            controller.enqueue(encoder.encode(": heartbeat\n\n"))
+            controller.close()
+          },
+        }),
+        { headers: { "content-type": "text/event-stream" } },
+      ),
+  })
+  let activity = 0
+  const received = []
+  for await (const item of client.event.subscribe({ onActivity: () => activity++ })) received.push(item)
+  expect(received).toEqual([event])
+  expect(activity).toBe(3)
 })
 
 // Moved from packages/app/e2e/regression/session-timeline-transport.spec.ts

@@ -191,6 +191,10 @@
       "reason": "Compose the authenticated Boc backend capability group"
     },
     {
+      "path": "packages/client/test/promise.test.ts",
+      "reason": "Include the Boc worktree group in the exact public client API inventory assertion"
+    },
+    {
       "path": "packages/client/src/effect/api/api.ts",
       "reason": "Generate the typed Boc Rift capability client"
     },
