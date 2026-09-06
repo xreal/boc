@@ -10,6 +10,7 @@ This runbook covers the private GitHub release archive and the public Electron u
 - The existing Electron updater reads the generic R2 feed. No GitHub token is shipped in the application.
 
 The release workflow is `.github/workflows/boc-release.yml`. Release preparation and R2 publishing live under `packages/boc/scripts/release/`.
+The compatible server version is pinned in the workflow and maintained during upstream syncs, so release operators only enter the Boc version.
 
 ## One-time infrastructure
 
