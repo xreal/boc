@@ -34,7 +34,7 @@ The exact approved files and reasons live in `packages/boc/fork-surface.json`. T
 | Desktop identity and packaging | `packages/desktop/electron-builder.config*`, `electron.vite.config.ts`, build scripts, `.gitignore`, `src/main/constants.ts`, `src/main/lifecycle/environment.ts` | Select channel-specific identity, metadata, icons, update source, environment, and staged Rift artifact. |
 | Desktop process composition | `packages/desktop/package.json`, `src/shared/ipc-rpc.ts`, `src/main/ipc.ts`, `src/renderer/desktop-app.tsx`, `src/main/service/background-service.ts` | Merge typed Boc RPCs/handlers, mount the renderer provider, and launch the Boc backend with its channel-scoped CLI service registration and isolated Rift runtime configuration. |
 | Server and public API | `packages/server/package.json`, `src/routes.ts`, `src/handlers.ts`, `packages/protocol/src/api.ts`, generated files under `packages/client/` | Register Boc worktree services and authenticated HTTP capability endpoints, then expose the generated typed clients. Generated clients are never edited by hand. |
-| Repository metadata | `AGENTS.md`, `bun.lock`, `.github/workflows/boc-audit.yml` | Preserve fork policy, dependencies, and automated surface enforcement. |
+| Repository metadata | `AGENTS.md`, `bun.lock`, `.gitignore`, `packages/storybook/.gitignore`, `.github/workflows/boc-audit.yml` | Preserve fork policy, dependencies, automated surface enforcement, and local generated-artifact exclusions. |
 
 No upstream component is intentionally copied into Boc. When a conflict tempts a copy, first look for a bridge, registry, Effect `Layer`, plugin, RPC group, or channel branch.
 

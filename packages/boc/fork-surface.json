@@ -18,6 +18,14 @@
       "reason": "Append-only Boc fork guidance above the upstream boundary"
     },
     {
+      "path": ".gitignore",
+      "reason": "Exclude local root Wrangler state from the fork worktree"
+    },
+    {
+      "path": "packages/storybook/.gitignore",
+      "reason": "Exclude generated Playwright helper declarations from the fork worktree"
+    },
+    {
       "path": "bun.lock",
       "reason": "Lock the BOC workspace and its app and desktop dependency edges"
     },
