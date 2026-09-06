@@ -7,6 +7,7 @@
     "packages/server/src/boc/**",
     "packages/desktop/src/boc/**",
     "packages/desktop/icons/boc/**",
+    "packages/desktop/icons/boc-dev/**",
     ".opencode/skills/boc-*/**",
     "BOC_*.md",
     "tmp/BOC_*.md",
@@ -60,6 +61,10 @@
     {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
       "reason": "Apply and display the Boc checkout strategy when moving a session"
+    },
+    {
+      "path": "packages/app/src/session/files/session-side-panel.tsx",
+      "reason": "Render the channel-aware Boc brand mark in the empty file panel"
     },
     {
       "path": "packages/app/src/settings/general/general.tsx",
@@ -119,7 +124,7 @@
     },
     {
       "path": "packages/desktop/electron.vite.config.ts",
-      "reason": "Configure the Boc renderer build channel"
+      "reason": "Configure the Boc renderer build channel and channel-aware desktop favicons"
     },
     {
       "path": "packages/desktop/scripts/copy-icons.ts",
@@ -131,7 +136,7 @@
     },
     {
       "path": "packages/desktop/scripts/prebuild.ts",
-      "reason": "Prepare the Boc release channel"
+      "reason": "Prepare the Boc release channel and select blue branding for local builds"
     },
     {
       "path": "packages/desktop/scripts/utils.ts",
@@ -156,6 +161,10 @@
     {
       "path": "packages/desktop/src/renderer/desktop-app.tsx",
       "reason": "Mount the generic BOC desktop provider"
+    },
+    {
+      "path": "packages/desktop/src/renderer/platform/notifications.ts",
+      "reason": "Use the packaged Boc icon for Boc desktop notifications"
     },
     {
       "path": "packages/desktop/src/shared/ipc-rpc.ts",
