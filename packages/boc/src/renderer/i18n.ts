@@ -4,6 +4,13 @@ import { jiraEnglish } from "../tools/jira/i18n/en"
 import { worktreesEnglish } from "../worktrees/i18n/en"
 
 export const bocEnglish = {
+  "boc.find.title": "Find in page",
+  "boc.find.placeholder": "Find in page…",
+  "boc.find.previous": "Previous match (Shift+Enter)",
+  "boc.find.next": "Next match (Enter)",
+  "boc.find.close": "Close search (Escape)",
+  "boc.find.result": "{{active}}/{{total}}",
+  "boc.find.scope": "Searches loaded page content. Expand collapsed sections to include them.",
   "boc.title": "Boc",
   "boc.projectTabs.reorder": "Drag to reorder projects, or use Alt+Arrow Up/Down. Click to collapse or expand.",
   "boc.projectTabs.newSession": "Create session in {{project}}",

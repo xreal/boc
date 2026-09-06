@@ -1,3 +1,4 @@
+import { BocFindBar } from "./find"
 import { bocExtensions, createBocTranslator, type BocExtension } from "@boc/extensions/renderer"
 import { useCommand } from "@/shell/commands/command"
 import { createBocHost } from "./host"
@@ -25,5 +26,5 @@ export function BocCommandBridge() {
     ]),
   )
 
-  return null
+  return <BocFindBar />
 }
