@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createResource, For, onCleanup, Show } from "solid-js"
+import { createEffect, createMemo, createResource, onCleanup, Show } from "solid-js"
+import { BocProjectTabList, createBocProjectTabs } from "@/boc/project-tabs"
 import { createStore } from "solid-js/store"
 import { DragDropProvider, PointerSensor } from "@dnd-kit/solid"
 import { isSortable, useSortable } from "@dnd-kit/solid/sortable"
@@ -17,7 +18,7 @@ import { createTabComposerState } from "@/composer/persistence"
 import { base64Encode } from "@opencode-ai/util/encode"
 import { showToast } from "@/shell/notifications/toast"
 import { canStartTabDrag, isTabCloseTarget } from "./tab-gesture"
-import { adjacentTabKey, mergeVisibleTabOrder } from "./tab-order"
+import { mergeVisibleTabOrder } from "./tab-order"
 import type { SessionInfo } from "@opencode-ai/client/promise"
 
 function SessionTabSlot(props: {
@@ -243,9 +244,17 @@ export function TitlebarTabStrip(props: {
   const language = useLanguage()
   const command = useCommand()
   const vertical = () => props.orientation === "vertical"
+  const projectTabs = createBocProjectTabs({
+    tabs: () => props.tabs,
+    current: () => props.currentTab,
+    enabled: vertical,
+  })
   let listRef!: HTMLDivElement
   const [visibility, setVisibility] = createStore<Record<string, boolean>>({})
-  const visibleTabs = createMemo(() => props.tabs.filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]))
+  const availableTabs = createMemo(() =>
+    projectTabs.ordered().filter((tab) => tab.type === "draft" || visibility[tabKey(tab)]),
+  )
+  const visibleTabs = createMemo(() => availableTabs().filter(projectTabs.visible))
   const visibleTabIds = () => visibleTabs().map(tabKey)
 
   command.register("titlebar-tab-cycle", () => [
@@ -269,7 +278,7 @@ export function TitlebarTabStrip(props: {
 
   function selectAdjacentTab(offset: -1 | 1) {
     const current = props.currentTab
-    const key = adjacentTabKey(visibleTabIds(), current ? tabKey(current) : undefined, offset)
+    const key = projectTabs.adjacent(visibleTabIds(), current ? tabKey(current) : undefined, offset)
     const next = props.tabs.find((tab) => tabKey(tab) === key)
     if (next) props.onNavigate(next)
   }
@@ -309,6 +318,7 @@ export function TitlebarTabStrip(props: {
             Feedback.configure({ dropAnimation: null }),
           ]}
           onDragStart={(event) => {
+            projectTabs.rememberOrder()
             const source = event.operation.source
             if (!source) return
             const tab = props.tabs.find((item) => tabKey(item) === source.id.toString())
@@ -340,7 +350,12 @@ export function TitlebarTabStrip(props: {
             classList={{ "flex-row items-center": !vertical(), "flex-col items-stretch": vertical() }}
             ref={listRef}
           >
-            <For each={props.tabs}>
+            <BocProjectTabList
+              each={projectTabs.ordered()}
+              visible={availableTabs()}
+              groups={projectTabs}
+              enabled={vertical()}
+            >
               {(tab) => {
                 const id = tabKey(tab)
                 let ref!: HTMLDivElement
@@ -386,7 +401,7 @@ export function TitlebarTabStrip(props: {
                   />
                 )
               }}
-            </For>
+            </BocProjectTabList>
           </div>
         </DragDropProvider>
       </div>

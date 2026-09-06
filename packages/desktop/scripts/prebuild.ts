@@ -10,7 +10,7 @@ if ((channel === "boc" || channel === "prod") && !Bun.env.OPENCODE_CLI_DIST) {
   throw new Error(`OPENCODE_CLI_DIST is required for ${channel} desktop builds`)
 }
 
-await $`bun ./scripts/copy-icons.ts ${channel}`
+await $`bun ./scripts/copy-icons.ts ${Bun.env.OPENCODE_CHANNEL === "local" ? "local" : channel}`
 await $`bun ./scripts/copy-metainfo.ts ${channel}`
 
 if (channel === "dev") await downloadCliToResources()

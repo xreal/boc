@@ -1,3 +1,7 @@
 node_modules/
 storybook-static/
 .storybook-cache/
+
+# Generated declaration output from Playwright helpers
+playwright/config.d.ts
+playwright/story.d.ts
