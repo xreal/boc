@@ -1,33 +1,35 @@
 # BOC: Entwicklungsumgebungen für Worktree- und Rift-Sessions
 
-Stand: 2026-09-05. Status: Recherche abgeschlossen, Umsetzung vorgeschlagen, devenv-Prüfung ausstehend.
+Stand: 2026-09-06. Status: Schritt A statisch abgeschlossen; kontrollierte Laufzeit- und Cache-Korrektheitsprüfungen stehen aus.
 
-Dieses Dokument ist ein eigenständiger, versionierter Arbeitsplan für die Fortsetzung auf einem Rechner mit vollständig installiertem devenv. Es implementiert keine Funktion und erteilt keine Freigabe, bestehende Umgebungen zu verändern. Offene Fragen bleiben offen, bis die jeweils genannte Evidenz vorliegt.
+Dieses Dokument ist ein eigenständiger, versionierter Arbeitsplan. Es implementiert keine Funktion und erteilt keine Freigabe, bestehende Umgebungen zu verändern. Statische Befunde sind von historischen Messwerten, noch offenen Laufzeitprüfungen und Produktvorschlägen getrennt.
 
 ## 1. Ziel und Entscheidungsstand
 
 Aus einer Session in einem isolierten Checkout soll sich mit einer klaren Aktion die zugehörige Entwicklungsumgebung einrichten lassen: Dependencies bereitstellen, benötigte App-Container starten und die eigene Host-URL öffnen. Große Datenbanken dürfen gemeinsam genutzt werden. Einrichtung und Bedienung müssen schnell sein und sich selbstverständlich in BOC einfügen.
 
-| Festlegung                                                                                          | Status                                            |
-| --------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
-| Worktrees und Rift-Checkouts unterstützen; Setup nur dort anbieten beziehungsweise freigeben        | Anforderung                                       |
-| Erstklassige UI/UX, Performance und minimaler Upstream-Diff                                         | Anforderung                                       |
-| Bestehendes devenv und Emdash/Bergdev als Wissensquelle nutzen                                      | Anforderung                                       |
-| Local-Environments-Dashboard ausklammern                                                            | Anforderung                                       |
-| Offene Fragen ausdrücklich dokumentieren; Prüfung auf vollständigem Setup fortsetzen                | Anforderung                                       |
-| Umgebung gehört zum Checkout, mehrere Sessions teilen ihre Bedienung                                | Architekturvorschlag                              |
-| Ein Hauptbutton mit Aktionsmenü rechts oben, ergänzend Session-Kontextmenü                          | UX-Vorschlag                                      |
-| Zunächst manuelle Aktionen auf einem lokalen BOC-Backend                                            | MVP-Vorschlag; Plattformumfang noch prüfen        |
-| BOC steuert Ausführung und Darstellung; devenv besitzt Docker-/Installationslogik                   | Architekturvorschlag                              |
-| Separate, kompatible Dependency-Snapshots statt gemeinsam beschreibbarer Installationsverzeichnisse | Performance-Vorschlag; Speichertechnik noch offen |
+| Festlegung                                                                                   | Status                                                 |
+| -------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
+| Worktrees und Rift-Checkouts unterstützen; Setup nur dort anbieten beziehungsweise freigeben | Anforderung                                            |
+| Erstklassige UI/UX, Performance und minimaler Upstream-Diff                                  | Anforderung                                            |
+| Bestehendes devenv und Emdash/Bergdev als Wissensquelle nutzen                               | Anforderung                                            |
+| Local-Environments-Dashboard ausklammern                                                     | Anforderung                                            |
+| Offene Fragen ausdrücklich dokumentieren; Prüfung auf vollständigem Setup fortsetzen         | Anforderung                                            |
+| Umgebung gehört zum Checkout, mehrere Sessions teilen ihre Bedienung                         | Architekturvorschlag                                   |
+| Ein Hauptbutton mit Aktionsmenü rechts oben, ergänzend Session-Kontextmenü                   | UX-Vorschlag                                           |
+| Zunächst manuelle Aktionen auf einem lokalen BOC-Backend                                     | MVP-Vorschlag; Plattformumfang noch prüfen             |
+| BOC steuert Ausführung und Darstellung; devenv besitzt Docker-/Installationslogik            | Architekturvorschlag                                   |
+| Key-adressierte, private Dependency-Snapshots mit Copy-on-write, wo verfügbar                | Begründete Empfehlung aus Schritt A; nicht beschlossen |
 
 Nicht Teil des ersten Schritts: Dashboard, eigener Paketmanager, pnpm-Migration, Remote-/SSH-Ausführung, allgemeines Plugin-System, automatische Datenbankkopien, neue Session-Core-Domäne oder unbedingtes automatisches Setup/Teardown.
 
 ## 2. Gesicherte Recherche
 
-BOC-Quellen wurden zuletzt bei `57345c1d8b` auf `boc-beta` nachgeprüft. Der untersuchte Emdash-Checkout meldete HEAD `ca2d1c173`; die Befunde beziehen sich auf die lokal vorhandenen Dateien, einschließlich möglicher Fork-Arbeitsänderungen, nicht pauschal auf diesen Commit oder Upstream-Emdash. Das eigentliche devenv-Script lag nicht vor. Es wurden keine Docker-, Setup- oder Installationskommandos ausgeführt und keine Performance-Werte gemessen.
+Die ursprüngliche BOC-/Emdash-Recherche wurde in Schritt A gegen die aktuellen lokalen Quellen geprüft. BOC stand bei `5ca616b9361a` auf `boc-beta`, Emdash bei `ca2d1c1737a4` und devenv bei `c3575c0d2cff` auf dessen Worktree-PoC-Zweig. Eine vorhandene, sachfremde Emdash-Arbeitsänderung blieb unangetastet. Das aktive `devenv`-Kommando löst auf `devenv.sh` dieses devenv-Checkouts auf.
 
-Alle BOC-Pfade sind relativ zu diesem Repository. Emdash-Pfade beziehen sich auf dessen Repository; `D/` steht dort für `apps/emdash-desktop/`. Alte lokale BOC-Unterlagen liegen unter `tmp/` und werden nicht automatisch auf einen anderen Rechner übertragen. Wenn vorhanden: zuerst `tmp/BOC_HANDOVER.md`, dann `tmp/BOC_EXTENSIONS_JIRA_PLAN.md` und den Rift-Plan lesen. Fehlen sie, für diese neue Funktion den aktuellen Code und dieses Dokument verwenden; die abgeschlossenen Jira-Arbeitspakete nicht erneut ausführen.
+Es wurden keine Setup-, Installations-, Start-, Stop-, Migrations-, Prune- oder Cache-Clear-Kommandos ausgeführt. Die Prüfung umfasste Quellen, Shell-Syntax, anonymisierte generierte Metadaten, historische Benchmark-Dateien sowie rein lesende Docker-/Runtime-Abfragen. Ein aktueller Benchmark war nicht zulässig: Es existierte kein aktiver Benchmark-Stack, und der Setup-Ablauf löscht den gemeinsam gemounteten Load-Balancer-Dateicache.
+
+Alle Quellen sind repository-relativ: BOC-Pfade beziehen sich auf dieses Repository, `devenv:` auf den devenv-Checkout und `emdash:` auf den Emdash-Checkout; `D/` steht weiterhin für `apps/emdash-desktop/`. Alte lokale BOC-Unterlagen liegen unter `tmp/` und werden nicht automatisch auf einen anderen Rechner übertragen. Wenn vorhanden: zuerst `tmp/BOC_HANDOVER.md`, dann `tmp/BOC_EXTENSIONS_JIRA_PLAN.md` und den Rift-Plan lesen. Fehlen sie, für diese neue Funktion den aktuellen Code und dieses Dokument verwenden; die abgeschlossenen Jira-Arbeitspakete nicht erneut ausführen.
 
 ### BOC: vorhandene Grundlagen und Grenzen
 
@@ -59,6 +61,72 @@ Alle BOC-Pfade sind relativ zu diesem Repository. Emdash-Pfade beziehen sich auf
 | `D/src/main/core/local-environments/adapters/devenv-config-reader.ts` und `service.ts`           | Nur URL-Vertrag untersucht: `.devenv/worktrees/*.env`, Zuordnung über `DEVENV_SRC_PATH`, URL aus `STACK_HOST`. Vorhandene Konfiguration bestätigt keine laufende oder erreichbare Anwendung. Dashboard und Inventar nicht portieren. |
 
 Nicht portieren: React-/MobX-Komponenten, Emdash-Workspace-Framework, komplette Terminalverwaltung, Dashboard-Inventar oder generische Provider-Hierarchien.
+
+### Schritt A: bestätigter devenv-Vertrag
+
+#### Setup-Ablauf
+
+`devenv:scripts/worktree-setup.sh:1-10` ist nur der kompatible Einstieg und delegiert per `exec` an `devenv:scripts/rift-task-setup.sh`. Dessen `main` (`:497-668`) führt folgende Kette aus:
+
+1. Checkout und Storefront-Domain validieren; ein `shop/`-Verzeichnis ist Pflicht.
+2. Lokalen Artifact-Cache initialisieren, Clone-Verfahren prüfen und alte temporäre Restore-Verzeichnisse bereinigen.
+3. `devenv stack set <checkout> <domain>` ausführen, dabei die Best-effort-Synchronisierung fehlender gemeinsamer Konfiguration, Assets und lokaler `.env` in den Checkout versuchen und die erzeugte Stack-Zuordnung laden.
+4. Composer-, Node- und Frontend-Schlüssel berechnen; vorhandene Cache-Artefakte parallel vorladen.
+5. `devenv composer-install shop`, `devenv frontend-install` und `devenv frontend-build` nur bei fehlendem brauchbarem Ziel beziehungsweise Cache-Miss ausführen.
+6. Mit `devenv up shop` im vorbereiteten Normalfall `lb`, `shop`, `ssr`, `api-php81`, `api-php83` und `api-php84` starten. Fehlen gemeinsame Zertifikate, startet devenv zuvor zusätzlich den Generator und schreibt in das gemeinsame Zertifikatsverzeichnis.
+7. `devenv clear-cache` ausführen.
+8. Bis zu 90 Sekunden die Stack-URL prüfen, anschließend den Artifact-Cache aufräumen und URL sowie Log-Verzeichnis ausgeben.
+
+Argumentfehler enden mit Exit-Code 2; Fehler der verpflichtenden Install-/Build-/Start-/Clear-/Readiness-Schritte werden als ungleich null weitergegeben. Config-Sync, Cache-Prefetch, Cache-Publish und abschließendes Cache-Prune sind dagegen Best-effort und können trotz Warnung beziehungsweise Fehler zu Setup-Exit 0 führen (`devenv:scripts/lib/devenv-worktree-stacks.sh:433-444`, `devenv:scripts/rift-task-setup.sh:296-299,336-346,661-663`). `INT`/`TERM` beendet mit 130, wartet auf Cache-Prefetches und gibt Locks frei, rollt aber bereits erzeugte Konfiguration oder Container nicht zurück (`devenv:scripts/rift-task-setup.sh:127-141,159-191,225-277`). Es gibt nur einen kurzen Stack-Zuordnungs-Lock und Locks pro Cache-Schlüssel, keinen Lock für den gesamten Setup-Lauf. Zwei Setups derselben Umgebung können daher nach `stack set` parallel weiterlaufen. BOC muss Warnungen im Log erreichbar halten und darf Exit 0 nicht als Beleg fehlerfreier Cache-Wartung darstellen.
+
+Setup ist nur dann sicher nicht interaktiv, wenn die gemeinsame Umgebung vorbereitet ist. `devenv up` ruft bei fehlenden generierten Secrets `prepare-shop` auf; dessen Ansible-Vorbereitung kann ein Vault-Passwort abfragen (`devenv:devenv.sh:303-325,457-468,542-565`). Das Backend muss diese Vorbedingung prüfen und darf nicht auf einen unsichtbaren Prompt warten.
+
+#### Dependencies, Mounts und Runtime
+
+| Artefakt / Runtime     | Erzeugung und Ort                                                                                                                                                           | Konsument / bestätigte Version                                                                                                                   | Isolation                                                                        |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| Composer `vendor`      | `shop-composer-ci`, `composer install` in `/app/shop`; kompletter Checkout als Bind-Mount `/app`; Ziel `<checkout>/shop/vendor` (`devenv:docker-compose.yml:1-18,976-1003`) | Composer-Image 2.4 mit PHP 8.3 (`devenv:services/composer/Dockerfile:1-76`); Shop-Runtime im laufenden gemeinsamen Stack meldete PHP 8.3.32      | Checkout-lokal und beschreibbar; Host-UID/GID wird in den Container gereicht     |
+| Node `node_modules`    | Node-One-shot, derzeit `npm i`; `<checkout>/shop/source` nach `/var/www/html`; Ziel dort `node_modules` (`devenv:devenv.sh:827-833`, `devenv:docker-compose.yml:797-811`)   | `node:22-slim`, `linux/amd64`; Manifest fordert Node `>=22.15.0` (`devenv:services/node/Dockerfile`, `devenv:src/shop/source/package.json:6-18`) | Checkout-lokal und beschreibbar; auf Apple Silicon emulierte amd64-Runtime       |
+| Frontend-Dist          | Derselbe Node-One-shot, `npm run build`; Ziel `<checkout>/shop/source/out/bf/dist`                                                                                          | Webpack, TypeScript und Vite laut `devenv:src/shop/source/package.json:9-18`                                                                     | Checkout-lokal und beschreibbar                                                  |
+| Shop                   | Checkout-Verzeichnisse `shop`, `jobs` und `common` als Bind-Mounts (`devenv:docker-compose.yml:813-845`)                                                                    | Ubuntu 22.04 / PHP 8.3; aktuell beobachtet PHP 8.3.32 (`devenv:services/shop/Dockerfile`)                                                        | Container pro Stack, Source und temporärer Shop-Cache pro Checkout               |
+| SSR                    | Checkout-Source und `node_modules` read-only, SSR-Source beschreibbar (`devenv:docker-compose.yml:847-879`)                                                                 | `node:22-alpine`, `linux/amd64`; aktuell beobachtet Node 22.23.1 (`devenv:services/node-ssr/Dockerfile`)                                         | Container pro Stack; Dependencies aus demselben Checkout                         |
+| Lokales Composer-Paket | Path-Repository `../common/bfnamespace` (`devenv:src/shop/composer.json:14-23`)                                                                                             | Symlink im Composer-Artefakt                                                                                                                     | Drei geprüfte Cache-Artefakte nutzten relative, damit checkout-portable Symlinks |
+
+Es gibt für Composer und npm keinen dedizierten, persistent gemounteten Download-Cache: Composer verwendet `COMPOSER_HOME=/tmp`, und der Node-One-shot mountet nur den Quellbaum. Kalte Artifact-Misses bezahlen daher Downloads, Entpacken, Scripts und Build erneut. Das ist von der Wiederverwendung kompletter Artefakte zu unterscheiden.
+
+#### Stack-ID, URL und Routing
+
+`devenv:scripts/lib/devenv-worktree-stacks.sh:50-66` erzeugt die ID aus einem gekürzten, bereinigten Branch-/Ticket-Slug und den ersten vier Hex-Zeichen des Hashes des normalisierten absoluten Checkout-Pfads. `stack set` schreibt `.devenv/worktrees/<stack-id>.env` mit `STACK_ID`, Branch, Domain, Compose-Projekt, gemeinsamem Infrastrukturprojekt, `STACK_HOST`, Shop-Container und `DEVENV_SRC_PATH` (`:216-236,349-447`). Erneutes Setup desselben Pfads behält die ID; zwei gleich benannte Branches bekommen normalerweise verschiedene Pfad-Hashes. Die 16-Bit-Verkürzung ist nicht kollisionsfrei, ein bereits anders belegter Name wird jedoch abgewiesen.
+
+Fünf anonymisiert geprüfte Zuordnungen erfüllten alle Datei-/ID-, Projekt-, Host-, Container- und Shared-Infrastructure-Invarianten; alle fünf Quellpfade existierten. Die Stichprobe enthielt keine zwei Checkouts desselben Branches. Ein später am exakt gleichen Pfad erstellter Checkout würde die alte Zuordnung übernehmen, weil weder Repository-Identität noch Erzeugungstoken gespeichert werden. Zwei Compose-Projekte mit Worktree-Präfix hatten bei der Prüfung keine aktuelle Zuordnungsdatei; der Orphan-Fall ist damit nicht nur theoretisch.
+
+Der gemeinsame Load Balancer bindet Host-Port 80/443 auf Loopback. Sein Gateway erkennt `<stack-id>.<domain>.localhost`, setzt `X-Devenv-Worktree` und routet über das externe `worktree-ingress`-Netz an den Alias des Stack-LB (`devenv:docker-compose.yml:298-323`, `devenv:docker-compose.worktree.yml:1-15,62-68`, `devenv:services/lb/etc/nginx/vhosts.d/04-worktree-gateway.conf`). Der Stack-LB publiziert selbst keine Host-Ports und deaktiviert das Gateway, damit keine Schleife entsteht.
+
+Es gibt keine Compose-Healthchecks. „Ready“ bedeutet im Setup ausschließlich: HTTPS liefert 200, 301, 302, 303, 307 oder 308 und der Response-Header `X-Devenv-Worktree` entspricht der Stack-ID. Die Prüfung verwendet `curl -k`, ein 2-Sekunden-Connect-Limit und standardmäßig 90 Sekunden Gesamtzeit (`devenv:scripts/rift-task-setup.sh:225-277`). Das belegt Route und HTTP-Antwort, aber nicht die Bereitschaft jeder API, von SSR, Datenbank, Redis oder RabbitMQ.
+
+Emdash liest eine strenge Teilmenge dieses kleinen Vertrags als Daten aus `.devenv/worktrees/*.env` und ordnet über den kanonischen `DEVENV_SRC_PATH` zu (`emdash:apps/emdash-desktop/src/main/core/local-environments/adapters/devenv-config-reader.ts`). Seine URL-Abfrage gibt bei passendem Pfad nur `https://${STACK_HOST}` zurück und prüft weder Docker noch HTTP (`emdash:apps/emdash-desktop/src/main/core/local-environments/service.ts:155-177`). Gequotete oder escapete Werte lehnt der Parser ab; Pfade mit Leerzeichen sind daher trotz Shell-Quoting im devenv-Writer nicht interoperabel. Außerdem akzeptiert Emdash nur das feste Infrastrukturprojekt `devenv`, während devenv ein abweichendes lokales `COMPOSE_PROJECT_NAME` als Infrastrukturprojekt schreiben kann. BOC soll den Producer-Vertrag selbst validieren und darf weder diese Emdash-Einschränkung noch dessen „configured“ als eigenen Runtime-Vertrag übernehmen.
+
+#### Stop, Cleanup und gemeinsame Zustände
+
+| Operation             | Bestätigte Wirkung                                                                                                                                       |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `devenv start`        | Startet nur bereits vorhandene Container des erkannten Compose-Projekts; installiert oder prüft nichts.                                                  |
+| `devenv stop`         | Stoppt nur Container dieses Compose-Projekts; Zuordnung, Container und Daten bleiben erhalten.                                                           |
+| `devenv down`         | Führt `docker compose --profile all down --remove-orphans` für das validierte Worktree-Projekt aus. Es wird kein `-v` und kein globales Prune verwendet. |
+| `devenv stack clear`  | Verweigert die Entfernung, solange auch nur gestoppte Container des Projekts existieren; entfernt danach nur die Zuordnungsdatei.                        |
+| Setup-Abbruch/-Fehler | Kein Rollback. Dependencies, Zuordnung und teilweise gestartete Container können verbleiben.                                                             |
+
+Die vorgesehene manuelle Entfernung ist `devenv down && devenv stack clear` (`devenv:README.md`, `devenv:devenv.sh:396-401,1097-1108`, `devenv:scripts/lib/devenv-worktree-stacks.sh:456-469`). `clean`, `reset` und `destroy` sind dafür ungeeignet, weil sie Checkout-Dateien beziehungsweise globale Docker-Ressourcen entfernen. Bei einem bereits gelöschten Checkout fehlt der sichere CWD-basierte Einstieg; BOC darf dann nicht aus einem Ersatzverzeichnis versehentlich den Default-Stack treffen.
+
+Worktree-Stacks starten im vorbereiteten Normalfall nur sechs App-Container und verbinden sie mit externen Netzen sowie Images des gemeinsamen Infrastrukturprojekts. Bestätigt gemeinsam sind:
+
+- Shop-, Catalog-, Merchandising- und Identity-Datenbanken samt persistenten Volumes (`devenv:docker-compose.yml:440-488,516-566`). Setup führt selbst keine Migration aus.
+- Redis samt Volume. PHP-Sessions liegen in Redis (`devenv:src/shop/source/bergfreunde-env.php:11-35`). Worktree-`clear-cache` lässt Redis inzwischen ausdrücklich unangetastet.
+- RabbitMQ samt Nachrichten und Volume; es gibt weder Stack-vHost noch Queue-Namensraum (`devenv:docker-compose.yml:881-905`). Ein Worktree kann daher Nachrichten für gemeinsame/default Worker erzeugen.
+- Zertifikate, API-Integrationsverzeichnisse, Job-Exportdaten sowie Shop-/Job-Logs als gemeinsame Host-Bind-Mounts (`devenv:docker-compose.yml:171-190,298-310,833-840`). Logs verschiedener Stacks können sich mischen.
+- Der Load-Balancer-Dateicache `volumes/cache`. Jeder Stack mountet dasselbe Verzeichnis, während Worktree-`clear-cache` `/tmp/cache/*` entfernt (`devenv:devenv.sh:817-825`). Die Meldung „nur dieser Worktree“ ist für diesen LB-Cache daher nicht korrekt.
+
+Nicht belegt sind getrennte Uploads und Search-Indizes. Mail, Cron, Jobs und Worker werden nicht pro Worktree gestartet; ihre möglichen Nebenwirkungen über gemeinsame Infrastruktur müssen in einem kontrollierten Testfall geprüft werden.
 
 ## 3. UX-Spezifikation als Vorschlag
 
@@ -165,19 +233,18 @@ Zielbudget: drei UI-Mount-Stellen für den Kernablauf, optional eine vierte für
 | Projekt  | Feature aktivieren, Setup-Kommando, nur bei Bedarf Start-/Stop-Kommando, klare Anzeige der wirksamen Host-Einstellungen |
 | Laufzeit | Letzter Lauf, Log-Verweis, Stack-ID/URL und beobachteter Zustand; keine manuell zu pflegenden Benutzereinstellungen     |
 
-Einfach beginnen: manuelle Einrichtung, kein Automatismus als Default und keine leeren Pflichtfelder für Lifecycle-Phasen, die devenv nicht benötigt. Host-Pfade nicht in geteilte Repository-Konfiguration schreiben. Bereits vorhandene devenv-Einstellungen, etwa aus anderen BOC-Tools, vor Einführung eines zweiten Felds auf gleiche Bedeutung prüfen.
+Einfach beginnen: manuelle Einrichtung, kein Automatismus als Default und keine leeren Pflichtfelder für Lifecycle-Phasen, die devenv nicht benötigt. Host-Pfade nicht in geteilte Repository-Konfiguration schreiben. Die Deployments-Einstellungen besitzen bereits ein hostlokales `devenvPath`, das dort allerdings ausschließlich `src/tools/bf-deploy` adressiert (`packages/boc/src/tools/deployments/main/store.ts`, `readiness.ts`). Vor Wiederverwendung oder Einführung eines zweiten Felds muss die Bedeutung sichtbar getrennt oder bewusst vereinheitlicht werden.
 
 Ob lokale Projektsettings allein reichen oder eine versionierbare Projektdatei sinnvoll ist, bleibt Q06. Keine neue `.boc.json`-Spezifikation allein auf Basis des Screenshots. Wird eine geteilte Datei ergänzt, Vorrang lokaler Overrides, Zurücksetzen und sichtbare Herkunft ausdrücklich definieren.
 
-### Vertrag erst nach devenv-Prüfung abschließen
+### Bestätigter Adapter-Rahmen und offene Produktentscheidung
 
-- Arbeitsverzeichnis ist der aufgelöste Checkout. Vorgeschlagene BOC-Variablen: `BOC_WORKTREE_PATH`, `BOC_PROJECT_PATH`; weitere nur bei tatsächlichem Bedarf.
-- Bestehende `EMDASH_*`-Abhängigkeiten feststellen. Falls nötig eine enge, dokumentierte Kompatibilität im Adapter; keine unbemerkte zweite Variablenspezifikation.
-- Script als korrekt gequotete Datei beziehungsweise ausführbares Programm starten; keine mehrzeilige Eingabefolge in eine interaktive Shell tippen. Exit-Code und Abbruch verlässlich erfassen.
-- URL und Stack-ID von devenv übernehmen. Bevorzugt bestehenden kleinen Metadatenvertrag lesen; neuen strukturierten Output nur einführen, wenn dieser nicht genügt. Konfigurationsdateien als Daten lesen, nicht zur URL-Ermittlung als Shell sourcen.
-- Hostname muss über erneutes Setup stabil bleiben und unterschiedliche Checkouts desselben Branches unterscheiden. Generierung möglichst an einer Stelle in devenv belassen.
-- Neue Container nicht allein wegen Exit-Code 0 als erreichbar melden. Health-Semantik und Prüfungskosten sind Q05.
-- Stop/Teardown darf nur Ressourcen des Ziel-Stacks betreffen. Keine automatische Entfernung geteilter Datenbank-Volumes, kein globales Docker-Prune.
+- Arbeitsverzeichnis und erstes Argument sind der kanonisch aufgelöste Checkout. Das aktuelle Script akzeptiert außerdem `TASK_PATH` und aus Kompatibilitätsgründen `EMDASH_TASK_PATH`; weitere `EMDASH_*`-Variablen werden nicht verwendet (`devenv:scripts/rift-task-setup.sh:15-28,427-495`). BOC braucht für diesen Vertrag keine zweite Pfadvariable.
+- Den Einstieg als ausführbares Programm mit Argumentarray starten, nicht als mehrzeilige Terminaleingabe. Das Script besitzt selbst Logs pro Schritt und verlässliche Exit-Codes, aber noch keinen strukturierten Fortschrittskanal.
+- URL und Stack-ID aus der strikt als Daten geparsten Zuordnungsdatei übernehmen. Branch oder Session-Titel sind keine Identität. Zusätzlich die registrierte BOC-Checkout-Zuordnung und vorhandene Compose-Projektbelegung validieren, damit ein wiederverwendeter Pfad keinen alten Stack übernimmt.
+- Setup-Erfolg schließt bereits eine HTTP-/Stack-Header-Prüfung ein. Start und Status nach einem späteren Stop brauchen dieselbe oder eine gleichwertige gezielte Prüfung; Exit-Code 0 von `devenv start` genügt nicht.
+- Stop ist `devenv stop`; Remove ist die getrennte, validierte Folge `devenv down` und danach `devenv stack clear`. Diese Aktionen dürfen nie auf `clean`, `reset`, `destroy` oder ein beliebiges Fallback-Arbeitsverzeichnis abgebildet werden.
+- Vor Start muss BOC erkennen, ob Shared Networks, vorbereitete Konfiguration und nichtinteraktive Credentials vorhanden sind. Wie diese Capability ohne Secret-Zugriff geprüft wird, bleibt eine Produktentscheidung für Schritt C.
 
 ## 6. Performance-Plan
 
@@ -198,6 +265,26 @@ Cache erst nach erfolgreicher vollständiger Erstellung veröffentlichen. Gleich
 Kein gemeinsam beschreibbarer Symlink oder blindes Hardlink-Abbild des gesamten `node_modules`/`vendor`. Ein `npm ci` nach Wiederherstellung entfernt `node_modules` und würde den Vorteil aufheben. Installationsscripts nicht pauschal abschalten, um eine schnellere Zahl zu erzielen.
 
 Rifts sauberes Git-Template bleibt im ersten Entwurf unverändert. Dependency-Wiederverwendung gehört zum optionalen Setup, damit Git und Rift denselben Ablauf nutzen. Eine spätere vorbereitete Rift-Vorlage wäre eine gesonderte, messungsgetriebene Entscheidung.
+
+### Cache-Befund und Empfehlung
+
+Das aktuelle devenv implementiert bereits einen hostlokalen, key-adressierten Artifact-Cache für `vendor`, `node_modules` und Frontend-Dist (`devenv:scripts/lib/rift-artifact-cache.sh`). Composer-Schlüssel enthalten Manifest, Lockfile, lokales `common/bfnamespace`, Patch-Baum sowie Composer-Dockerfile und Entrypoint. Node-Schlüssel enthalten Manifest, Lockfile, optionale `.npmrc` und Node-Dockerfile. Der Frontend-Schlüssel enthält den committed `shop/source`-Tree, beide Dependency-Schlüssel und einen Hash der lokalen `.env` (`:181-242`). Veröffentlichung erfolgt über temporäre Verzeichnisse erst nach Nutzbarkeitsprüfung und `COMPLETED`-Marker; Locks gelten pro Typ/Schlüssel (`:304-329,351-429,488-569`).
+
+Auf dem geprüften Host lagen drei Composer-, zwei Node- und drei Frontend-Einträge vor. Alle acht Metadaten meldeten `apfs-clone`; drei Composer-Stichproben enthielten relative lokale Paket-Symlinks. Das bestätigt die technische Verfügbarkeit privater Copy-on-write-Bäume auf diesem Host, nicht die Korrektheit jedes Artefakts.
+
+Ein bestätigter Korrektheitsfehler blockiert die unveränderte Übernahme: `rift_try_restore_or_wait` akzeptiert jedes bereits „brauchbar“ aussehende Ziel als `target-present`, bevor der berechnete Schlüssel verglichen wird (`devenv:scripts/lib/rift-artifact-cache.sh:572-603`). Nach Lockfile-, Runtime- oder Source-Änderung sowie nach Rift `--copy-all` können dadurch alte Dependencies oder Dist-Dateien als warm gelten. Zusätzlich bildet der Plattformschlüssel Docker-Server-OS/-Architektur ab, nicht zuverlässig die für Node/SSR erzwungene `linux/amd64`-Plattform; genaue Image-Digests, npm-/Composer-Patchversionen und libc/ABI fehlen.
+
+**Empfehlung — Vorschlag, nicht bestätigte Produktentscheidung:** Den Cache in devenv besitzen lassen und das vorhandene Modell aus key-adressiertem vollständigem Artefakt plus privatem Copy-on-write-Restore weiterentwickeln. Auf APFS `cp -cR`, auf reflink-fähigem Linux `cp --reflink`, sonst normale Kopie beziehungsweise Installation verwenden. BOC soll diesen Cache nur auslösen und Status darstellen, nicht duplizieren.
+
+Vor Freigabe sind folgende kleine Korrekturen im devenv-Vertrag erforderlich:
+
+1. Ein vorhandenes Ziel nur mit einem atomar veröffentlichten, zielseitigen Schlüsselmarker als warm akzeptieren; unbekanntes oder abweichendes Ziel neu installieren beziehungsweise aus dem richtigen Key restaurieren.
+2. Schlüssel an der tatsächlichen Service-Plattform ausrichten und immutable Image-Identität, Paketmanager-Version und relevante Installationsflags einbeziehen.
+3. Composer-Plugin-/Script-Nebenwirkungen außerhalb von `vendor`, native Node-Module, Autoloading und Frontend-Ausführung in einer separaten Kopie prüfen.
+4. Gleichzeitiges Setup derselben Umgebung zusätzlich als Gesamtoperation serialisieren; die Cache-Locks allein genügen nicht.
+5. Einen gemeinsamen Composer-/npm-Download-Cache nur als zweiten, gemessenen Miss-Pfad ergänzen. Niemals `vendor` oder `node_modules` gemeinsam beschreibbar mounten.
+
+Damit bleibt die schnellste bestätigte Technik erhalten, ohne BOC an APFS zu koppeln. Dependency-Images oder Docker-Volumes sind für den aktuellen Bind-Mount-Runtimepfad unnötig indirekt und würden den Restore in den Checkout nicht vermeiden. Diese Empfehlung wird erst nach den offenen Cache-Miss-, Lockfile-, Parallelitäts- und Anwendungsprüfungen zur Entscheidung.
 
 ### UI- und Hintergrundkosten
 
@@ -223,46 +310,128 @@ Rifts sauberes Git-Template bleibt im ersten Entwurf unverändert. Dependency-Wi
 
 Mindestens drei vergleichbare Warm-Läufe, Median und Spannweite sowie Hardware, Dateisystem, Image-/Runtime-Versionen und Dependency-Größe dokumentieren. Kalte Läufe nur mit separatem Testcache herstellen, nicht durch Löschen des normalen Caches. Die konkreten Warm-Setup-Zeitbudgets werden erst nach Baseline festgelegt; bis dahin keine Sekundenversprechen oder erfundenen Beschleunigungsfaktoren.
 
-## 7. Offene Fragen für den vollständig eingerichteten Rechner
+### Vorhandene Messwerte und Grenzen
 
-Alle Zeilen beginnen als **offen**. Antworten mit Datei/Funktion, beobachtetem Verhalten und gegebenenfalls Messung belegen. Vermutungen als solche markieren.
+Unter `devenv:.devenv/benchmarks/results/` lagen zwölf historische Ergebnisdateien: elf erfolgreiche und ein fehlgeschlagener Lauf. Neun erfolgreiche Läufe meldeten für Composer, Node und Frontend keinen Miss, Disable- oder Dirty-Bypass-Status:
 
-| ID  | Frage                                                                       | Konkret untersuchen / Ergebnis                                                                                                                                                                     | Blockiert                                                  |
-| --- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| Q01 | Was macht Setup tatsächlich; welche Lifecycle-Phasen existieren?            | `scripts/worktree-setup.sh`, aufgerufene Teile von `devenv.sh`; Reihenfolge, Parameter, Exit-Codes, interaktive Prompts, Wiederholung, Abbruch, Start/Stop. Kommandokette aufschreiben.            | Reale Ausführung und abschließende Aktionsliste            |
-| Q02 | Wo werden Node-/PHP-Dependencies installiert und ausgeführt?                | Compose-Dateien, Dockerfiles, Mounts, Volumes, Benutzerrechte, Node/npm/PHP/Composer-Versionen, Host-/Containerplattform. Speicher- und Laufzeitkarte erstellen.                                   | Cache-Technik und Installationskommandos                   |
-| Q03 | Wie entstehen und überleben Stack-ID, Hostname und Pfadzuordnung?           | Anonymisierte `.devenv/worktrees/*.env`, Writer-Code, gleiche Branches in zwei Checkouts, erneutes Setup, gelöschter/erneut verwendeter Pfad.                                                      | URL-Vertrag und Wiederzuordnung                            |
-| Q04 | Welche Dependency-Dateien sind wiederverwendbar?                            | Lockfiles, Manifeste, Workspaces, lokale Pakete, native Module, Composer-Plugins/-Scripts, Autoload-/Build-Artefakte und pfadabhängige Symlinks. In einer Kopie tatsächlich importieren/ausführen. | Cache-Schlüssel und Warm-Pfad                              |
-| Q05 | Was bedeutet „bereit“ und wie funktioniert Routing?                         | Reverse Proxy, DNS/TLS, Ports, `STACK_HOST`, Compose-/HTTP-Health; Dauer und Kosten vorhandener Prüfungen.                                                                                         | Verlässliche Laufzeit-/Readiness-Anzeige                   |
-| Q06 | Wo liegt heute Konfiguration und was soll geteilt werden?                   | Bestehende BOC-/devenv-Pfadeinstellungen, projektlokale Overrides, `.emdash.json`-Nutzung; benötigte lokale und versionierbare Felder.                                                             | Endgültiges Settings-Schema und Persistenzort              |
-| Q07 | Wie laufen Prozesse, Logs und Wiederanbindung über UI-/Backend-Lebensdauer? | BOC-PTY-Scope und Aufbewahrung; Tab-Wechsel, Dialog schließen, Fenster neu öffnen, Backend-Unterbrechung, Prozessgruppen-Abbruch. In Testumgebung prüfen, laufende App nicht neu starten.          | Zuverlässiger Runner, Abbruch und Log-Persistenz           |
-| Q08 | Was stoppt/entfernt Teardown genau?                                         | `down`, `stack clear`, getrennte Stop-/Remove-Funktionen, Verhalten bei fehlendem Checkout; vorzeitige Löschung und teilweise fertiges Setup.                                                      | Stop/Cleanup; automatische Löschintegration bleibt separat |
-| Q09 | Was wird außer der Datenbank geteilt?                                       | Redis, Sessions, Queues/Worker, Search-Indizes, Uploads, Mail, Cron und Migrationen; Stack-Namensräume und globale Nebenwirkungen dokumentieren.                                                   | Korrektheit paralleler Umgebungen                          |
-| Q10 | Wo liegt die tatsächliche Laufzeit?                                         | Vorhandenes Setup in Schritte zerlegen; kalt/warm, identischer/neuer Checkout, parallele Einrichtung, CPU/I/O/Watcher. Messergebnisse gemäß Abschnitt 6.                                           | Performance-Ziel und Optimierungsreihenfolge               |
-| Q11 | Welche Plattformen und Speicherorte müssen anfangs funktionieren?           | Zielrechner, Dateisystem, Docker-Runtime, Volumes, lokale Backend-Fähigkeiten; verfügbare Clone-/Reflink-Verfahren prüfen.                                                                         | Verbindliche Support-Matrix und Fallback                   |
-| Q12 | Wie greifen bestehendes Startup-Script und neues Setup zusammen?            | Projekt-`commands.start` und tatsächliche Nutzung prüfen; doppelte devenv-Ausführung verhindern, ohne bestehenden Hook umzudeuten.                                                                 | Einführung in vorhandene Projekte                          |
+| Messgröße               |       Median |   Spannweite |
+| ----------------------- | -----------: | -----------: |
+| Git-Worktree erstellen  |          3 s |        2–3 s |
+| Setup bis HTTP-ready    |         31 s |      24–40 s |
+| Verifikation            |          1 s |        0–1 s |
+| Cleanup                 |         10 s |      10–15 s |
+| Gesamtlauf              |         49 s |      42–58 s |
+| Logische Checkout-Größe | rund 1,64 GB | 1,64–1,67 GB |
 
-### Sammelpaket für die Fortsetzung
+Alle neun meldeten sechs App-Container und keine neue Image-ID. Zwei weitere erfolgreiche Läufe mit mindestens einem Artifact-Miss benötigten 139 beziehungsweise 159 Sekunden bis Readiness. Das deutet auf hohen Nutzen der Artefaktwiederverwendung hin, ist aber kein belastbarer Beschleunigungsfaktor: Die Ergebnisdateien enthalten weder Source-Commit noch CPU/RAM, Dateisystem, Docker-/Compose-Versionen, genaue Image-Digests oder Runtime-Patchversionen. Acht der neun Warm-Läufe melden `target-present`; deren Logs zeigen zuvor jeweils erfolgreiche Prefetches aller drei passenden Keys. Das Label belegt daher nicht, dass der Stale-Target-Fehler in diesen Läufen auftrat, kann aber frisch restaurierte und ungeprüft vorhandene Ziele nicht unterscheiden. Zusätzlich stammen acht der zwölf Ergebnisdateien aus dem älteren `.devenv/stacks`-Vertrag und nur vier aus dem aktuellen `.devenv/worktrees`-Vertrag; beide Miss-Läufe gehören zur älteren Gruppe. Die Kohorten sind deshalb nur historische Richtwerte.
 
-- Setup-Script und nur die tatsächlich aufgerufenen devenv-Funktionen.
-- Relevante Compose-/Dockerfile-Ausschnitte mit Dependency-Mounts, Routing und gemeinsamer Infrastruktur.
-- Eine anonymisierte generierte Stack-Konfiguration; keine Zugangsdaten oder personenbezogenen Host-Pfade.
-- Exakte Installationsbefehle, Versionen, relevante Manifest-/Lockfile-Struktur und aktuelle Cache-Einstellungen.
-- Eine Ablaufskizze und Messwerttabelle. Auch fehlende Messungen und nicht reproduzierte Fälle ausdrücklich nennen.
+Der aktuell geprüfte Host ist Apple Silicon/arm64 mit APFS, Bash 5.3.15, Docker Client/Engine 29.7.2 und Compose 5.5.0; der Docker-Server läuft als Linux/arm64. Diese aktuellen Systemwerte dürfen den älteren Ergebnisdateien nicht nachträglich als Benchmark-Metadaten zugeschrieben werden. Ein neuer Lauf unterblieb, weil kein aktiver Benchmark-Stack vorhanden war und Setup sowohl den gemeinsamen LB-Cache leert als auch alte Artifact-Cache-Einträge prunen kann. Kalt-, Parallel-, Lockfile-Miss-, Watcher-, CPU- und I/O-Messungen bleiben offen.
 
-Zunächst read-only untersuchen. Ausführung und Benchmarks nur in einem ausdrücklich als Test vorgesehenen Checkout/Stack. Falls das Script gemeinsame Datenbanken migriert, globale Services stoppt oder produktive Daten verändert, diese Schritte vor einem Testlauf abgrenzen. Keine Live-DB-Kopien, kein globales Prune oder Cache-Löschen für diese Recherche.
+## 7. Antworten auf Q01–Q12 und offene Restpunkte
+
+Die Statusangabe „statisch beantwortet“ bestätigt den aktuellen Quellvertrag, nicht das Verhalten eines noch nicht ausgeführten BOC-Adapters. „Teilbeantwortet“ lässt eine konkret benannte Laufzeit- oder Produktentscheidung offen.
+
+### Q01 — Setup und Lifecycle
+
+**Statisch beantwortet.** Die reale Kette ist in Abschnitt 2 dokumentiert: `stack set` → Cache-Key/Restore → Composer → npm → Frontend-Build → `up shop` → `clear-cache` → HTTP-Readiness → Cache-Prune. Setup kann bei unvorbereiteter gemeinsamer Umgebung in `prepare-shop` interaktiv werden. Wiederholung behält die Pfadzuordnung; Abbruch liefert 130, aber ohne Rollback. Start, Stop, Remove und Assignment-Clear sind getrennte devenv-Operationen.
+
+**Offen:** kontrollierter Erfolgs-, Fehler-, Retry- und Abbruchlauf; Verhalten zweier gleichzeitiger Setups desselben Checkouts; Capability-Prüfung für einen garantiert nichtinteraktiven Start.
+
+### Q02 — Dependency-Ort und Runtime
+
+**Statisch beantwortet.** `vendor`, `node_modules` und Frontend-Dist liegen in jedem Checkout und werden über Bind-Mounts von Composer-/Node-One-shots sowie Shop/SSR genutzt. Host-UID/GID vermeidet fremde Dateieigentümer. Node-One-shot und SSR sind `linux/amd64`; Composer und Shop sind auf dem aktuellen Host Linux/arm64-Images. Statisch gelten Composer 2.4, PHP 8.3 und Node 22; im laufenden gemeinsamen Stack wurden PHP 8.3.32 und Node 22.23.1 rein lesend bestätigt. Die genaue npm- und Composer-Patchversion des One-shots wurde nicht durch einen neuen Containerlauf bestimmt.
+
+**Offen:** tatsächliche Native-Module/ABI-Kompatibilität und Linux-Fallbacks in einem freigegebenen Test-Checkout.
+
+### Q03 — Stack-ID, URL und Pfadzuordnung
+
+**Teilbeantwortet.** Writer, Invarianten, Wiederholungsverhalten und Routing sind in Abschnitt 2 belegt. Fünf aktuelle anonymisierte Zuordnungen waren konsistent. Derselbe Pfad behält seine ID; verschiedene Pfade unterscheiden sich normalerweise durch vier Hash-Hexzeichen. Exakt wiederverwendete Pfade können alte Zuordnungen übernehmen, und die Hashverkürzung bleibt kollisionsanfällig. Emdash konsumiert den Vertrag, erzeugt ihn aber nicht.
+
+**Offen:** Laufprobe mit zwei Checkouts desselben Branches sowie verbindliche zusätzliche BOC-Eigentumsprüfung bei Pfadwiederverwendung und extern gelöschtem Checkout.
+
+### Q04 — Wiederverwendbare Dependencies
+
+**Teilbeantwortet.** Die aktuellen Cache-Eingaben und privaten Restore-Ziele sind belegt; APFS-Clones und relative Composer-Path-Symlinks wurden in vorhandenen Artefakten beobachtet. Der `target-present`-Pfad vergleicht jedoch keinen Key und ist ein bestätigter Korrektheitsblocker.
+
+**Offen:** geändertes Lockfile/Image, Composer-Plugins und Installationsscripts außerhalb `vendor`, Autoloading, native Node-Module, Frontend-Ausführung und Rift-`--copy-all` in separaten Kopien. Bis dahin ist kein Warm-Cache korrektheitsseitig abgenommen.
+
+### Q05 — Readiness und Routing
+
+**Teilbeantwortet.** Route, URL-Schema und Setup-Prüfung sind belegt. Es gibt keine Compose-Healthchecks; HTTP-Status plus korrekter Stack-Header ist die vorhandene Readiness-Definition. Emdashs „configured“ bedeutet dagegen nur, dass eine passende Konfigurationsdatei existiert.
+
+**Offen:** Kosten und Aussagekraft einer späteren Statusprüfung nach `start`, SSR/API-/DB-/Redis-/Rabbit-Ausfälle sowie TLS ohne `-k`. UI darf bis dahin nur „URL vorhanden“ beziehungsweise „vom Setup als HTTP-ready gemeldet“ anzeigen.
+
+### Q06 — Konfiguration und Teilbarkeit
+
+**Teilbeantwortet.** devenv hält Maschinenkonfiguration in `dev.env`, Zuordnungen in `.devenv/worktrees`, Cache in `.devenv/rift-cache` und Setup-Logs in `.devenv/rift-setup-logs`; diese Orte sind lokal und ignoriert. Storefront-Domains sind unter `devenv:config/storefront-domains.txt` versioniert. BOC-Projektmetadaten einschließlich `commands.start` liegen serverseitig in der Project-Tabelle (`packages/core/src/project.ts:211-233`); Worktree-Backend-Präferenzen und Deployments-`devenvPath` sind getrennte hostlokale Desktop-Stores.
+
+Emdashs `.emdash.json` teilt `preservePatterns`, `shellSetup`, `scripts.setup/run/teardown` und Commands; lokale DB-Werte überschreiben die versionierten Nicht-Command-Felder (`emdash:apps/emdash-desktop/src/shared/core/project-settings/project-settings.ts`, `emdash:apps/emdash-desktop/src/main/core/projects/settings/effective-task-settings.ts`). Das ist eine Wissensquelle, kein BOC-Vertrag.
+
+**Offen:** Ob BOC überhaupt versionierbare Environment-Felder braucht. Vorläufiger Vorschlag bleibt: Host-Devenv-Pfad und Cache-Capability lokal; Projekt-Aktivierung und optionaler Default-Domain projektbezogen; Stack-ID/URL ausschließlich generierte Laufzeitdaten.
+
+### Q07 — Prozesse, Logs und Wiederanbindung
+
+**Statisch teilweise beantwortet.** Der normale BOC-PTY ist Location-/Backend-intern. Er hält maximal 2 MiB Ausgabe und 25 beendete Sessions im Speicher; sein Layer-Finalizer beendet laufende Prozesse (`packages/core/src/pty.ts:13-16,91-131,216-237`). UI-Unmount schließt nur den Socket und speichert Rendererzustand, explizites Schließen entfernt den PTY; nach Exit entfernt die normale Terminal-UI den Eintrag (`packages/app/src/session/terminal/terminal.tsx:537-690`, `context.tsx:161-180,339-358`). Das genügt weder für Backend-Neustart noch für erreichbare abgeschlossene Environment-Logs.
+
+Der Persistent-PTY-Daemon läuft detached und unterstützt einen Backend-Handoff (`packages/core/src/persistent-pty/daemon.ts:198-269,334-382`). Er meldet Output-Offsets und Replay-Truncation, aber seine Retentionsgrenze liegt im externen Binary (`packages/schema/src/persistent-pty.ts:9-15`, `packages/core/src/persistent-pty/daemon.ts:492-597`). Bei einem sichtbar angehängten Exit entfernt der aktuelle Service den Terminaleintrag automatisch (`packages/core/src/persistent-pty/index.ts:306-333`). `terminate` ist vorhanden, doch die Repository-Quellen beweisen keine Prozessgruppen-/Kindprozess-Semantik.
+
+Emdash bestätigt nur ein Konzept: phasenstabile Lifecycle-PTYs, In-Memory-Deduplizierung, 16-KiB-Fehler-Tail und 64-KiB-Replay im Main Process. Status und Logs überleben keinen Main-Process-Neustart; sein POSIX-Prozessbaum-Terminator kann nicht ungeprüft portiert werden.
+
+**Offen:** kontrollierte Tests für Fenster-/Backend-Handoff, Daemon-Ausfall, Log-Truncation und Prozessbaum-Abbruch. Architekturvorschlag für Schritt C: Persistent PTY als Prozesshalter prüfen, aber letzten Lauf, Endstatus und begrenztes Log Environment-eigen speichern; kein PTY allein erfüllt den Vertrag.
+
+### Q08 — Stop und Cleanup
+
+**Statisch beantwortet.** `stop` stoppt nur Projektcontainer. `down` entfernt Container und projektlokale Compose-Ressourcen ohne `-v`; `stack clear` entfernt anschließend nur die Zuordnung. Geteilte Infrastruktur und Dependency-/Log-/Cache-Dateien bleiben. Bei fehlendem Checkout oder nicht beweisbarer Zuordnung ist automatisches Cleanup nicht sicher. Zwei aktuell beobachtete unzugeordnete Worktree-Compose-Projekte bestätigen den Orphan-Fall.
+
+**Offen:** Fehlerfälle von `down`/`stack clear` und ein sicherer, expliziter Orphan-Cleanup-Einstieg. Automatisches Cleanup vor Checkout-Löschung bleibt außerhalb des manuellen MVP.
+
+### Q09 — Gemeinsam genutzter Zustand
+
+**Teilbeantwortet.** Datenbanken, Redis einschließlich PHP-Sessions, RabbitMQ, Zertifikate, mehrere Integrations-/Exportverzeichnisse, Logs und der LB-Dateicache werden geteilt. Es gibt keine Redis- oder RabbitMQ-Namensräume pro Stack. Worktree-Setup migriert die Datenbank nicht und startet keine eigenen Worker/Jobs. `clear-cache` lässt Redis in Worktree-Stacks unangetastet, löscht aber den gemeinsamen LB-Dateicache.
+
+**Offen:** Uploads, Search-Indizes sowie konkrete Queue-/Worker-Nebenwirkungen zweier paralleler App-Versionen. Vor diesen Prüfungen keine Behauptung vollständiger Parallelisolation.
+
+### Q10 — Laufzeit und Optimierungsreihenfolge
+
+**Nur historisch beantwortet.** Die vorhandenen Messwerte stehen in Abschnitt 6. Der gemischte historische Warm-Median bis HTTP-ready beträgt 31 Sekunden; zwei erfolgreiche Miss-Läufe des älteren Stack-Vertrags benötigten 139 beziehungsweise 159 Sekunden. Wegen fehlender Benchmark-Metadaten, gemischter Setup-Versionen und des mehrdeutigen `target-present`-Labels sind dies Richtwerte, keine Baseline oder Abnahme.
+
+**Offen:** ein freigegebener Test-Stack ohne Eingriff in gemeinsame Caches, mindestens drei kontrollierte Warm-Läufe, separater Kaltcache, parallele Setups, CPU/I/O/Watcher und Zeitanteile je Phase. Erst danach ein verbindliches Warm-Zeitbudget festlegen.
+
+### Q11 — Plattformen und Speicherorte
+
+**Teilbeantwortet.** Aktuell ist nur macOS auf Apple Silicon mit APFS praktisch belegt. Der Cache probiert dort `cp -cR`, auf Linux `cp -a --reflink=always` und fällt bei anderer oder getrennter Filesystem-Unterstützung auf eine normale Kopie zurück (`devenv:scripts/lib/rift-artifact-cache.sh:47-140`). Devenv verlangt Bash 4+, aktuell ist 5.3.15 installiert. Docker läuft als Linux/arm64; Node/SSR erzwingen amd64.
+
+**Offen:** Linux-Reflink, Cross-Filesystem-Copy, WSL/Windows, Compose-`!reset`-Mindestversion und Performance ohne Copy-on-write. MVP-Support daher zunächst nur für den nachgewiesenen lokalen macOS-/Docker-Pfad vorschlagen; nicht als endgültige Produktentscheidung festschreiben.
+
+### Q12 — Vorhandenes Startup-Script
+
+**Statisch beantwortet, Nutzung offen.** `Project.Commands.start` ist der vorhandene Startup-Hook (`packages/schema/src/project.ts:26-30`). `Worktree.create` führt ihn nach Erstellung und Registrierung für jede gewählte Strategie synchron im neuen Checkout aus, unter Unix via `bash -lc`, mit `OPENCODE_WORKTREE_BASE` und `OPENCODE_WORKTREE_PATH`; Fehler lassen die Erstellung fehlschlagen (`packages/core/src/worktree.ts:233-290`). Er besitzt keine Live-/Reconnect-/Log-Semantik und darf nicht als manueller Environment-Runner umgedeutet werden.
+
+Eine rein lesende lokale Datenbankabfrage fand keine konfigurierten Startup-Kommandos, enthielt aber auch keinen Projektdatensatz für diesen Checkout und beweist daher nichts über die Zielprojekte. Emdash führt optional `scripts.setup` vor `scripts.run` aus, koordiniert dies aber nicht mit direkten devenv-Aktionen.
+
+**Offen:** tatsächliche Zielprojektwerte vor Einführung prüfen. Ist `commands.start` bereits das devenv-Setup, darf BOC nicht ein zweites Mal ausführen; andernfalls bleibt der bestehende Hook unverändert und die manuelle Environment-Aktion erhält eine getrennte Konfiguration.
+
+### Freigegebene Restprüfung für Schritt C/D
+
+Laufzeit- und Benchmark-Prüfungen nur in einem ausdrücklich als Test vorgesehenen Checkout/Stack mit eigenem Cache. Vorher den gemeinsamen LB-Cache aus `clear-cache` entkoppeln; im aktuellen Auftrag ist dessen Löschung auch für einen Test nicht freigegeben. Keine Live-DB-Kopien, Migrationen, globalen Stops, Prunes oder Löschungen bestehender/geteilter Caches. Benötigt werden danach insbesondere:
+
+- Erfolgs-, Fehler-, Retry- und Prozessbaum-Abbruchlauf mit wiedererreichbaren Logs.
+- Zwei Checkouts desselben Branches und zwei Sessions desselben Checkouts.
+- Lockfile-/Image-Miss, Rift-`--copy-all`, native Module, Composer-Autoload und echte App-Ausführung.
+- Gemeinsamer DB-/Redis-/RabbitMQ-Betrieb mit kontrollierter Queue-/Worker-Beobachtung.
+- Warm/Kalt/Parallel-Messung mit Source-Commit, Hardware, Dateisystem, Images, Runtime-Versionen und Phasenwerten.
 
 ## 8. Umsetzung in überprüfbaren Schritten
 
 | Schritt                    | Arbeit                                                                                                                                       | Abschlusskriterium                                                                                                                          |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
-| A: devenv-Vertrag klären   | Q01–Q06 und Q08–Q12 untersuchen; Baseline aufnehmen, Q07 anhand BOC prüfen                                                                   | Evidenz und offene Restpunkte hier eintragen; keine erfundene API oder Cache-Entscheidung                                                   |
+| A: devenv-Vertrag klären   | Q01–Q06 und Q08–Q12 untersuchen; vorhandene Messwerte einordnen, Q07 anhand BOC prüfen                                                       | **Statisch abgeschlossen 2026-09-06:** Evidenz, historische Werte, Cache-Empfehlung und offene Laufzeitprüfungen dokumentiert               |
 | B: UI/UX mit Fixtures      | BOC-eigene Zustandsdarstellung, Hauptaktion/Menü, Settings und begrenzte Ausgabe mit realistischer Fixtures                                  | Alle UI-Zustände, schmale/breite Fenster, horizontale/vertikale Tabs, Tastatur und Fokus geprüft; keine echten Scripts nötig                |
 | C: manueller Ablauf        | Runner und gespeicherte Konfiguration, registrierten Checkout prüfen, ein Lauf pro Umgebung, Endstatus und Logs, bestehendes devenv anbinden | Reales Setup im Test-Checkout; doppelte Sessions, Fehler, Wiederholung und UI-Wechsel korrekt; Capability verbirgt nicht unterstützte Ziele |
 | D: Dependency-Optimierung  | Die gemessene Cache-Strategie im passenden devenv-/Adapter-Bereich umsetzen                                                                  | Warm/Kalt-Messung, Cache-Miss bei geänderten Inputs und tatsächliche Anwendung mit isolierten Dependency-Schreibzugriffen geprüft           |
 | E: Integration abschließen | Status/URL, geklärtes Stop/Abbruch, Reconnect, Settings-Validierung, Kontextmenü und gezielte Performance-Prüfung                            | UX-Abnahme, keine relevante Session-Regression, Fork-Diff dokumentiert, unterstützte Plattformen benannt                                    |
 
-B kann vor vollständigem Abschluss von A mit klar markierten Fixtures vorbereitet werden. Reale Docker-/Dependency-Implementierung hängt von den jeweiligen offenen Fragen ab. C ist ein Funktionsmeilenstein; die geforderte Performance ist erst nach D/E abgenommen. Kein pauschales Implementierungsmandat aus diesem Plan ableiten.
+B kann nach gesondertem Auftrag mit klar markierten Fixtures vorbereitet werden. Reale Docker-/Dependency-Implementierung hängt von den benannten Laufzeit- und Korrektheitsprüfungen ab. C ist ein Funktionsmeilenstein; die geforderte Performance ist erst nach D/E abgenommen. Kein pauschales Implementierungsmandat aus diesem Plan ableiten.
 
 Automatisches Setup bei Checkout-Erstellung, zuverlässiges Teardown vor beliebiger Löschung und ein globales Dashboard bekommen bei Bedarf spätere, eigene Arbeitspakete.
 
@@ -291,29 +460,25 @@ Fertig ist das Feature erst, wenn:
 8. Upstream-Änderungen auf erklärte additive Einhängestellen begrenzt bleiben.
 9. Unterstützte Plattformen, verbleibende Grenzen und offene Fragen dokumentiert sind. Nicht geprüfte Fälle gelten nicht als erledigt.
 
-## 10. Startprompt für den anderen Rechner
+## 10. Fortsetzungsprompt nach Schritt A
 
 ```text
 Wir planen BOC-Entwicklungsumgebungen für Git-Worktree- und Rift-Sessions.
-Lies BOC_ENVIRONMENTS_PLAN.md und die gültigen AGENTS.md-Anweisungen.
-Auf diesem Rechner ist das vollständige devenv verfügbar. Die abgeschlossene
-Recherche in Abschnitt 2 ist Ausgangspunkt, kein Beweis für das aktuelle Script.
+Lies BOC_ENVIRONMENTS_PLAN.md und die gültigen AGENTS.md-Anweisungen. Schritt A
+ist statisch abgeschlossen; behandle die dortigen Laufzeit- und Cache-Prüfungen
+weiterhin als offen. Dashboard bleibt außerhalb des Auftrags.
 
-Führe zunächst Schritt A aus: Ermittle die relevanten devenv-/Projekt- und
-Emdash-Quellen und beantworte Q01–Q12 mit konkreter Evidenz. Priorität haben
-Setup-Ablauf, Dependency-Mounts und Runtime, Stack-ID/URL, Stop/Cleanup sowie
-gemeinsame DB/Queues/Caches. Dashboard bleibt außerhalb des Auftrags.
+Beginne den ausdrücklich beauftragten nächsten Schritt mit der kleinsten
+verantwortbaren Änderung. Vor einem realen Setup oder Benchmark muss ein
+eindeutig freigegebener Test-Checkout/-Stack mit eigenem Cache existieren und
+der gemeinsame Load-Balancer-Dateicache aus dem Setup entkoppelt sein. Keine
+bestehenden Container stoppen, Datenbanken migrieren, bestehende/geteilte
+Caches oder Volumes löschen oder laufende App beziehungsweise Server neu starten.
 
-Beginne read-only. Keine bestehenden Container stoppen, keine Datenbanken
-migrieren, keine Caches/Volumes löschen und keine laufende App oder Server
-neu starten. Benchmarks nur in einem ausdrücklich vorgesehenen Test-Stack;
-ohne solchen die Messungen als offen dokumentieren.
-
-Aktualisiere den Plan mit Befunden, Messwerten, noch offenen Fragen und einer
-begründeten Empfehlung zur Cache-Technik. Erhalte die Trennung zwischen
-Anforderungen, Vorschlägen und bestätigten Entscheidungen. Keine Feature-
-Implementierung ohne anschließenden Auftrag. Erstklassige UI/UX, messbare
-Performance und wenige additive Upstream-Eingriffe bleiben verbindlich.
+Erhalte die Trennung zwischen Anforderungen, Vorschlägen und bestätigten
+Entscheidungen. Erstklassige UI/UX, messbare Performance und wenige additive
+Upstream-Eingriffe bleiben verbindlich. Cache-Korrektheit geht vor einer warmen
+Benchmark-Zahl; `commands.start` bleibt ein unveränderter separater Hook.
 
 Nutze ausschließlich repository-relative Pfade und anonymisierte Beispiele
 in Plänen und Handovers. Versionierte Änderungen gemäß Repository-Workflow
@@ -335,6 +500,7 @@ Diese Quellen wurden während der vorangegangenen Recherche geprüft. Sie erklä
 
 Neue Befunde hier datiert ergänzen; die Fragen in Abschnitt 7 nur bei belegter Antwort schließen.
 
-| Datum      | Schritt          | Ergebnis                                                                                                                                                        | Noch offen                                                   |
-| ---------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
-| 2026-09-05 | Recherche / Plan | BOC- und Emdash-Einhängestellen geprüft; Architektur, UI-Zustände, Messmatrix und Prüffragen festgehalten. Keine Feature-Implementierung oder Setup-Ausführung. | Q01–Q12; nächster Schritt A auf vollständigem devenv-Rechner |
+| Datum      | Schritt           | Ergebnis                                                                                                                                                                                                  | Noch offen                                                                                                              |
+| ---------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-05 | Recherche / Plan  | BOC- und Emdash-Einhängestellen geprüft; Architektur, UI-Zustände, Messmatrix und Prüffragen festgehalten. Keine Feature-Implementierung oder Setup-Ausführung.                                           | Q01–Q12; nächster Schritt A auf vollständigem devenv-Rechner                                                            |
+| 2026-09-06 | A: Quellenprüfung | Aktuelles devenv, Projekt-Mounts/Runtime, Emdash und BOC-Prozesspfade statisch geprüft; zwölf historische Messdateien eingeordnet; Cache-Empfehlung formuliert. Keine Feature- oder Lifecycle-Ausführung. | Kontrollierter Test-Stack; Cache-Key-Korrektheit, Queue-/Worker-Isolation, Runner-Abbruch/Reconnect und neue Benchmarks |
