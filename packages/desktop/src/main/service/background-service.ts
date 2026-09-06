@@ -1,6 +1,7 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { resolveRiftEnvironment } from "../../boc/rift"
+import { bocServiceFile } from "../../boc/service"
 import type { ServerReadyData } from "../../shared/ipc-contract"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
@@ -64,7 +65,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
 })
 
 function serviceFile(path: Path.Path, isolated: boolean) {
-  if (CHANNEL === "boc") return path.join(app.getPath("userData"), "opencode", "service-boc.json")
+  if (CHANNEL === "boc") return bocServiceFile({ home: app.getPath("home"), state: process.env.XDG_STATE_HOME })
   if (isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
     return path.join(app.getPath("userData"), "opencode", "service-local.json")
   }
