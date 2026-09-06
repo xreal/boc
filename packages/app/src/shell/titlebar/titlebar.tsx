@@ -453,9 +453,9 @@ export function Titlebar(props: {
                 <Show when={windows() || linux()}>
                   <WindowsAppMenu command={command} platform={platform} />
                 </Show>
-                <Show when={!mobile() && !props.verticalTabs}>{homeButton()}</Show>
                 <Show when={!mobile() && !props.verticalTabs}>
                   <BocNavigationBridge orientation="horizontal" />
+                  {homeButton()}
                 </Show>
 
                 <Show
@@ -650,8 +650,8 @@ export function Titlebar(props: {
                             <Show when={!windows()}>
                               <ChannelIndicator sidebar debugTools={props.debugTools} />
                             </Show>
-                            {homeButton(true)}
                             <BocNavigationBridge orientation="vertical" />
+                            {homeButton(true)}
                             <button
                               type="button"
                               data-action="vertical-tabs-new-session"
