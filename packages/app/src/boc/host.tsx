@@ -1,3 +1,4 @@
+import { createBocControls } from "./controls"
 import { createBocSessions } from "./session-links"
 import { useLocation, useNavigate } from "@solidjs/router"
 import type { BocHost } from "@boc/extensions/renderer"
@@ -16,6 +17,7 @@ export function createBocHost(): BocHost {
 
   return {
     sessions,
+    controls: createBocControls(),
     navigate,
     location: () => ({ pathname: location.pathname, search: location.search }),
     route: () => {

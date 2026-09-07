@@ -57,7 +57,7 @@ function watchTarget(file: string): Promise<Watcher.WatchInput> {
   )
 }
 
-const Module = Schema.Struct({
+export const Module = Schema.Struct({
   default: Schema.Union([
     Schema.Struct({
       id: Schema.String,

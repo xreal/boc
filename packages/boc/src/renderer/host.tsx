@@ -1,6 +1,9 @@
 import { createContext, useContext, type ParentProps } from "solid-js"
 
+import type { BergflowHost } from "../tools/bergflow/host"
+
 export type BocHost = {
+  controls?: BergflowHost
   sessions?: {
     start(input: { prompt: string; title: string; issueUrl: string }): Promise<void>
     open(server: string, sessionID: string): Promise<void>

@@ -253,6 +253,14 @@
     {
       "path": "packages/core/test/plugin/supervisor-reload.test.ts",
       "reason": "Verify host fallback selection, external failures and options, disable operations, package installation, and storage continuity through the real Location loader"
+    },
+    {
+      "path": "packages/core/src/plugin/module.ts",
+      "reason": "Export the existing module schema for adapting the portable bundled Bergflow plugin through the normal Promise plugin adapter"
+    },
+    {
+      "path": "packages/app/component-tests/bergflow.spec.ts",
+      "reason": "Exercise production Bergflow controls for keyboard mutation, focus retention, read-only capabilities, search, and narrow context selection"
     }
   ]
 }

@@ -4,9 +4,9 @@ import { bocExtensions, type BocExtension } from "./registry"
 import { exampleExtension } from "./tools/__fixtures__/example/extension"
 
 describe("BOC extension registry", () => {
-  test("registers Jira and Deployments through the generic extension seam", () => {
-    expect(bocExtensions.map((extension) => extension.id)).toEqual(["jira", "deployments"])
-    expect(bocExtensions.every((extension) => extension.desktopOnly)).toBe(true)
+  test("registers tools through the generic extension seam", () => {
+    expect(bocExtensions.map((extension) => extension.id)).toEqual(["jira", "deployments", "bergflow"])
+    expect(bocExtensions.filter((extension) => extension.desktopOnly).map(extension => extension.id)).toEqual(["jira", "deployments"])
   })
 
   test("keeps extension and command ids unique", () => {
