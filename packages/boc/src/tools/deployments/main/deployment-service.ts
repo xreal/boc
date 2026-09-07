@@ -1,14 +1,11 @@
 import path from "node:path"
-import {
-  DEPLOYMENT_KUBE_CONTEXT,
-  isReservedDevEnvironment,
-  type AllowedDevEnvironment,
-} from "../domain/environments"
+import { DEPLOYMENT_KUBE_CONTEXT, isReservedDevEnvironment, type AllowedDevEnvironment } from "../domain/environments"
 import { deploymentFailure, type DeploymentFailure } from "../domain/failures"
 import {
   isBlockingDeploymentOperation,
+  isTerminalDeploymentOperation,
+  aggregateDeploymentOperation,
   pruneDeploymentHistory,
-  type DeploymentOperationState,
   type DeploymentOperationSummary,
   type DeploymentWorkflowOperation,
 } from "../domain/operations"
@@ -36,6 +33,7 @@ import type {
 import { readArgoFleet, verifyArgoDevTarget, type ArgoCliRuntime } from "./argo-cli"
 import type { DeploymentCommandRunner } from "./command-runner"
 import { deploymentCommandFailure } from "./command-failure"
+import { readDeploymentOperation } from "./operation-tracker"
 import type { CacheRunSnapshot } from "./cache-runner"
 import {
   DEPLOYMENT_WORKFLOW_CACHE_MS,
@@ -70,6 +68,7 @@ export type DeploymentRuntime = {
   createId?: () => string
   fileExists?: DeploymentFileExists
   runCache?: (environment: AllowedDevEnvironment, onUpdate: (snapshot: CacheRunSnapshot) => void) => void
+  notifyFinished?: (operation: DeploymentOperationSummary) => void
 }
 
 type FleetSnapshot = {
@@ -121,6 +120,9 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const changingAutoSync = new Set<AllowedDevEnvironment>()
   const cacheRuns = new Map<AllowedDevEnvironment, CacheRunSnapshot>()
   let writes = Promise.resolve()
+  let tracking: Promise<void> | undefined
+  let trackingTimer: ReturnType<typeof setTimeout> | undefined
+  let trackingEnabled = false
 
   const operations = () => readDeploymentOperations(runtime.store, now())
 
@@ -139,11 +141,49 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       (operation) => operation.environment === environment && isBlockingDeploymentOperation(operation.state),
     )
 
-  const attachSystems = (systems: readonly DeploymentSystem[], readiness: DeploymentReadiness) =>
-    systems.map((system) => {
-      const operation = blockingOperation(system.environment)
+  const refreshOperations = () => {
+    if (tracking) return tracking
+    tracking = (async () => {
+      const active = operations().filter(
+        (operation) => isBlockingDeploymentOperation(operation.state) && !dispatching.has(operation.environment),
+      )
+      for (const operation of active) {
+        const next = await readDeploymentOperation(github, operation)
+        if (JSON.stringify(next) === JSON.stringify(operation)) continue
+        const finished = isTerminalDeploymentOperation(next.state)
+        const updatedAt = new Date(now()).toISOString()
+        const updated = { ...next, updatedAt, ...(finished ? { finishedAt: updatedAt } : {}) }
+        await persistOperations((current) => current.map((item) => (item.id === updated.id ? updated : item)))
+        if (finished) {
+          cache = undefined
+          if (readDeploymentSettings(runtime.store).notificationsEnabled) runtime.notifyFinished?.(updated)
+        }
+      }
+    })().finally(() => {
+      tracking = undefined
+    })
+    return tracking
+  }
+
+  const track = async () => {
+    await refreshOperations().catch(() => undefined)
+    if (trackingEnabled) {
+      trackingTimer = setTimeout(() => void track(), 10_000)
+      trackingTimer.unref?.()
+    }
+  }
+
+  const attachSystems = (systems: readonly DeploymentSystem[], readiness: DeploymentReadiness) => {
+    const history = operations()
+    return systems.map((system) => {
+      const matching = history.filter((item) => item.environment === system.environment)
+      const operation = matching.find((item) => isBlockingDeploymentOperation(item.state))
+      const latest = matching.at(-1)
+      const displayed = operation ?? latest
       const redeploy =
-        system.branch && system.branch.trim().toLowerCase() !== "master" && !isReservedDevEnvironment(system.environment)
+        system.branch &&
+        system.branch.trim().toLowerCase() !== "master" &&
+        !isReservedDevEnvironment(system.environment)
           ? (["redeploy"] as const)
           : []
       const autoSync =
@@ -153,15 +193,21 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
           ? (["auto-sync"] as const)
           : []
       const cacheBlocked = cacheRunBlocks(system.environment)
-      const allowed: readonly DeploymentRowAction[] = !operation && !changingAutoSync.has(system.environment) && !cacheBlocked
-        ? [...(readiness.deploymentReady ? (["deploy", "reset", ...redeploy] as const) : []), ...autoSync, ...(!isReservedDevEnvironment(system.environment) && runtime.runCache ? (["clear-cache"] as const) : [])]
-        : []
+      const allowed: readonly DeploymentRowAction[] =
+        !operation && !changingAutoSync.has(system.environment) && !cacheBlocked
+          ? [
+              ...(readiness.deploymentReady ? (["deploy", "reset", ...redeploy] as const) : []),
+              ...autoSync,
+              ...(!isReservedDevEnvironment(system.environment) && runtime.runCache ? (["clear-cache"] as const) : []),
+            ]
+          : []
       return {
         ...system,
-        ...(operation ? { operation } : {}),
+        ...(displayed ? { operation: displayed } : {}),
         allowedActions: [...allowed],
       }
     })
+  }
 
   const readFresh = async (settings: DeploymentSettings, targetGeneration: number, signal: AbortSignal) => {
     const [argoResult, autoSync, githubResult] = await Promise.all([
@@ -177,7 +223,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     if (!argoResult.ok) return { ok: false as const, failure: argoResult.failure, readiness }
 
     const snapshot = {
-      systems: attachSystems(argoResult.systems, readiness),
+      systems: argoResult.systems,
       readiness,
       fetchedAt: new Date(now()).toISOString(),
       generation: targetGeneration,
@@ -456,9 +502,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       const target = await verifyArgoDevTarget(argo, settings)
       if (!target.ok) return target.failure
     }
-    if (
-      conflictingMutation(stored.public.environment)
-    ) {
+    if (conflictingMutation(stored.public.environment)) {
       return deploymentFailure("conflict", {
         capability: "github_workflow_dispatch",
         context: { environment: stored.public.environment },
@@ -490,55 +534,74 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       updatedAt: createdAt,
     }
     dispatching.add(operation.environment)
-    await persistOperations((current) => [...current, operation]).finally(() =>
-      dispatching.delete(operation.environment),
-    )
-
-    const workflowResults = await stored.bound.reduce<Promise<DeploymentWorkflowOperation[]>>(
-      async (previous, workflow) => {
-        const completed = await previous
+    try {
+      await persistOperations((current) => [...current, operation])
+      const workflowResults: DeploymentWorkflowOperation[] = []
+      for (const workflow of stored.bound) {
         const dispatched = await dispatchGithubWorkflow(github, {
           filename: workflow.filename,
           ref: stored.public.ref,
           inputs: workflow.inputs,
         })
-        if (!dispatched.ok) {
-          const uncertain = ["timeout", "cancelled", "unknown", "network", "malformed"].includes(dispatched.category)
-          return [
-            ...completed,
-            {
-              filename: workflow.filename,
-              state: uncertain ? "unknown" : "failure",
-            },
-          ]
-        }
-        if (!dispatched.runUrl) {
-          return [...completed, { filename: workflow.filename, state: "unknown" }]
-        }
-        return [
-          ...completed,
-          {
-            filename: workflow.filename,
-            state: "queued",
-            runId: dispatched.runId,
-            runUrl: dispatched.runUrl,
-          },
-        ]
-      },
-      Promise.resolve([]),
-    )
+        workflowResults.push(
+          dispatched.ok
+            ? {
+                filename: workflow.filename,
+                state: dispatched.runUrl ? "queued" : "unknown",
+                ...(dispatched.runUrl ? { runId: dispatched.runId, runUrl: dispatched.runUrl } : {}),
+              }
+            : {
+                filename: workflow.filename,
+                state: ["timeout", "cancelled", "unknown", "network", "malformed"].includes(dispatched.category)
+                  ? "unknown"
+                  : "failure",
+              },
+        )
+        // Keep accepted run identities across a desktop restart, including partial dispatches.
+        await persistOperations((current) =>
+          current.map((item) =>
+            item.id === operation.id
+              ? {
+                  ...item,
+                  workflows: [...workflowResults, ...operation.workflows.slice(workflowResults.length)],
+                  dispatchedAt: new Date(now()).toISOString(),
+                }
+              : item,
+          ),
+        )
+      }
 
-    const next: DeploymentOperationSummary = {
-      ...operation,
-      workflows: workflowResults,
-      state: aggregateDispatchState(workflowResults.map((workflow) => workflow.state)),
-      updatedAt: new Date(now()).toISOString(),
+      const updatedAt = new Date(now()).toISOString()
+      const state = aggregateDeploymentOperation(workflowResults.map((workflow) => workflow.state))
+      const next: DeploymentOperationSummary = {
+        ...operation,
+        workflows: workflowResults,
+        state,
+        updatedAt,
+        dispatchedAt: updatedAt,
+        ...(isTerminalDeploymentOperation(state) ? { finishedAt: updatedAt } : {}),
+      }
+      await persistOperations((current) => current.map((item) => (item.id === operation.id ? next : item)))
+      if (isTerminalDeploymentOperation(next.state) && readDeploymentSettings(runtime.store).notificationsEnabled) {
+        runtime.notifyFinished?.(next)
+      }
+      return { ok: true, operation: next }
+    } finally {
+      dispatching.delete(operation.environment)
     }
-    await persistOperations((current) => current.map((item) => (item.id === operation.id ? next : item)))
-    return { ok: true, operation: next }
   }
 
   return {
+    refreshOperations,
+    startTracking() {
+      if (trackingEnabled) return
+      trackingEnabled = true
+      void track()
+    },
+    stopTracking() {
+      trackingEnabled = false
+      clearTimeout(trackingTimer)
+    },
     getSettings: () => readDeploymentSettings(runtime.store),
     async saveSettings(settings: DeploymentSettings): Promise<DeploymentSettingsResult> {
       const normalized = normalizeDeploymentSettings(settings)
@@ -667,7 +730,11 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
             context: { environment: input.environment, reason: "state-changed" },
           })
         }
-        if (dispatching.has(input.environment) || blockingOperation(input.environment) || cacheRuns.get(input.environment)?.state === "running") {
+        if (
+          dispatching.has(input.environment) ||
+          blockingOperation(input.environment) ||
+          cacheRuns.get(input.environment)?.state === "running"
+        ) {
           return deploymentFailure("conflict", {
             capability: "bf_deploy_auto_sync",
             context: { environment: input.environment },
@@ -795,13 +862,6 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
 }
 
 export type DeploymentService = ReturnType<typeof createDeploymentService>
-
-function aggregateDispatchState(states: readonly DeploymentOperationState[]): DeploymentOperationState {
-  if (states.some((state) => state === "unknown")) return "unknown"
-  if (states.some((state) => state === "queued")) return "queued"
-  if (states.every((state) => state === "failure")) return "failure"
-  return "unknown"
-}
 
 function cancelledReadiness(): FreshFleet {
   return {

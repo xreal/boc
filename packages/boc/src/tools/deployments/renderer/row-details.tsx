@@ -1,7 +1,13 @@
 import type { BocTranslator } from "../../../renderer/i18n"
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
+import { Show } from "solid-js"
+import { DeploymentOperationDetails } from "./operation-progress"
 
-export function DeploymentRowDetails(props: { t: BocTranslator; system: DeploymentSystem }) {
+export function DeploymentRowDetails(props: {
+  t: BocTranslator
+  system: DeploymentSystem
+  openExternal: (url: string) => void
+}) {
   const value = (content?: string) => content || props.t("boc.deployments.table.noValue")
 
   return (
@@ -43,6 +49,11 @@ export function DeploymentRowDetails(props: { t: BocTranslator; system: Deployme
             : props.t("boc.deployments.details.none")
         }
       />
+      <Show when={props.system.operation}>
+        {(operation) => (
+          <DeploymentOperationDetails t={props.t} operation={operation()} openExternal={props.openExternal} />
+        )}
+      </Show>
     </section>
   )
 }

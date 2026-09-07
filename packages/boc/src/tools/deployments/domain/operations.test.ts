@@ -24,8 +24,9 @@ describe("deployment operations", () => {
     expect(aggregateDeploymentOperation(["success", "success"])).toBe("success")
     expect(aggregateDeploymentOperation(["success", "queued"])).toBe("queued")
     expect(aggregateDeploymentOperation(["success", "in-progress"])).toBe("in-progress")
-    expect(aggregateDeploymentOperation(["failure", "in-progress", "timed-out"])).toBe("failure")
-    expect(aggregateDeploymentOperation(["timed-out", "queued"])).toBe("timed-out")
+    expect(aggregateDeploymentOperation(["failure", "in-progress", "timed-out"])).toBe("in-progress")
+    expect(aggregateDeploymentOperation(["timed-out", "queued"])).toBe("queued")
+    expect(aggregateDeploymentOperation(["success", "failure", "timed-out"])).toBe("failure")
     expect(aggregateDeploymentOperation(["unknown", "in-progress"])).toBe("unknown")
   })
 

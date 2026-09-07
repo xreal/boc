@@ -7,6 +7,47 @@ import type { CacheRunSnapshot } from "./cache-runner"
 const help = "--core --kube-context string --output string --prompts-enabled --selector string"
 
 describe("deployment fleet service", () => {
+  test("keeps the finished result visible and refreshes the fleet after releasing the mutation lock", async () => {
+    let lists = 0
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(undefined, [
+        {
+          id: "tracked",
+          environment: "02",
+          branch: "SHOP-42",
+          state: "queued",
+          createdAt: "2026-09-07T12:00:00Z",
+          updatedAt: "2026-09-07T12:00:00Z",
+          workflows: [{ filename: "app-shop.yml", state: "queued", runId: "42" }],
+        },
+      ]),
+      platform: "linux",
+      now: () => Date.parse("2026-09-07T12:02:00Z"),
+      runCache: () => {},
+      run: async (command) => {
+        if (command.executable === "gh" && command.args[0] === "run") {
+          return success(JSON.stringify({ databaseId: 42, status: "completed", conclusion: "success", jobs: [] }))
+        }
+        if (isApplicationList(command)) {
+          lists += 1
+          return success(application("02"))
+        }
+        return healthyCommand(command)
+      },
+    })
+    const before = await service.listSystems({ requestId: "before", refresh: false })
+    expect(before).toMatchObject({ ok: true, systems: [{ operation: { state: "queued" }, allowedActions: [] }] })
+    await service.refreshOperations()
+    const after = await service.listSystems({ requestId: "after", refresh: false })
+    expect(after).toMatchObject({
+      ok: true,
+      systems: [{ operation: { state: "success" }, allowedActions: ["clear-cache"] }],
+    })
+    expect(lists).toBe(2)
+    await service.listSystems({ requestId: "cached", refresh: false })
+    expect(lists).toBe(2)
+  })
+
   test("keeps one cache mutation per system, blocks other mutations, and exposes the same run when reopened", async () => {
     let starts = 0
     let update: ((snapshot: CacheRunSnapshot) => void) | undefined
@@ -25,17 +66,39 @@ describe("deployment fleet service", () => {
     expect(service.startCacheRun({ environment: "02" })).toMatchObject({ ok: true, run: { output: "started" } })
     expect(starts).toBe(1)
     expect(service.getCacheRun({ environment: "02" })).toMatchObject({ ok: true, run: { output: "started" } })
-    expect(await service.prepareDeployment({ environment: "02", ref: "SHOP-42", workflows: [{ filename: "app-shop.yml", inputs: {} }] })).toMatchObject({ ok: false, category: "conflict" })
-    expect(await service.turnAutoSyncOff({ environment: "02", expected: "on" })).toMatchObject({ ok: false, category: "conflict" })
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "conflict" })
+    expect(await service.turnAutoSyncOff({ environment: "02", expected: "on" })).toMatchObject({
+      ok: false,
+      category: "conflict",
+    })
     expect(service.startCacheRun({ environment: "20" })).toMatchObject({ ok: false, category: "unsafe-target" })
     expect(starts).toBe(1)
 
     update?.({ environment: "02", state: "unknown", output: "disconnected", startedAt: "2026-09-07T00:00:00.000Z" })
-    expect(await service.prepareDeployment({ environment: "02", ref: "SHOP-42", workflows: [{ filename: "app-shop.yml", inputs: {} }] })).toMatchObject({ ok: false, category: "conflict" })
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "conflict" })
     expect(service.startCacheRun({ environment: "02" })).toMatchObject({ ok: false, category: "conflict" })
-    expect(service.resolveCacheRun({ environment: "02", startedAt: "stale", confirmedEnded: true })).toMatchObject({ ok: false, category: "conflict" })
-    expect(service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })).toMatchObject({ ok: true, run: { state: "resolved", output: "disconnected" } })
-    expect(service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })).toMatchObject({ ok: false, category: "conflict" })
+    expect(service.resolveCacheRun({ environment: "02", startedAt: "stale", confirmedEnded: true })).toMatchObject({
+      ok: false,
+      category: "conflict",
+    })
+    expect(
+      service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true }),
+    ).toMatchObject({ ok: true, run: { state: "resolved", output: "disconnected" } })
+    expect(
+      service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true }),
+    ).toMatchObject({ ok: false, category: "conflict" })
   })
 
   test("omits the optional run field when no cache run exists", () => {

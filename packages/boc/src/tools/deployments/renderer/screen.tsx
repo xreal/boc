@@ -1,7 +1,7 @@
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Icon } from "@opencode-ai/ui/icon"
-import { onCleanup, onMount, Show } from "solid-js"
+import { createSignal, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocScreenProps } from "../../../registry"
 import { useBocDesktop } from "../../../renderer/desktop"
@@ -26,6 +26,7 @@ import { DeploymentsToolbar } from "./toolbar"
 import "./deployments.css"
 import { AutoSyncOffDialog } from "./auto-sync-dialog"
 import { CacheDialog } from "./cache-dialog"
+import { DEPLOYMENT_ACTIONS_URL } from "../domain/github"
 
 export default function DeploymentsScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
@@ -36,6 +37,9 @@ export default function DeploymentsScreen(props: BocScreenProps) {
   let bootstrapGeneration = 0
   let cacheTimer: ReturnType<typeof setTimeout> | undefined
   let fixtureCacheRun: DeploymentCacheRunSnapshot | undefined
+  let operationTimer: ReturnType<typeof setTimeout> | undefined
+  let disposed = false
+  const [now, setNow] = createSignal(Date.now())
   const [view, setView] = createStore({
     search: "",
     availability: "all" as DeploymentAvailabilityFilter,
@@ -68,7 +72,9 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         ...system,
         ...(operation ? { operation } : {}),
         allowedActions:
-          operation && isBlockingDeploymentOperation(operation.state) ? [] : (["deploy", "reset", "clear-cache"] as const),
+          operation && isBlockingDeploymentOperation(operation.state)
+            ? []
+            : (["deploy", "reset", "clear-cache"] as const),
       }
     })
   }
@@ -131,19 +137,30 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     applyWorkspace(result.workspace)
     setView("loading", false)
     void pollCacheRuns(result.workspace.systems)
+    scheduleOperations()
   }
 
   const pollCacheRuns = async (targets = view.systems) => {
     clearTimeout(cacheTimer)
     const results = await Promise.all(
-      targets.map(async (system) => [system.environment, await desktop.deployments.getCacheRun({ environment: system.environment }).catch(() => undefined)] as const),
+      targets.map(
+        async (system) =>
+          [
+            system.environment,
+            await desktop.deployments.getCacheRun({ environment: system.environment }).catch(() => undefined),
+          ] as const,
+      ),
     )
-    const runs = Object.fromEntries(results.flatMap(([environment, result]) => result?.ok && result.run ? [[environment, result.run]] : []))
+    const runs = Object.fromEntries(
+      results.flatMap(([environment, result]) => (result?.ok && result.run ? [[environment, result.run]] : [])),
+    )
+    if (disposed) return
     setView("cacheRuns", runs)
-    if (Object.values(runs).some((run) => run.state === "running")) cacheTimer = setTimeout(() => void pollCacheRuns(), 1000)
+    if (Object.values(runs).some((run) => run.state === "running"))
+      cacheTimer = setTimeout(() => void pollCacheRuns(), 1000)
   }
 
-  const refresh = async (force = true) => {
+  const refresh = async (force = true, quiet = false) => {
     if (view.refreshing) return
     const request = requests.begin()
     setView({ refreshing: true, refreshNotice: undefined })
@@ -163,8 +180,31 @@ export default function DeploymentsScreen(props: BocScreenProps) {
       fetchedAt: result.fetchedAt,
       staleFailure: result.staleFailure,
       transportFailure: false,
-      refreshNotice: result.staleFailure ? "failure" : "success",
+      refreshNotice: quiet ? undefined : result.staleFailure ? "failure" : "success",
+      queuedNotice: view.queuedNotice
+        ? {
+            ...view.queuedNotice,
+            state:
+              result.systems.find((system) => system.name === view.queuedNotice?.system)?.operation?.state ??
+              view.queuedNotice.state,
+          }
+        : undefined,
     })
+    scheduleOperations()
+  }
+
+  const scheduleOperations = () => {
+    clearTimeout(operationTimer)
+    if (
+      disposed ||
+      fixtureEnabled ||
+      !view.systems.some((system) => system.operation && isBlockingDeploymentOperation(system.operation.state))
+    )
+      return
+    operationTimer = setTimeout(async () => {
+      await refresh(false, true)
+      scheduleOperations()
+    }, 5_000)
   }
 
   const openDeploy = (system: DeploymentSystem, kind: "deploy" | "reset" | "redeploy") => {
@@ -177,11 +217,14 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         onQueued={(operation) => {
           setView({
             queuedNotice: { system: system.name, state: operation.state },
+            expanded: operation.environment,
             queuedOperations: { ...view.queuedOperations, [operation.environment]: operation },
             systems: view.systems.map((item) =>
               item.environment === operation.environment ? { ...item, operation, allowedActions: [] } : item,
             ),
           })
+          scheduleOperations()
+          if (!fixtureEnabled && !isBlockingDeploymentOperation(operation.state)) void refresh(false, true)
         }}
       />
     ))
@@ -209,7 +252,11 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         t={t}
         system={system}
         run={() =>
-          desktop.deployments.setAutoSync({ environment: system.environment, expected: system.autoSync, confirmed: true })
+          desktop.deployments.setAutoSync({
+            environment: system.environment,
+            expected: system.autoSync,
+            confirmed: true,
+          })
         }
         onSuccess={(result) => {
           setView({
@@ -245,18 +292,31 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         system={system}
         get={fixtureEnabled ? get : () => desktop.deployments.getCacheRun({ environment: system.environment })}
         start={fixtureEnabled ? start : () => desktop.deployments.startCacheRun({ environment: system.environment })}
-        resolve={fixtureEnabled ? resolve : (startedAt) => desktop.deployments.resolveCacheRun({ environment: system.environment, startedAt, confirmedEnded: true })}
+        resolve={
+          fixtureEnabled
+            ? resolve
+            : (startedAt) =>
+                desktop.deployments.resolveCacheRun({
+                  environment: system.environment,
+                  startedAt,
+                  confirmedEnded: true,
+                })
+        }
         onUpdate={(run) => setView("cacheRuns", system.environment, run)}
       />
     ))
   }
 
   onMount(() => {
+    const clock = setInterval(() => setNow(Date.now()), 1000)
     if (!fixtureEnabled) void bootstrap()
     onCleanup(() => {
       bootstrapGeneration += 1
       requests.invalidate()
       clearTimeout(cacheTimer)
+      clearTimeout(operationTimer)
+      clearInterval(clock)
+      disposed = true
     })
   })
 
@@ -276,6 +336,16 @@ export default function DeploymentsScreen(props: BocScreenProps) {
           </span>
         </div>
         <div class="ml-auto flex shrink-0 items-center gap-2 text-[11px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+          <a
+            class="underline underline-offset-2"
+            href={DEPLOYMENT_ACTIONS_URL}
+            onClick={(event) => {
+              event.preventDefault()
+              props.host.openExternal(DEPLOYMENT_ACTIONS_URL)
+            }}
+          >
+            {t("boc.deployments.progress.github")}
+          </a>
           <Show when={fleetReady() === false && systems().length > 0}>
             <span class="text-v2-state-fg-warning">{t("boc.deployments.readiness.degraded")}</span>
             <span aria-hidden="true">·</span>
@@ -372,6 +442,8 @@ export default function DeploymentsScreen(props: BocScreenProps) {
           <DeploymentSystemsTable
             t={t}
             systems={filtered()}
+            now={now()}
+            openExternal={(url) => props.host.openExternal(url)}
             expanded={view.expanded}
             onToggleDetails={(environment) =>
               setView("expanded", view.expanded === environment ? undefined : environment)

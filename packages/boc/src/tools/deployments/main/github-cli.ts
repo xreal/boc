@@ -1,4 +1,6 @@
 import { Option, Schema } from "effect"
+import { DEPLOYMENT_GITHUB_OWNER, DEPLOYMENT_GITHUB_REPO, DEPLOYMENT_GITHUB_REPOSITORY } from "../domain/github"
+export { DEPLOYMENT_GITHUB_OWNER, DEPLOYMENT_GITHUB_REPO, DEPLOYMENT_GITHUB_REPOSITORY } from "../domain/github"
 import { deploymentFailure, type DeploymentCapability, type DeploymentFailure } from "../domain/failures"
 import {
   deploymentWorkflowFilenameFromPath,
@@ -12,9 +14,6 @@ import { deploymentCommandFailure } from "./command-failure"
 import type { DeploymentCommand, DeploymentCommandResult, DeploymentCommandRunner } from "./command-runner"
 import { parseWorkflowDispatchContract, type ParsedDeploymentWorkflow } from "./workflow-parser"
 
-export const DEPLOYMENT_GITHUB_OWNER = "bergfreunde"
-export const DEPLOYMENT_GITHUB_REPO = "shop"
-export const DEPLOYMENT_GITHUB_REPOSITORY = `${DEPLOYMENT_GITHUB_OWNER}/${DEPLOYMENT_GITHUB_REPO}`
 export const DEPLOYMENT_GITHUB_HOST = "github.com"
 export const DEPLOYMENT_WORKFLOW_CACHE_MS = 5 * 60 * 1000
 export const DEPLOYMENT_BRANCH_QUERY_MIN_LENGTH = 2
@@ -337,7 +336,7 @@ export async function dispatchGithubWorkflow(
   return { ok: true, ...identity }
 }
 
-function runGh(
+export function runGh(
   runtime: GithubCliRuntime,
   args: readonly string[],
   options: { signal?: AbortSignal; stdin?: string; timeoutMs?: number } = {},

@@ -5,6 +5,7 @@ import { createDeploymentService } from "./deployment-service"
 import { createDeploymentHandlers } from "./handlers"
 import { DEPLOYMENT_STORE_NAME } from "./store"
 import { createCacheRunner } from "./cache-runner"
+import { notifyDeploymentFinished } from "./notification"
 
 let file: Store | undefined
 
@@ -30,6 +31,10 @@ const service = createDeploymentService({
   run: createDeploymentCommandRunner(() => process.env),
   platform: process.platform,
   runCache: createCacheRunner(),
+  notifyFinished: notifyDeploymentFinished,
 })
+
+void app.whenReady().then(() => service.startTracking())
+app.on("before-quit", () => service.stopTracking())
 
 export const deploymentHandlers = createDeploymentHandlers({ service })

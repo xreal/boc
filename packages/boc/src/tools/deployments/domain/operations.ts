@@ -15,11 +15,20 @@ export const DeploymentOperationState = Schema.Literals([
 ])
 export type DeploymentOperationState = typeof DeploymentOperationState.Type
 
+export const DeploymentJob = Schema.Struct({
+  id: Schema.Number,
+  name: Schema.String,
+  state: Schema.Union([DeploymentOperationState, Schema.Literals(["skipped", "waiting"])]),
+})
+
 export const DeploymentWorkflowOperation = Schema.Struct({
   filename: DeploymentWorkflowFilename,
   state: DeploymentOperationState,
   runId: Schema.optionalKey(Schema.String),
   runUrl: Schema.optionalKey(Schema.String),
+  jobs: Schema.optionalKey(Schema.Array(DeploymentJob)),
+  trackingUnavailable: Schema.optionalKey(Schema.Boolean),
+  completion: Schema.optionalKey(Schema.Literals(["deployment", "workflow"])),
 })
 export type DeploymentWorkflowOperation = typeof DeploymentWorkflowOperation.Type
 
@@ -32,6 +41,8 @@ export const DeploymentOperationSummary = Schema.Struct({
   state: DeploymentOperationState,
   createdAt: Schema.String,
   updatedAt: Schema.String,
+  dispatchedAt: Schema.optionalKey(Schema.String),
+  finishedAt: Schema.optionalKey(Schema.String),
 })
 export type DeploymentOperationSummary = typeof DeploymentOperationSummary.Type
 
@@ -61,6 +72,9 @@ export function isBlockingDeploymentOperation(state: DeploymentOperationState) {
 export function aggregateDeploymentOperation(states: readonly DeploymentOperationState[]): DeploymentOperationState {
   if (states.length === 0) return "unknown"
   if (states.every((state) => state === "success")) return "success"
+  // A failed sibling must not release the environment while another workflow still deploys.
+  const active = states.filter((state) => !isTerminalDeploymentOperation(state))
+  if (active.length) return OPERATION_PRECEDENCE.find((state) => active.includes(state)) ?? "unknown"
   return OPERATION_PRECEDENCE.find((state) => states.includes(state)) ?? "unknown"
 }
 

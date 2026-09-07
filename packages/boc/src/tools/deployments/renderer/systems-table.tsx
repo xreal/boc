@@ -11,6 +11,7 @@ import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { DeploymentRowDetails } from "./row-details"
 import { autoSyncOffMenuVisible, redeployMenuVisible } from "./action-visibility"
 import type { DeploymentCacheRunSnapshot } from "../rpcs"
+import { DeploymentProgress } from "./operation-progress"
 
 export function DeploymentSystemsTable(props: {
   t: BocTranslator
@@ -23,6 +24,8 @@ export function DeploymentSystemsTable(props: {
   onTurnAutoSyncOff?: (system: DeploymentSystem) => void
   onClearCache?: (system: DeploymentSystem) => void
   cacheRuns?: Record<string, DeploymentCacheRunSnapshot | undefined>
+  now: number
+  openExternal: (url: string) => void
 }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-auto">
@@ -110,6 +113,9 @@ export function DeploymentSystemsTable(props: {
                     </td>
                     <td data-deployment-column="state" class="border-b border-v2-border-border-muted px-3">
                       <SystemState t={props.t} system={system} />
+                      <Show when={system.operation}>
+                        {(operation) => <DeploymentProgress t={props.t} operation={operation()} now={props.now} />}
+                      </Show>
                     </td>
                     <td data-deployment-column="actions" class="border-b border-v2-border-border-muted pl-3 pr-4">
                       <SystemActions
@@ -127,7 +133,7 @@ export function DeploymentSystemsTable(props: {
                   <Show when={expanded()}>
                     <tr>
                       <td colspan="9" class="border-b border-v2-border-border-muted p-0">
-                        <DeploymentRowDetails t={props.t} system={system} />
+                        <DeploymentRowDetails t={props.t} system={system} openExternal={props.openExternal} />
                       </td>
                     </tr>
                   </Show>
@@ -282,7 +288,11 @@ function SystemActions(props: {
             <Show when={autoSyncOffMenuVisible(props.system)}>
               <Menu.Item
                 disabled={blocked() || !props.system.allowedActions?.includes("auto-sync")}
-                badge={blocked() || !props.system.allowedActions?.includes("auto-sync") ? props.t("boc.deployments.action.unavailable.short") : undefined}
+                badge={
+                  blocked() || !props.system.allowedActions?.includes("auto-sync")
+                    ? props.t("boc.deployments.action.unavailable.short")
+                    : undefined
+                }
                 onSelect={() => props.onTurnAutoSyncOff?.(props.system)}
               >
                 {props.t("boc.deployments.action.autoSync.off")}
