@@ -77,6 +77,7 @@ describe("development environments", () => {
     const first = fixture.backend(fixture.registered)
     expect((await setup(first, "project", fixture.checkout)).accepted).toBe(true)
     await eventually(() => expect(fixture.process.commands).toHaveLength(1))
+    await eventually(() => expect(fixture.process.observers(fixture.process.commands[0].id)).toBe(1))
     fixture.process.output(fixture.process.commands[0].id, "before handoff\n")
     fixture.process.disconnect(fixture.process.commands[0].id)
 
@@ -504,6 +505,10 @@ class FakeProcessHost implements ProcessHost {
       observer.resolve({ finalOffset: process.output.byteLength, disconnected: true }),
     )
     process.observers = []
+  }
+
+  observers(id: string) {
+    return this.#processes.get(id)?.observers.length ?? 0
   }
 }
 
