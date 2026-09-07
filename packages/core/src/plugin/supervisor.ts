@@ -22,13 +22,16 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
   operations: readonly ConfigPluginSource.Operation[],
   install: boolean,
   running: ReadonlyMap<string, Plugin.Generation>,
+  fallbacks: readonly Plugin.Generation[],
 ) {
   const matches = (selector: string, target: string) =>
     selector === "*" || (selector.endsWith(".*") ? target.startsWith(selector.slice(0, -1)) : selector === target)
-  const definitions = [...pre, ...post]
+  const definitions = [...pre, ...post, ...fallbacks]
   const enabled = new Set(definitions.map((plugin) => plugin.id))
   const packages = new Map<string, Plugin.Generation>()
   const pending = new Set<string>()
+  const unidentified = new Set<string>()
+  const fallbackOptions = new Map<string, Record<string, unknown>>()
   const failures = new Map<
     string,
     Plugin.Info & { readonly state: Extract<Plugin.State, { readonly status: "failed" }> }
@@ -36,6 +39,17 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
   const plugins = () => [...definitions, ...packages.values()]
 
   for (const operation of operations) {
+    if (operation.type === "unresolved") {
+      if (fallbacks.length) {
+        unidentified.add(operation.target)
+        failures.set(operation.target, {
+          source: pluginSource(operation.target),
+          state: { status: "failed", error: operation.error },
+          features: { server: true },
+        })
+      }
+      continue
+    }
     if (operation.type === "remove") {
       if (operation.target === "*") failures.clear()
       plugins()
@@ -52,6 +66,9 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
       operation.target.startsWith("opencode.")
     if (selectsPlugins) {
       matched.forEach((plugin) => enabled.add(plugin.id))
+      fallbacks
+        .filter((plugin) => matches(operation.target, plugin.id))
+        .forEach((plugin) => fallbackOptions.set(plugin.id, operation.options))
       continue
     }
 
@@ -66,6 +83,7 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
     )
     if ("pending" in plugin) {
       pending.add(operation.target)
+      unidentified.add(operation.target)
       continue
     }
     if ("error" in plugin) {
@@ -76,22 +94,41 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
       })
       // The new revision never became a generation, so the one already running keeps its place.
       const retained = packages.get(operation.target) ?? running.get(operation.target)
-      if (!retained) continue
+      if (!retained) {
+        unidentified.add(operation.target)
+        continue
+      }
+      unidentified.delete(operation.target)
       packages.set(operation.target, retained)
       enabled.add(retained.id)
       continue
     }
     failures.delete(operation.target)
+    unidentified.delete(operation.target)
     const previous = packages.get(operation.target)
     if (previous) enabled.delete(previous.id)
     packages.set(operation.target, plugin)
     enabled.add(plugin.id)
   }
 
+  const claimed = new Set([...pre, ...post, ...packages.values()].map((plugin) => plugin.id))
+  const available = fallbacks.filter((plugin) => enabled.has(plugin.id) && !claimed.has(plugin.id))
+  // A failed import has no trustworthy ID. Do not replace a possibly selected
+  // external plugin with a host fallback, even briefly during package installation.
+  const selected = unidentified.size ? [] : available
   const ordered = [
     ...pre.filter((plugin) => enabled.has(plugin.id)),
     ...[...packages.values()].filter((plugin) => enabled.has(plugin.id)),
     ...post.filter((plugin) => enabled.has(plugin.id)),
+    ...selected.map((plugin) => {
+      const options = fallbackOptions.get(plugin.id)
+      if (!options) return plugin
+      return {
+        ...plugin,
+        revision: JSON.stringify([plugin.revision, options]),
+        effect: (host: Parameters<typeof plugin.effect>[0]) => plugin.effect({ ...host, options }),
+      }
+    }),
   ]
   // Registry activation dies on a duplicate ID, which would drop the whole generation including builtins.
   // Keep the first occurrence in boot order and report later ones like any other plugin setup failure.
@@ -102,6 +139,18 @@ const resolve = Effect.fn("PluginSupervisor.resolve")(function* (
     packages: new Map([...packages].filter(([, plugin]) => enabled.has(plugin.id))),
     failures: [
       ...failures.values(),
+      ...(unidentified.size
+        ? available.map((plugin) => ({
+            id: Plugin.ID.make(plugin.id),
+            source: plugin.source ?? { type: "sdk" as const },
+            state: {
+              status: "failed" as const,
+              error:
+                "Host fallback not activated because a configured plugin could not be identified. Resolve the reported plugin error first.",
+            },
+            features: { server: true as const, ...plugin.features },
+          }))
+        : []),
       ...ordered.filter(duplicate).map((plugin) => ({
         id: Plugin.ID.make(plugin.id),
         source: plugin.source ?? { type: "builtin" as const },
@@ -137,12 +186,14 @@ export const layer = Layer.effectDiscard(
 
     const activate = Effect.fn("PluginSupervisor.activate")(function* () {
       const current = ++generation
+      const hosted = sdk.all()
+      const fallbacks = hosted.filter((plugin) => plugin.fallback)
       // Combine internal plugins with host-contributed plugins in boot order.
       // Instance-bound plugins come last: later activation can override earlier
       // container writes, so the instance's explicit choices win over globals.
       const pre = [
         ...internal.pre.map((plugin) => ({ ...plugin, revision: "internal", source: { type: "builtin" as const } })),
-        ...sdk.all(),
+        ...hosted.filter((plugin) => !plugin.fallback),
         ...instance.all(),
       ]
       const post = internal.post.map((plugin) => ({
@@ -152,7 +203,7 @@ export const layer = Layer.effectDiscard(
       }))
       const operations = yield* sources.operations()
       // Activate everything available locally before waiting on missing package installs.
-      const immediate = yield* resolve(modules, pre, post, operations, false, running)
+      const immediate = yield* resolve(modules, pre, post, operations, false, running, fallbacks)
       const source = (source: Plugin.Source) =>
         source.type === "package"
           ? {
@@ -168,7 +219,7 @@ export const layer = Layer.effectDiscard(
         )
       yield* apply(immediate)
       const resolved = immediate.pending.length
-        ? yield* resolve(modules, pre, post, operations, true, running)
+        ? yield* resolve(modules, pre, post, operations, true, running, fallbacks)
         : immediate
       if (resolved !== immediate) yield* apply(resolved)
       running = resolved.packages
