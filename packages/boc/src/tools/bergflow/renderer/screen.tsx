@@ -67,247 +67,252 @@ export default function BergflowScreen(props: BocScreenProps) {
     setFilters({ search: "", category: "all" })
   }
   return (
-    <main data-boc-bergflow class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto text-v2-text-text-base">
-      <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-4 sm:p-6">
-        <header class="bergflow-header flex flex-wrap items-center justify-between gap-3">
-          <div class="flex items-center gap-3">
-            <span class="bergflow-mark" aria-hidden="true">
-              <Icon name="outline-sliders" size="large" />
-            </span>
-            <div>
-              <h1 class="text-20-medium">{t("boc.bergflow.title")}</h1>
-              <p class="mt-1 text-13-regular text-v2-text-text-muted">{t("boc.bergflow.subtitle")}</p>
-            </div>
-          </div>
-          <Button
-            variant="outline"
-            onClick={() => void preserveFocus(control.refresh)}
-            disabled={!view.selection || view.loading || !!view.pending}
-          >
-            {t(view.loading && view.snapshot ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
-          </Button>
-        </header>
-        <div class="bergflow-context">
-          <div class="flex flex-wrap gap-3" aria-busy={!!view.pending}>
-            <label class="flex min-w-[160px] flex-1 flex-col gap-1 text-12-medium">
-              {t("boc.bergflow.server")}
-              <select
-                aria-label={t("boc.bergflow.server")}
-                class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                value={selectedServer()}
-                disabled={!!view.pending}
-                onChange={(event) => selectServer(event.currentTarget.value)}
-              >
-                <option value="">{t("boc.bergflow.selectServer")}</option>
-                <For each={host.servers()}>{(server) => <option value={server.key}>{server.name}</option>}</For>
-                <Show when={view.selection && !serverInfo()}>
-                  <option value={view.selection?.server}>{t("boc.bergflow.error.unavailable")}</option>
-                </Show>
-              </select>
-            </label>
-            <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
-              {t("boc.bergflow.project")}
-              <select
-                aria-label={t("boc.bergflow.project")}
-                class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                value={view.selection?.project ?? ""}
-                disabled={!!view.pending || !serverInfo()}
-                onChange={(event) => {
-                  const root = event.currentTarget.value
-                  if (root) control.select({ server: selectedServer(), project: root, directory: root })
-                }}
-              >
-                <option value="">{t("boc.bergflow.selectProject")}</option>
-                <For each={serverInfo()?.projects}>
-                  {(project) => <option value={project.directory}>{project.name}</option>}
-                </For>
-                <Show when={view.selection && !projectInfo()}>
-                  <option value={view.selection?.project}>{view.selection?.project}</option>
-                </Show>
-              </select>
-            </label>
-            <Show when={locations().length > 1}>
-              <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
-                {t("boc.bergflow.worktree")}
+    <main
+      data-boc-bergflow
+      data-boc-screen="bergflow"
+      class="mx-2 mb-[var(--shell-bottom-inset,8px)] mt-[var(--shell-top-inset,8px)] flex min-h-0 min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-[10px] bg-v2-background-bg-base text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
+    >
+      <header class="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-muted px-4">
+        <h1 class="min-w-0 truncate text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+          {t("boc.bergflow.title")}
+        </h1>
+        <Button
+          variant="outline"
+          size="small"
+          onClick={() => void preserveFocus(control.refresh)}
+          disabled={!view.selection || view.loading || !!view.pending}
+        >
+          {t(view.loading && view.snapshot ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
+        </Button>
+      </header>
+      <div class="min-h-0 flex-1 overflow-y-auto">
+        <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-4 sm:p-6">
+          <div class="bergflow-context">
+            <div class="flex flex-wrap gap-3" aria-busy={!!view.pending}>
+              <label class="flex min-w-[160px] flex-1 flex-col gap-1 text-12-medium">
+                {t("boc.bergflow.server")}
                 <select
-                  aria-label={t("boc.bergflow.worktree")}
-                  dir="ltr"
+                  aria-label={t("boc.bergflow.server")}
                   class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                  value={view.selection?.directory}
+                  value={selectedServer()}
                   disabled={!!view.pending}
-                  onChange={(event) => {
-                    const selection = view.selection
-                    if (selection) control.select({ ...selection, directory: event.currentTarget.value })
-                  }}
+                  onChange={(event) => selectServer(event.currentTarget.value)}
                 >
-                  <For each={locations()}>{(directory) => <option value={directory}>{directory}</option>}</For>
+                  <option value="">{t("boc.bergflow.selectServer")}</option>
+                  <For each={host.servers()}>{(server) => <option value={server.key}>{server.name}</option>}</For>
+                  <Show when={view.selection && !serverInfo()}>
+                    <option value={view.selection?.server}>{t("boc.bergflow.error.unavailable")}</option>
+                  </Show>
                 </select>
               </label>
-            </Show>
-          </div>
-          <Show when={view.selection}>
-            <div class="flex flex-col gap-1 text-12-regular text-v2-text-text-muted">
-              <p class="break-words">
-                <bdi dir="ltr">{view.snapshot?.info.location.directory ?? view.selection?.directory}</bdi>
-              </p>
-              <p>{t("boc.bergflow.scope")}</p>
-              <Show when={view.pending}>
-                <p role="status">{t("boc.bergflow.contextLocked")}</p>
+              <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
+                {t("boc.bergflow.project")}
+                <select
+                  aria-label={t("boc.bergflow.project")}
+                  class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
+                  value={view.selection?.project ?? ""}
+                  disabled={!!view.pending || !serverInfo()}
+                  onChange={(event) => {
+                    const root = event.currentTarget.value
+                    if (root) control.select({ server: selectedServer(), project: root, directory: root })
+                  }}
+                >
+                  <option value="">{t("boc.bergflow.selectProject")}</option>
+                  <For each={serverInfo()?.projects}>
+                    {(project) => <option value={project.directory}>{project.name}</option>}
+                  </For>
+                  <Show when={view.selection && !projectInfo()}>
+                    <option value={view.selection?.project}>{view.selection?.project}</option>
+                  </Show>
+                </select>
+              </label>
+              <Show when={locations().length > 1}>
+                <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
+                  {t("boc.bergflow.worktree")}
+                  <select
+                    aria-label={t("boc.bergflow.worktree")}
+                    dir="ltr"
+                    class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
+                    value={view.selection?.directory}
+                    disabled={!!view.pending}
+                    onChange={(event) => {
+                      const selection = view.selection
+                      if (selection) control.select({ ...selection, directory: event.currentTarget.value })
+                    }}
+                  >
+                    <For each={locations()}>{(directory) => <option value={directory}>{directory}</option>}</For>
+                  </select>
+                </label>
               </Show>
             </div>
+            <Show when={view.selection}>
+              <div class="flex flex-col gap-1 text-12-regular text-v2-text-text-muted">
+                <p class="break-words">
+                  <bdi dir="ltr">{view.snapshot?.info.location.directory ?? view.selection?.directory}</bdi>
+                </p>
+                <p>{t("boc.bergflow.scope")}</p>
+                <Show when={view.pending}>
+                  <p role="status">{t("boc.bergflow.contextLocked")}</p>
+                </Show>
+              </div>
+            </Show>
+          </div>
+          <div role="status" aria-live="polite" aria-atomic="true" class="bergflow-feedback text-13-regular">
+            <Show when={view.error}>{(error) => <p>{t(`boc.bergflow.error.${error()}`)}</p>}</Show>
+            <Show when={view.stale && view.snapshot}>
+              <p class="mt-1 text-v2-text-text-muted">{t("boc.bergflow.stale")}</p>
+            </Show>
+          </div>
+          <Show when={view.error === "missing" || view.error === "disabled" || view.error === "unsupported"}>
+            <details class="rounded-lg border border-v2-border-border-base p-3 text-13-regular">
+              <summary class="cursor-pointer">{t("boc.bergflow.admin")}</summary>
+              <p class="mt-2 leading-relaxed text-v2-text-text-muted">{t("boc.bergflow.adminText")}</p>
+            </details>
           </Show>
-        </div>
-        <div role="status" aria-live="polite" aria-atomic="true" class="bergflow-feedback text-13-regular">
-          <Show when={view.error}>{(error) => <p>{t(`boc.bergflow.error.${error()}`)}</p>}</Show>
-          <Show when={view.stale && view.snapshot}>
-            <p class="mt-1 text-v2-text-text-muted">{t("boc.bergflow.stale")}</p>
-          </Show>
-        </div>
-        <Show when={view.error === "missing" || view.error === "disabled" || view.error === "unsupported"}>
-          <details class="rounded-lg border border-v2-border-border-base p-3 text-13-regular">
-            <summary class="cursor-pointer">{t("boc.bergflow.admin")}</summary>
-            <p class="mt-2 leading-relaxed text-v2-text-text-muted">{t("boc.bergflow.adminText")}</p>
-          </details>
-        </Show>
-        <Show
-          when={view.selection}
-          fallback={<p class="py-12 text-center text-v2-text-text-muted">{t("boc.bergflow.choose")}</p>}
-        >
           <Show
-            when={!view.loading || view.snapshot}
-            fallback={
-              <div aria-busy="true" class="flex flex-col gap-3">
-                <For each={[1, 2, 3, 4]}>
-                  {() => <div class="h-20 animate-pulse rounded-lg bg-v2-background-bg-layer-01" />}
-                </For>
-              </div>
-            }
+            when={view.selection}
+            fallback={<p class="py-12 text-center text-v2-text-text-muted">{t("boc.bergflow.choose")}</p>}
           >
-            <Show when={view.snapshot}>
-              <div class="bergflow-filters">
-                <TextField
-                  class="min-w-[200px] flex-1"
-                  label={t("boc.bergflow.search")}
-                  value={filters.search}
-                  onChange={(search) => setFilters("search", search)}
-                  placeholder={t("boc.bergflow.search")}
-                />
-                <div class="bergflow-categories" role="group" aria-label={t("boc.bergflow.filter")}>
-                  <For each={["all", ...kinds] as const}>
-                    {(kind) => (
-                      <button
-                        type="button"
-                        aria-pressed={filters.category === kind}
-                        onClick={() => setFilters("category", kind)}
-                      >
-                        <Icon name={kind === "all" ? "outline-sliders" : categoryIcons[kind]} />
-                        {t(`boc.bergflow.${kind}`)}
-                        <span>
-                          {
-                            view.snapshot?.items.filter(
-                              (item) => item.present && (kind === "all" || item.kind === kind),
-                            ).length
-                          }
-                        </span>
-                      </button>
-                    )}
+            <Show
+              when={!view.loading || view.snapshot}
+              fallback={
+                <div aria-busy="true" class="flex flex-col gap-3">
+                  <For each={[1, 2, 3, 4]}>
+                    {() => <div class="h-20 animate-pulse rounded-lg bg-v2-background-bg-layer-01" />}
                   </For>
                 </div>
-              </div>
-              <Show when={view.snapshot?.incomplete.length}>
-                <p class="bergflow-notice text-12-regular">
-                  <Icon name="info" />
-                  {t("boc.bergflow.partial")}
-                </p>
-              </Show>
-              <For each={kinds}>
-                {(kind) => {
-                  const items = () => filtered().filter((item) => item.kind === kind && item.present)
-                  return (
-                    <Show when={items().length}>
-                      <section class="min-w-0">
-                        <h2 class="mb-2 flex items-center gap-2 text-14-medium">
-                          <span class="bergflow-category-icon" aria-hidden="true">
-                            <Icon name={categoryIcons[kind]} />
-                          </span>
-                          {t(`boc.bergflow.${kind}`)}{" "}
-                          <span class="bergflow-count text-12-regular text-v2-text-text-muted">{items().length}</span>
-                        </h2>
-                        <Show
-                          when={(kind === "agent" || kind === "instruction") && items().every((item) => !item.mutable)}
+              }
+            >
+              <Show when={view.snapshot}>
+                <div class="bergflow-filters">
+                  <TextField
+                    class="min-w-[200px] flex-1"
+                    label={t("boc.bergflow.search")}
+                    value={filters.search}
+                    onChange={(search) => setFilters("search", search)}
+                    placeholder={t("boc.bergflow.search")}
+                  />
+                  <div class="bergflow-categories" role="group" aria-label={t("boc.bergflow.filter")}>
+                    <For each={["all", ...kinds] as const}>
+                      {(kind) => (
+                        <button
+                          type="button"
+                          aria-pressed={filters.category === kind}
+                          onClick={() => setFilters("category", kind)}
                         >
-                          <p class="bergflow-readonly-note text-12-regular text-v2-text-text-muted">
-                            {t(kind === "agent" ? "boc.bergflow.readOnly.agent" : "boc.bergflow.readOnly.instruction")}
-                          </p>
-                        </Show>
-                        <div class="bergflow-cards">
-                          <For each={items()}>
-                            {(item) => (
-                              <ControlRow
-                                item={item}
-                                t={t}
-                                disabled={disabled()}
-                                pending={view.pending === item.key}
-                                error={view.rowError?.key === item.key ? view.rowError.error : undefined}
-                                operations={view.snapshot?.info.operations ?? []}
-                                change={(action, enabled) =>
-                                  void preserveFocus(() => control.mutate(item, action, enabled))
-                                }
-                              />
-                            )}
-                          </For>
-                        </div>
-                      </section>
-                    </Show>
-                  )
-                }}
-              </For>
-              <Show when={filtered().some((item) => !item.present)}>
-                <details class="rounded-lg border border-v2-border-border-base p-3">
-                  <summary class="cursor-pointer text-13-medium">{t("boc.bergflow.orphans")}</summary>
-                  <For each={filtered().filter((item) => !item.present)}>
-                    {(item) => (
-                      <ControlRow
-                        item={item}
-                        t={t}
-                        disabled={disabled()}
-                        pending={view.pending === item.key}
-                        error={view.rowError?.key === item.key ? view.rowError.error : undefined}
-                        operations={view.snapshot?.info.operations ?? []}
-                        change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
-                      />
-                    )}
-                  </For>
-                </details>
-              </Show>
-              <Show when={filtered().length === 0}>
-                <div class="flex flex-col items-center gap-3 py-10 text-v2-text-text-muted">
-                  <p>{t(view.snapshot?.items.length ? "boc.bergflow.noMatches" : "boc.bergflow.empty")}</p>
-                  <Show when={filters.search || filters.category !== "all"}>
-                    <Button variant="outline" onClick={clearFilters}>
-                      {t("boc.bergflow.clearFilters")}
-                    </Button>
-                  </Show>
+                          <Icon name={kind === "all" ? "outline-sliders" : categoryIcons[kind]} />
+                          {t(`boc.bergflow.${kind}`)}
+                          <span>
+                            {
+                              view.snapshot?.items.filter(
+                                (item) => item.present && (kind === "all" || item.kind === kind),
+                              ).length
+                            }
+                          </span>
+                        </button>
+                      )}
+                    </For>
+                  </div>
                 </div>
+                <Show when={view.snapshot?.incomplete.length}>
+                  <p class="bergflow-notice text-12-regular">
+                    <Icon name="info" />
+                    {t("boc.bergflow.partial")}
+                  </p>
+                </Show>
+                <For each={kinds}>
+                  {(kind) => {
+                    const items = () => filtered().filter((item) => item.kind === kind && item.present)
+                    return (
+                      <Show when={items().length}>
+                        <section class="min-w-0">
+                          <h2 class="mb-2 flex items-center gap-2 text-14-medium">
+                            <span class="bergflow-category-icon" aria-hidden="true">
+                              <Icon name={categoryIcons[kind]} />
+                            </span>
+                            {t(`boc.bergflow.${kind}`)}{" "}
+                            <span class="bergflow-count text-12-regular text-v2-text-text-muted">{items().length}</span>
+                          </h2>
+                          <Show
+                            when={
+                              (kind === "agent" || kind === "instruction") && items().every((item) => !item.mutable)
+                            }
+                          >
+                            <p class="bergflow-readonly-note text-12-regular text-v2-text-text-muted">
+                              {t(
+                                kind === "agent" ? "boc.bergflow.readOnly.agent" : "boc.bergflow.readOnly.instruction",
+                              )}
+                            </p>
+                          </Show>
+                          <div class="bergflow-cards">
+                            <For each={items()}>
+                              {(item) => (
+                                <ControlRow
+                                  item={item}
+                                  t={t}
+                                  disabled={disabled()}
+                                  pending={view.pending === item.key}
+                                  error={view.rowError?.key === item.key ? view.rowError.error : undefined}
+                                  operations={view.snapshot?.info.operations ?? []}
+                                  change={(action, enabled) =>
+                                    void preserveFocus(() => control.mutate(item, action, enabled))
+                                  }
+                                />
+                              )}
+                            </For>
+                          </div>
+                        </section>
+                      </Show>
+                    )
+                  }}
+                </For>
+                <Show when={filtered().some((item) => !item.present)}>
+                  <details class="rounded-lg border border-v2-border-border-base p-3">
+                    <summary class="cursor-pointer text-13-medium">{t("boc.bergflow.orphans")}</summary>
+                    <For each={filtered().filter((item) => !item.present)}>
+                      {(item) => (
+                        <ControlRow
+                          item={item}
+                          t={t}
+                          disabled={disabled()}
+                          pending={view.pending === item.key}
+                          error={view.rowError?.key === item.key ? view.rowError.error : undefined}
+                          operations={view.snapshot?.info.operations ?? []}
+                          change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
+                        />
+                      )}
+                    </For>
+                  </details>
+                </Show>
+                <Show when={filtered().length === 0}>
+                  <div class="flex flex-col items-center gap-3 py-10 text-v2-text-text-muted">
+                    <p>{t(view.snapshot?.items.length ? "boc.bergflow.noMatches" : "boc.bergflow.empty")}</p>
+                    <Show when={filters.search || filters.category !== "all"}>
+                      <Button variant="outline" onClick={clearFilters}>
+                        {t("boc.bergflow.clearFilters")}
+                      </Button>
+                    </Show>
+                  </div>
+                </Show>
+                <footer class="flex flex-col gap-1 border-t border-v2-border-border-base pt-4 text-12-regular text-v2-text-text-muted">
+                  <p>{t("boc.bergflow.running")}</p>
+                  <p>
+                    {t("boc.bergflow.version", {
+                      version: view.snapshot?.info.version ?? "",
+                      protocol: view.snapshot?.info.protocol ?? 1,
+                    })}{" "}
+                    ·{" "}
+                    {t(
+                      view.snapshot?.info.source === "unknown"
+                        ? "boc.bergflow.sourceUnknown"
+                        : `boc.bergflow.${view.snapshot?.info.source ?? "bundled"}`,
+                    )}
+                  </p>
+                </footer>
               </Show>
-              <footer class="flex flex-col gap-1 border-t border-v2-border-border-base pt-4 text-12-regular text-v2-text-text-muted">
-                <p>{t("boc.bergflow.running")}</p>
-                <p>
-                  {t("boc.bergflow.version", {
-                    version: view.snapshot?.info.version ?? "",
-                    protocol: view.snapshot?.info.protocol ?? 1,
-                  })}{" "}
-                  ·{" "}
-                  {t(
-                    view.snapshot?.info.source === "unknown"
-                      ? "boc.bergflow.sourceUnknown"
-                      : `boc.bergflow.${view.snapshot?.info.source ?? "bundled"}`,
-                  )}
-                </p>
-              </footer>
             </Show>
           </Show>
-        </Show>
+        </div>
       </div>
     </main>
   )
@@ -324,6 +329,7 @@ function ControlRow(props: {
 }) {
   const statusID = createUniqueId()
   const desired = () => props.item.override ?? props.item.defaultEnabled ?? props.item.effective === "enabled"
+  const showStatus = () => props.pending || props.item.application === "failed" || props.item.effective === "disabled"
   return (
     <article class="bergflow-card min-w-0 p-3 sm:p-4" aria-busy={props.pending}>
       <div class="flex items-start justify-between gap-4">
@@ -335,19 +341,21 @@ function ControlRow(props: {
             <bdi dir="auto">{props.item.source || props.t("boc.bergflow.sourceUnknown")}</bdi> ·{" "}
             {props.t(props.item.override === null ? "boc.bergflow.default" : "boc.bergflow.override")}
           </p>
-          <p
-            id={statusID}
-            class="bergflow-status mt-2 text-12-regular"
-            data-state={
-              props.pending ? "pending" : props.item.application === "failed" ? "failed" : props.item.effective
-            }
-          >
-            {props.pending
-              ? props.t("boc.bergflow.applying")
-              : props.item.application === "failed"
-                ? props.t("boc.bergflow.savedPending")
-                : props.t(`boc.bergflow.${props.item.effective}`)}
-          </p>
+          <Show when={showStatus()}>
+            <p
+              id={statusID}
+              class="bergflow-status mt-2 text-12-regular"
+              data-state={
+                props.pending ? "pending" : props.item.application === "failed" ? "failed" : props.item.effective
+              }
+            >
+              {props.pending
+                ? props.t("boc.bergflow.applying")
+                : props.item.application === "failed"
+                  ? props.t("boc.bergflow.savedPending")
+                  : props.t(`boc.bergflow.${props.item.effective}`)}
+            </p>
+          </Show>
           <Show
             when={
               props.item.availability === "needs_auth" ||
@@ -372,7 +380,7 @@ function ControlRow(props: {
             checked={desired()}
             disabled={props.disabled}
             onChange={(enabled) => props.change("set", enabled)}
-            aria-describedby={statusID}
+            aria-describedby={showStatus() ? statusID : undefined}
           >
             {props.item.name}
           </Switch>

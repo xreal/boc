@@ -112,7 +112,7 @@ function ControlsPreview() {
 }
 
 export default {
-  title: "Boc/Bergflow Controls",
+  title: "Boc/Project Controls",
   id: "boc-bergflow",
   component: ControlsPreview,
   parameters: { layout: "fullscreen" },

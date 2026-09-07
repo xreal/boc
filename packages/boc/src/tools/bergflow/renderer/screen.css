@@ -1,29 +1,9 @@
 [data-boc-bergflow] {
-  background: var(--v2-background-bg-deep);
-
-  .bergflow-header {
-    padding-block: 8px;
-  }
-
-  .bergflow-mark {
-    display: grid;
-    place-items: center;
-    flex-shrink: 0;
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    color: var(--v2-icon-icon-accent);
-    background: color-mix(in srgb, var(--v2-icon-icon-accent) 14%, var(--v2-background-bg-base));
-    border: 1px solid color-mix(in srgb, var(--v2-icon-icon-accent) 24%, transparent);
-    box-shadow: var(--shadow-xs);
-  }
-
   .bergflow-context {
     display: grid;
     gap: 14px;
     padding: 18px;
     border: 1px solid var(--v2-border-border-base);
-    border-block-start: 2px solid var(--v2-icon-icon-accent);
     border-radius: 12px;
     background: var(--v2-background-bg-base);
     box-shadow: var(--shadow-xs);
@@ -149,12 +129,6 @@
       background: currentColor;
     }
 
-    &[data-state="enabled"] {
-      background: var(--v2-state-bg-success);
-      color: var(--v2-state-fg-success);
-    }
-
-    &[data-state="unknown"],
     &[data-state="pending"] {
       background: var(--v2-state-bg-warning);
       color: var(--v2-state-fg-warning);
@@ -175,10 +149,17 @@
   }
 
   button:focus-visible,
-  select:focus-visible,
   summary:focus-visible {
     outline: 2px solid var(--v2-border-border-focus);
     outline-offset: 3px;
+  }
+
+  select:focus,
+  [data-component="input"][data-variant="normal"] [data-slot="input-wrapper"]:focus-within:not(:has([data-readonly])) {
+    border-color: var(--v2-border-border-focus);
+    outline: 2px solid var(--v2-border-border-focus);
+    outline-offset: 2px;
+    box-shadow: none;
   }
 }
 
