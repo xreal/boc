@@ -1,5 +1,9 @@
 export const bergflowEnglish = {
   "boc.bergflow.title": "Project Controls",
+  "boc.bergflow.origin.system": "System · bundled with OpenCode",
+  "boc.bergflow.origin.global": "Global · user configuration",
+  "boc.bergflow.origin.project": "Project · checkout configuration",
+  "boc.bergflow.origin.unknown": "Origin not reported",
   "boc.bergflow.subtitle": "Your project. Your capabilities.",
   "boc.bergflow.readOnly": "Read-only",
   "boc.bergflow.readOnly.agent":

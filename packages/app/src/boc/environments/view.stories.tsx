@@ -1,8 +1,9 @@
 import type { BocEnvironmentState } from "@opencode-ai/client/promise"
-import { onCleanup } from "solid-js"
+import { onCleanup, Show } from "solid-js"
+import { Menu } from "@opencode-ai/ui/menu"
 import { environmentFixtures, type EnvironmentFixtureName } from "./fixtures"
 import { createEnvironmentResource } from "./store"
-import { EnvironmentControl, type EnvironmentActionTarget } from "./view"
+import { EnvironmentControl, EnvironmentContextMenu, type EnvironmentActionTarget } from "./view"
 
 const target = {
   server: { type: "sidecar", variant: "base", http: { url: "http://storybook.local" } },
@@ -31,7 +32,7 @@ function activeRun(environment: BocEnvironmentState, action: "setup" | "start" |
   }
 }
 
-function EnvironmentPreview(props: { fixture: EnvironmentFixtureName; enabled: boolean }) {
+function EnvironmentPreview(props: { fixture: EnvironmentFixtureName; enabled: boolean; contextMenu?: boolean }) {
   const resource = createEnvironmentResource({
     server: "sidecar",
     projectID: target.session.projectID,
@@ -53,6 +54,22 @@ function EnvironmentPreview(props: { fixture: EnvironmentFixtureName; enabled: b
 
   return (
     <div class="flex min-h-40 items-start justify-end bg-v2-background-bg-base p-4">
+      <Show when={props.contextMenu}>
+        <Menu>
+          <Menu.Trigger>Session menu</Menu.Trigger>
+          <Menu.Portal>
+            <Menu.Content>
+              <EnvironmentContextMenu
+                target={target}
+                resource={resource}
+                settingsReady={() => true}
+                enabled={() => props.enabled}
+                domain={() => "shop.localhost"}
+              />
+            </Menu.Content>
+          </Menu.Portal>
+        </Menu>
+      </Show>
       <EnvironmentControl
         target={target}
         resource={resource}
@@ -76,6 +93,7 @@ export default {
 }
 
 export const Running = {}
+export const ContextMenu = { args: { contextMenu: true } }
 export const SetupRunning = { args: { fixture: "setupRunning" } }
 export const SetupFailed = { args: { fixture: "setupFailed" } }
 export const SetupCancelled = { args: { fixture: "setupCancelled" } }

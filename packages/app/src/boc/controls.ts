@@ -34,6 +34,12 @@ export function createBocControls(): BergflowHost {
         return {
           key: ServerConnection.key(server),
           name: serverName(server),
+          globalDirectories: [
+            ctx.sync.data.path.config,
+            ...(ctx.sync.data.path.home
+              ? [`${ctx.sync.data.path.home}/.agents`, `${ctx.sync.data.path.home}/.claude`]
+              : []),
+          ].filter(Boolean),
           projects: [...projects.values()].map((project) => ({
             directory: project.worktree,
             name: project.name ?? project.worktree,

@@ -27,6 +27,7 @@ import { SessionErrorFallback } from "./route-error"
 import { createSessionResolution } from "./session-resolution"
 import { SessionScreen } from "./screen"
 import { PreparingComposer } from "./preparing-composer"
+import { BocPreparingCheckout } from "@/boc/environments/preparing"
 
 export function TargetSessionRouteContent() {
   const params = useParams<{ serverKey: string; id: string }>()
@@ -84,6 +85,7 @@ function PreparingSession(props: { sessionID: string; pending: PendingSession })
             >
               <TextShimmer text={language.t("session.new.worktree.creating")} active />
             </div>
+            <BocPreparingCheckout pending={props.pending} />
           </div>
         </div>
         <PreparingComposer pending={props.pending} />

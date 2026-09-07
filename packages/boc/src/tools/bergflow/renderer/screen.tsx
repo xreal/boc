@@ -2,12 +2,14 @@ import type { ControlItem } from "@bergflow/opencode/rpc"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Switch } from "@opencode-ai/ui/switch"
-import { TextField } from "@opencode-ai/ui/text-field"
-import { createMemo, createUniqueId, For, Show } from "solid-js"
+import { TextInput } from "@opencode-ai/ui/text-input"
+import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { createMemo, createUniqueId, For, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocScreenProps } from "../../../registry"
 import { createBocTranslator, type BocTranslator } from "../../../renderer/i18n"
 import { createBergflowControls, type ControlError } from "./state"
+import { controlOrigin } from "./origin"
 import "./screen.css"
 
 const kinds = ["agent", "skill", "tool", "mcp", "instruction"] as const
@@ -18,6 +20,8 @@ const categoryIcons = {
   mcp: "status",
   instruction: "edit",
 } as const
+
+const originIcons = { system: "server", global: "settings-gear", project: "folder", unknown: "help" } as const
 
 export default function BergflowScreen(props: BocScreenProps) {
   const t = createBocTranslator(props.host.locale)
@@ -37,6 +41,19 @@ export default function BergflowScreen(props: BocScreenProps) {
     server && project && directory ? { server, project, directory } : undefined,
   )
   const view = control.view
+  let searchInput: HTMLInputElement | undefined
+  onMount(() => {
+    const find = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "f") return
+      if (!searchInput?.isConnected || document.querySelector('[role="dialog"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      searchInput.focus()
+      searchInput.select()
+    }
+    window.addEventListener("keydown", find, { capture: true })
+    onCleanup(() => window.removeEventListener("keydown", find, { capture: true }))
+  })
   const [filters, setFilters] = createStore({ search: "", category: "all", server: "" })
   const selectedServer = () => view.selection?.server ?? filters.server
   const serverInfo = () => host.servers().find((server) => server.key === selectedServer())
@@ -44,6 +61,11 @@ export default function BergflowScreen(props: BocScreenProps) {
   const locations = () => [
     ...new Set([...(projectInfo()?.locations ?? []), ...(view.selection ? [view.selection.directory] : [])]),
   ]
+  const origin = (item: ControlItem) =>
+    controlOrigin(item.source, {
+      project: [view.snapshot?.info.project.canonical ?? "", ...locations()],
+      global: serverInfo()?.globalDirectories ?? [],
+    })
   const filtered = createMemo(() => {
     const query = filters.search.trim().toLocaleLowerCase()
     return (
@@ -185,11 +207,13 @@ export default function BergflowScreen(props: BocScreenProps) {
             >
               <Show when={view.snapshot}>
                 <div class="bergflow-filters">
-                  <TextField
-                    class="min-w-[200px] flex-1"
-                    label={t("boc.bergflow.search")}
+                  <TextInput
+                    ref={searchInput}
+                    class="bergflow-search"
+                    aria-label={t("boc.bergflow.search")}
+                    leadingIcon={<Icon name="magnifying-glass" />}
                     value={filters.search}
-                    onChange={(search) => setFilters("search", search)}
+                    onInput={(event) => setFilters("search", event.currentTarget.value)}
                     placeholder={t("boc.bergflow.search")}
                   />
                   <div class="bergflow-categories" role="group" aria-label={t("boc.bergflow.filter")}>
@@ -254,6 +278,7 @@ export default function BergflowScreen(props: BocScreenProps) {
                               {(item) => (
                                 <ControlRow
                                   item={item}
+                                  origin={origin(item)}
                                   t={t}
                                   disabled={disabled()}
                                   pending={view.pending === item.key}
@@ -278,6 +303,7 @@ export default function BergflowScreen(props: BocScreenProps) {
                       {(item) => (
                         <ControlRow
                           item={item}
+                          origin={origin(item)}
                           t={t}
                           disabled={disabled()}
                           pending={view.pending === item.key}
@@ -325,6 +351,7 @@ export default function BergflowScreen(props: BocScreenProps) {
 
 function ControlRow(props: {
   item: ControlItem
+  origin: ReturnType<typeof controlOrigin>
   t: BocTranslator
   disabled: boolean
   pending: boolean
@@ -339,7 +366,17 @@ function ControlRow(props: {
     <article class="bergflow-card min-w-0 p-3 sm:p-4" aria-busy={props.pending}>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
-          <h3 class="break-words text-14-medium">
+          <h3 class="flex items-start gap-2 break-words text-14-medium" aria-label={props.item.name}>
+            <Tooltip value={props.t(`boc.bergflow.origin.${props.origin}`)}>
+              <span
+                class="bergflow-origin"
+                data-origin={props.origin}
+                role="img"
+                aria-label={props.t(`boc.bergflow.origin.${props.origin}`)}
+              >
+                <Icon name={originIcons[props.origin]} size="small" />
+              </span>
+            </Tooltip>
             <bdi>{props.item.name}</bdi>
           </h3>
           <p class="mt-1 break-words text-12-regular text-v2-text-text-muted">

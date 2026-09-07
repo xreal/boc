@@ -10,6 +10,8 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { actionLabel, resourceAnnouncement, type EnvironmentActionTarget } from "./view"
 import { environmentDuration, retryableEnvironmentAction } from "./model"
 import type { EnvironmentResource } from "./store"
+import { environmentOutput } from "./output"
+import "./dialog.css"
 
 export function EnvironmentDetailsDialog(props: {
   target: EnvironmentActionTarget
@@ -19,12 +21,17 @@ export function EnvironmentDetailsDialog(props: {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const dialog = useDialog()
-  const [view, setView] = createStore({ following: true })
+  const [view, setView] = createStore({ following: true, now: Date.now() })
   let log: HTMLPreElement | undefined
   let frame: number | undefined
 
   const environment = () => props.resource.state.environment
   const run = () => environment()?.latestRun
+  createEffect(() => {
+    if (run()?.status !== "running") return
+    const timer = setInterval(() => setView("now", Date.now()), 1000)
+    onCleanup(() => clearInterval(timer))
+  })
   const retry = () => retryableEnvironmentAction(environment())
   const configuredStack = () => {
     const stack = environment()?.stack
@@ -50,9 +57,7 @@ export function EnvironmentDetailsDialog(props: {
     const action = retry()
     if (!action) return
     if (action === "remove") {
-      dialog.push(() => (
-        <EnvironmentRemoveDialog target={props.target} resource={props.resource} />
-      ))
+      dialog.push(() => <EnvironmentRemoveDialog target={props.target} resource={props.resource} />)
       return
     }
     await props.resource.run(action, props.target.session.id, {
@@ -61,42 +66,61 @@ export function EnvironmentDetailsDialog(props: {
   }
 
   return (
-    <Dialog size="large" class="max-h-[min(760px,calc(100vh-32px))] overflow-hidden">
+    <Dialog size="large" fit containerClass="boc-environment-dialog">
       <DialogHeader closeLabel={t("boc.environments.close")}>
-        <DialogTitleGroup
-          title={t("boc.environments.title")}
-          description={t("boc.environments.details.description")}
-        />
+        <DialogTitleGroup title={t("boc.environments.title")} description={t("boc.environments.details.description")} />
       </DialogHeader>
       <DialogBody class="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 pb-5">
         <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
           <StatusCard
             label={t("boc.environments.details.availability")}
             value={availabilityLabel(t, environment())}
-            tone={environment()?.availability.available ? "neutral" : "danger"}
+            tone={!environment() ? "neutral" : environment()?.availability.available ? "success" : "danger"}
           />
           <StatusCard
             label={t("boc.environments.details.stack")}
             value={stackLabel(t, environment())}
-            tone={environment()?.stack.status === "invalid" ? "danger" : "neutral"}
+            tone={
+              environment()?.stack.status === "invalid"
+                ? "danger"
+                : environment()?.stack.status === "configured"
+                  ? "success"
+                  : "neutral"
+            }
           />
           <StatusCard
             label={t("boc.environments.details.containers")}
             value={containerLabel(t, environment())}
-            tone={environment()?.containers.status === "partial" ? "warning" : "neutral"}
+            tone={
+              environment()?.containers.status === "partial"
+                ? "warning"
+                : environment()?.containers.status === "running"
+                  ? "success"
+                  : "neutral"
+            }
           />
           <StatusCard
             label={t("boc.environments.details.application")}
             value={httpLabel(t, environment())}
-            tone={environment()?.http.status === "unreachable" ? "danger" : "neutral"}
+            tone={
+              environment()?.http.status === "unreachable"
+                ? "danger"
+                : environment()?.http.status === "ready"
+                  ? "success"
+                  : "neutral"
+            }
           />
         </div>
 
         <Show when={configuredStack()} keyed>
           {(stack) => (
-            <div class="rounded-md border border-v2-border-border-base bg-v2-background-bg-inset px-3 py-2 text-12-regular leading-text-base text-v2-text-text-muted">
-              <bdi class="block break-all text-v2-text-text-base">{stack.url}</bdi>
-              <bdi class="block break-all">{stack.stackID}</bdi>
+            <div class="rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-3 py-2 text-12-regular leading-text-base text-v2-text-text-muted">
+              <bdi dir="ltr" class="block break-all text-v2-text-text-base">
+                {stack.url}
+              </bdi>
+              <bdi dir="ltr" class="block break-all">
+                {stack.stackID}
+              </bdi>
             </div>
           )}
         </Show>
@@ -111,10 +135,10 @@ export function EnvironmentDetailsDialog(props: {
                 <span class="text-11-regular tabular-nums leading-text-compact text-v2-text-text-muted">
                   {latest.exitCode === undefined
                     ? t("boc.environments.details.runtime", {
-                        duration: environmentDuration(latest.startedAt, latest.endedAt),
+                        duration: environmentDuration(latest.startedAt, latest.endedAt ?? view.now),
                       })
                     : t("boc.environments.details.runtimeWithExitCode", {
-                        duration: environmentDuration(latest.startedAt, latest.endedAt),
+                        duration: environmentDuration(latest.startedAt, latest.endedAt ?? view.now),
                         code: latest.exitCode,
                       })}
                 </span>
@@ -122,34 +146,36 @@ export function EnvironmentDetailsDialog(props: {
             </Show>
           </div>
           <Show when={run()?.truncated}>
-            <p class="m-0 text-11-regular leading-text-compact text-v2-text-text-warning" role="note">
+            <p class="m-0 text-11-regular leading-text-compact text-v2-state-fg-warning" role="note">
               {t("boc.environments.details.outputTruncated")}
             </p>
           </Show>
           <pre
             ref={log}
+            dir="ltr"
             role="log"
             aria-label={t("boc.environments.details.output")}
             aria-live="off"
             tabIndex={0}
-            class="m-0 max-h-80 min-h-36 overflow-auto whitespace-pre-wrap break-words rounded-md bg-v2-background-bg-inset p-3 font-mono text-12-regular leading-text-base text-v2-text-text-base outline-none focus-visible:ring-1 focus-visible:ring-v2-border-border-focus motion-reduce:scroll-auto"
+            class="m-0 max-h-80 min-h-36 overflow-auto whitespace-pre rounded-md border border-v2-border-border-base bg-v2-background-bg-deep p-3 text-start text-[12px] leading-[var(--line-height-base)] text-v2-text-text-base outline-none focus-visible:ring-1 focus-visible:ring-v2-border-border-focus motion-reduce:scroll-auto"
+            style={{ "font-family": "var(--font-family-mono)" }}
             onScroll={(event) => {
               const element = event.currentTarget
               setView("following", element.scrollHeight - element.scrollTop - element.clientHeight <= 12)
             }}
           >
-            {run()?.log || t("boc.environments.details.noOutput")}
+            {environmentOutput(run()?.log ?? "") || t("boc.environments.details.noOutput")}
           </pre>
         </div>
 
         <Show when={props.resource.state.stale}>
-          <p class="m-0 text-12-regular leading-text-base text-v2-text-text-warning" role="status">
+          <p class="m-0 text-12-regular leading-text-base text-v2-state-fg-warning" role="status">
             {t("boc.environments.stale")}
           </p>
         </Show>
         <p
           class="m-0 min-h-5 text-12-regular leading-text-base text-v2-text-text-muted"
-          classList={{ "text-v2-text-text-danger": props.resource.state.failed || !!props.resource.state.rejection }}
+          classList={{ "text-v2-state-fg-danger": props.resource.state.failed || !!props.resource.state.rejection }}
           role={props.resource.state.failed || props.resource.state.rejection ? "alert" : "status"}
           aria-live="polite"
           aria-atomic="true"
@@ -158,11 +184,19 @@ export function EnvironmentDetailsDialog(props: {
         </p>
       </DialogBody>
       <DialogFooter>
-        <Button variant="ghost" disabled={props.resource.state.refreshing} onClick={() => void props.resource.inspect()}>
+        <Button
+          variant="ghost"
+          disabled={props.resource.state.refreshing}
+          onClick={() => void props.resource.inspect()}
+        >
           {t("boc.environments.refresh")}
         </Button>
         <Show when={run()?.status === "running"}>
-          <Button variant="warning" disabled={!!props.resource.state.acting} onClick={() => void props.resource.cancel()}>
+          <Button
+            variant="warning"
+            disabled={!!props.resource.state.acting}
+            onClick={() => void props.resource.cancel()}
+          >
             {t("boc.environments.cancel")}
           </Button>
         </Show>
@@ -181,10 +215,7 @@ export function EnvironmentDetailsDialog(props: {
   )
 }
 
-export function EnvironmentRemoveDialog(props: {
-  target: EnvironmentActionTarget
-  resource: EnvironmentResource
-}) {
+export function EnvironmentRemoveDialog(props: { target: EnvironmentActionTarget; resource: EnvironmentResource }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const dialog = useDialog()
@@ -214,22 +245,35 @@ export function EnvironmentRemoveDialog(props: {
   )
 }
 
-function StatusCard(props: { label: string; value: string; tone: "neutral" | "warning" | "danger" }) {
+function StatusCard(props: { label: string; value: string; tone: "neutral" | "success" | "warning" | "danger" }) {
   return (
-    <div class="flex min-h-16 items-start gap-2 rounded-md border border-v2-border-border-base bg-v2-background-bg-base p-3">
+    <div
+      class="flex min-h-16 items-start gap-2 rounded-md border p-3"
+      role="group"
+      aria-label={props.label}
+      classList={{
+        "border-v2-border-border-base bg-v2-background-bg-base text-v2-text-text-base": props.tone === "neutral",
+        "border-v2-state-border-success bg-v2-state-bg-success text-v2-state-fg-success": props.tone === "success",
+        "border-v2-state-border-warning bg-v2-state-bg-warning text-v2-state-fg-warning": props.tone === "warning",
+        "border-v2-state-border-danger bg-v2-state-bg-danger text-v2-state-fg-danger": props.tone === "danger",
+      }}
+    >
       <Icon
-        name={props.tone === "danger" ? "warning" : props.tone === "warning" ? "circle-exclamation" : "status"}
+        name={
+          props.tone === "success"
+            ? "circle-check"
+            : props.tone === "danger"
+              ? "warning"
+              : props.tone === "warning"
+                ? "circle-exclamation"
+                : "status"
+        }
         size="small"
         class="mt-0.5 shrink-0"
-        classList={{
-          "text-v2-icon-icon-danger": props.tone === "danger",
-          "text-v2-icon-icon-warning": props.tone === "warning",
-          "text-v2-icon-icon-muted": props.tone === "neutral",
-        }}
       />
       <div class="min-w-0">
         <div class="text-11-medium leading-text-compact text-v2-text-text-muted">{props.label}</div>
-        <div class="text-12-regular leading-text-base text-v2-text-text-base">{props.value}</div>
+        <div class="text-12-regular leading-text-base">{props.value}</div>
       </div>
     </div>
   )

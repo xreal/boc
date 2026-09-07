@@ -18,6 +18,22 @@ function ControlsPreview() {
     items: [
       {
         kind: "skill",
+        id: "opencode",
+        name: "OpenCode guide",
+        source: "/builtin/opencode.md",
+        effect: "next_skill_request",
+        mutable: true,
+      },
+      {
+        kind: "skill",
+        id: "global-review",
+        name: "Global review",
+        source: "/config/opencode/skills/review/SKILL.md",
+        effect: "next_skill_request",
+        mutable: true,
+      },
+      {
+        kind: "skill",
         id: "review",
         name: "Review changes",
         source: "/workspace/shop/.opencode/skills/review/SKILL.md",
@@ -78,6 +94,7 @@ function ControlsPreview() {
       {
         key: "fixture",
         name: "Development server",
+        globalDirectories: ["/config/opencode"],
         projects: [
           { name: "Shop", directory: "/workspace/shop", locations: ["/workspace/shop", "/workspace/shop-review"] },
         ],

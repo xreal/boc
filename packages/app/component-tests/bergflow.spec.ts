@@ -1,5 +1,30 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("places origin icons before names and focuses search with Ctrl/Cmd+F", async ({ mount, page }) => {
+  const component = await mount("boc-bergflow--default")
+  for (const [name, origin] of [
+    ["OpenCode guide", "System"],
+    ["Global review", "Global"],
+    ["Review changes", "Project"],
+  ]) {
+    const heading = component.getByRole("heading", { name, exact: true })
+    await expect(heading.getByRole("img", { name: new RegExp(`^${origin} ·`) })).toBeVisible()
+  }
+  const search = component.getByRole("textbox", { name: "Search capabilities" })
+  await page.keyboard.press("Control+f")
+  await expect(search).toBeFocused()
+  await search.fill("review")
+  await component.getByRole("heading", { name: "Project Controls", exact: true }).click()
+  await page.keyboard.press("Meta+f")
+  await expect(search).toBeFocused()
+  await page.keyboard.type("OpenCode guide")
+  await expect(search).toHaveValue("OpenCode guide")
+  await expect(component.getByRole("heading", { name: "Review changes", exact: true })).toHaveCount(0)
+  const input = component.locator('[data-component="text-input-v2"]')
+  await expect(input).toHaveCSS("outline-width", "1px")
+  await expect(input).toHaveCSS("outline-offset", "0px")
+})
+
 story("applies a keyboard toggle and preserves focus on the capability", async ({ mount, page }) => {
   const component = await mount("boc-bergflow--default")
   const toggle = component.getByRole("switch", { name: "Review changes" })

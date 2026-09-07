@@ -10,6 +10,15 @@ export const environmentsEnglish = {
   "boc.environments.stop": "Stop environment",
   "boc.environments.open": "Open in browser",
   "boc.environments.copyUrl": "Copy environment URL",
+  "boc.environments.copyPath": "Copy checkout path",
+  "boc.environments.openTerminal": "Open checkout in terminal",
+  "boc.environments.preparing.context": "Preparing an isolated checkout before starting the session.",
+  "boc.environments.preparing.waiting":
+    "Waiting for checkout creation and any configured startup script to finish. This operation does not provide live output.",
+  "boc.environments.preparing.disconnected":
+    "Connection interrupted. Waiting to reconnect; the checkout operation may still be running.",
+  "boc.environments.preparing.source": "Source project",
+  "boc.environments.preparing.branch": "Requested branch",
   "boc.environments.viewOutput": "View environment output",
   "boc.environments.cancel": "Cancel current run",
   "boc.environments.retry": "Retry {{action}}",
@@ -60,27 +69,34 @@ export const environmentsEnglish = {
   "boc.environments.details.available.git": "Registered Git worktree",
   "boc.environments.details.available.boc/rift": "Registered Rift checkout",
   "boc.environments.details.unavailable.backend-unavailable": "The Boc environment backend is not available.",
-  "boc.environments.details.unavailable.unsupported-platform": "Development environments are supported on macOS and Linux.",
+  "boc.environments.details.unavailable.unsupported-platform":
+    "Development environments are supported on macOS and Linux.",
   "boc.environments.details.unavailable.checkout-unavailable": "This checkout is no longer available.",
   "boc.environments.details.unavailable.checkout-not-registered": "This directory is not a registered checkout.",
-  "boc.environments.details.unavailable.checkout-not-isolated": "The main checkout does not use a separate development environment.",
-  "boc.environments.details.unavailable.checkout-ownership-mismatch": "The checkout or stack assignment no longer matches its recorded owner.",
+  "boc.environments.details.unavailable.checkout-not-isolated":
+    "The main checkout does not use a separate development environment.",
+  "boc.environments.details.unavailable.checkout-ownership-mismatch":
+    "The checkout or stack assignment no longer matches its recorded owner.",
   "boc.environments.details.unavailable.devenv-unavailable": "The active devenv installation could not be found.",
-  "boc.environments.details.unavailable.devenv-preflight-failed": "devenv is not ready for a non-interactive environment action.",
+  "boc.environments.details.unavailable.devenv-preflight-failed":
+    "devenv is not ready for a non-interactive environment action.",
   "boc.environments.remove.title": "Remove development environment?",
-  "boc.environments.remove.description": "This removes only this checkout's app containers and stack assignment. Checkout files and shared services remain.",
+  "boc.environments.remove.description":
+    "This removes only this checkout's app containers and stack assignment. Checkout files and shared services remain.",
   "boc.environments.remove.confirm": "Remove environment",
   "boc.environments.settings.title": "Development environment",
   "boc.environments.settings.description": "Enable the fixed devenv workflow for isolated checkouts in this project.",
   "boc.environments.settings.experimental": "Experimental",
   "boc.environments.settings.enabled": "Enable development environments",
-  "boc.environments.settings.enabled.description": "Show setup and lifecycle actions for registered Git worktrees and Rift checkouts.",
+  "boc.environments.settings.enabled.description":
+    "Show setup and lifecycle actions for registered Git worktrees and Rift checkouts.",
   "boc.environments.settings.domain": "Storefront domain",
   "boc.environments.settings.domain.description": "Optional. Leave empty to use devenv's configured default domain.",
   "boc.environments.settings.domain.placeholder": "Use devenv default",
   "boc.environments.settings.domain.invalid": "Enter a hostname without a protocol, path, spaces, or port.",
   "boc.environments.settings.shared.title": "Shared local services",
-  "boc.environments.settings.shared.description": "Databases, Redis and PHP sessions, and RabbitMQ are shared with other local stacks. Stop and remove actions leave those services and their volumes untouched.",
+  "boc.environments.settings.shared.description":
+    "Databases, Redis and PHP sessions, and RabbitMQ are shared with other local stacks. Stop and remove actions leave those services and their volumes untouched.",
   "boc.environments.settings.save": "Save environment settings",
   "boc.environments.settings.saved": "Environment settings saved.",
 } as const

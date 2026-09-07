@@ -78,6 +78,10 @@
       "reason": "Show the effective Boc checkout method beside new checkout"
     },
     {
+      "path": "packages/app/src/session/route.tsx",
+      "reason": "Mount Boc checkout preparation context, elapsed time and connection feedback beside the existing loading indicator"
+    },
+    {
       "path": "packages/app/src/session/header/session-header.tsx",
       "reason": "Mount the Boc environment control inside the existing right titlebar slot"
     },

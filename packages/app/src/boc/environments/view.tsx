@@ -19,6 +19,7 @@ import { pathKey } from "@/workspaces/path-key"
 import { environmentPrimaryIntent, retryableEnvironmentAction, type EnvironmentPrimaryIntent } from "./model"
 import { useEnvironmentProjectSettings } from "./settings-store"
 import { useEnvironmentResource, type EnvironmentResource } from "./store"
+import "./view.css"
 
 export type EnvironmentTarget = {
   server: ServerConnection.Any
@@ -120,7 +121,7 @@ export function EnvironmentControl(props: {
   }
 
   return (
-    <SplitButton class="mx-1" data-boc-environment-control>
+    <SplitButton class="mx-1" data-boc-environment-control data-expanded-label={wide()}>
       <Tooltip placement="bottom" value={label()} class="flex items-center">
         <SplitButtonAction
           ref={actionButton}
@@ -158,12 +159,7 @@ export function EnvironmentControl(props: {
           <Menu.Content class="min-w-56">
             <Menu.Group>
               <Menu.GroupLabel>{t("boc.environments.title")}</Menu.GroupLabel>
-              <EnvironmentMenuItems
-                t={t}
-                enabled={props.enabled()}
-                resource={props.resource}
-                actions={actions}
-              />
+              <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
             </Menu.Group>
           </Menu.Content>
         </Menu.Portal>
@@ -174,32 +170,46 @@ export function EnvironmentControl(props: {
 }
 
 export function EnvironmentContextMenuItems(props: { target: EnvironmentTarget; returnFocus?: () => void }) {
+  const view = useEnvironmentView(props.target)
+  return (
+    <EnvironmentContextMenu
+      target={props.target}
+      resource={view.resource}
+      settingsReady={view.settings.ready}
+      enabled={() => view.settings.settings.enabled}
+      domain={() => view.settings.settings.domain.trim() || undefined}
+      returnFocus={props.returnFocus}
+    />
+  )
+}
+
+export function EnvironmentContextMenu(props: {
+  target: EnvironmentActionTarget
+  resource: EnvironmentResource
+  settingsReady: () => boolean
+  enabled: () => boolean
+  domain: () => string | undefined
+  returnFocus?: () => void
+}) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
-  const view = useEnvironmentView(props.target)
   const actions = createEnvironmentActions({
     target: props.target,
-    resource: view.resource,
-    domain: () => view.settings.settings.domain.trim() || undefined,
+    resource: props.resource,
+    domain: props.domain,
     returnFocus: props.returnFocus,
   })
 
   return (
     <>
       <Menu.Separator />
-      <Menu.GroupLabel>{t("boc.environments.title")}</Menu.GroupLabel>
-      <Show
-        when={view.settings.ready()}
-        fallback={<Menu.Item disabled>{t("boc.environments.checking")}</Menu.Item>}
-      >
-        <EnvironmentMenuItems
-          t={t}
-          enabled={view.settings.settings.enabled}
-          resource={view.resource}
-          actions={actions}
-        />
-      </Show>
-      <EnvironmentAnnouncement t={t} resource={view.resource} />
+      <Menu.Group>
+        <Menu.GroupLabel>{t("boc.environments.title")}</Menu.GroupLabel>
+        <Show when={props.settingsReady()} fallback={<Menu.Item disabled>{t("boc.environments.checking")}</Menu.Item>}>
+          <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
+        </Show>
+      </Menu.Group>
+      <EnvironmentAnnouncement t={t} resource={props.resource} />
     </>
   )
 }
@@ -221,105 +231,117 @@ function EnvironmentMenuItems(props: {
     const status = environment()?.containers.status
     return status === "running" || status === "partial"
   }
-  const runAndShowDetails = (action: "setup" | "start" | "stop") => () =>
-    void props.actions.runAndShowDetails(action)
+  const runAndShowDetails = (action: "setup" | "start" | "stop") => () => void props.actions.runAndShowDetails(action)
 
   return (
-    <Show
-      when={props.enabled}
-      fallback={
+    <>
+      <Show
+        when={props.enabled}
+        fallback={
+          <Menu.Item onSelect={() => void props.actions.settings()}>
+            <Icon name="settings-gear" size="small" />
+            {props.t("boc.environments.configure")}
+          </Menu.Item>
+        }
+      >
+        <Show
+          when={!props.resource.state.loading || environment()}
+          fallback={
+            <Menu.Item disabled>
+              <EnvironmentSpinner />
+              {props.t("boc.environments.checking")}
+            </Menu.Item>
+          }
+        >
+          <Menu.Item onSelect={() => void props.actions.details()}>
+            <Icon name="terminal" size="small" />
+            {props.t("boc.environments.viewOutput")}
+          </Menu.Item>
+          <Show when={running()}>
+            <Menu.Item disabled={!!props.resource.state.acting} onSelect={() => void props.resource.cancel()}>
+              <Icon name="stop" size="small" />
+              {props.t("boc.environments.cancel")}
+            </Menu.Item>
+          </Show>
+          <Show when={!running() && retry()} keyed>
+            {(action) => (
+              <Menu.Item disabled={!!props.resource.state.acting} onSelect={() => void props.actions.retry(action)}>
+                <Icon name="reset" size="small" />
+                {props.t("boc.environments.retry", { action: actionLabel(props.t, action) })}
+              </Menu.Item>
+            )}
+          </Show>
+          <Show when={!running() && !retry() && environment()?.availability.available && !configured()}>
+            <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("setup")}>
+              <Icon name="workspace-isolated" size="small" />
+              {props.t("boc.environments.setup")}
+            </Menu.Item>
+          </Show>
+          <Show when={!running() && !retry() && configured()}>
+            <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("setup")}>
+              <Icon name="workspace-isolated" size="small" />
+              {props.t("boc.environments.setupAgain")}
+            </Menu.Item>
+          </Show>
+          <Show when={!running() && !retry() && canStart()}>
+            <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("start")}>
+              <Icon name="circle-check" size="small" />
+              {props.t("boc.environments.start")}
+            </Menu.Item>
+          </Show>
+          <Show when={!running() && !retry() && canStop()}>
+            <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("stop")}>
+              <Icon name="stop" size="small" />
+              {props.t("boc.environments.stop")}
+            </Menu.Item>
+          </Show>
+          <Show when={configured()}>
+            <Menu.Separator />
+            <Menu.Item onSelect={props.actions.open}>
+              <Icon name="arrow-up-right" size="small" />
+              {props.t("boc.environments.open")}
+            </Menu.Item>
+            <Menu.Item onSelect={() => void props.actions.copy()}>
+              <Icon name="outline-copy" size="small" />
+              {props.t("boc.environments.copyUrl")}
+            </Menu.Item>
+            <Show when={!running()}>
+              <Menu.Item
+                class="text-v2-state-fg-danger"
+                disabled={!!props.resource.state.acting}
+                onSelect={() => void props.actions.remove()}
+              >
+                <Icon name="trash" size="small" />
+                {props.t("boc.environments.remove")}
+              </Menu.Item>
+            </Show>
+          </Show>
+        </Show>
+        <Menu.Separator />
+        <Menu.Item
+          disabled={props.resource.state.loading || props.resource.state.refreshing}
+          onSelect={() => void props.resource.inspect()}
+        >
+          <Icon name="reset" size="small" />
+          {props.t("boc.environments.refresh")}
+        </Menu.Item>
         <Menu.Item onSelect={() => void props.actions.settings()}>
           <Icon name="settings-gear" size="small" />
           {props.t("boc.environments.configure")}
         </Menu.Item>
-      }
-    >
-      <Show
-        when={!props.resource.state.loading || environment()}
-        fallback={
-          <Menu.Item disabled>
-            <EnvironmentSpinner />
-            {props.t("boc.environments.checking")}
-          </Menu.Item>
-        }
-      >
-        <Menu.Item onSelect={() => void props.actions.details()}>
-          <Icon name="terminal" size="small" />
-          {props.t("boc.environments.viewOutput")}
-        </Menu.Item>
-        <Show when={running()}>
-          <Menu.Item disabled={!!props.resource.state.acting} onSelect={() => void props.resource.cancel()}>
-            <Icon name="stop" size="small" />
-            {props.t("boc.environments.cancel")}
-          </Menu.Item>
-        </Show>
-        <Show when={!running() && retry()} keyed>
-          {(action) => (
-            <Menu.Item disabled={!!props.resource.state.acting} onSelect={() => void props.actions.retry(action)}>
-              <Icon name="reset" size="small" />
-              {props.t("boc.environments.retry", { action: actionLabel(props.t, action) })}
-            </Menu.Item>
-          )}
-        </Show>
-        <Show when={!running() && !retry() && environment()?.availability.available && !configured()}>
-          <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("setup")}>
-            <Icon name="workspace-isolated" size="small" />
-            {props.t("boc.environments.setup")}
-          </Menu.Item>
-        </Show>
-        <Show when={!running() && !retry() && configured()}>
-          <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("setup")}>
-            <Icon name="workspace-isolated" size="small" />
-            {props.t("boc.environments.setupAgain")}
-          </Menu.Item>
-        </Show>
-        <Show when={!running() && !retry() && canStart()}>
-          <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("start")}>
-            <Icon name="circle-check" size="small" />
-            {props.t("boc.environments.start")}
-          </Menu.Item>
-        </Show>
-        <Show when={!running() && !retry() && canStop()}>
-          <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("stop")}>
-            <Icon name="stop" size="small" />
-            {props.t("boc.environments.stop")}
-          </Menu.Item>
-        </Show>
-        <Show when={configured()}>
-          <Menu.Separator />
-          <Menu.Item onSelect={props.actions.open}>
-            <Icon name="arrow-up-right" size="small" />
-            {props.t("boc.environments.open")}
-          </Menu.Item>
-          <Menu.Item onSelect={() => void props.actions.copy()}>
-            <Icon name="outline-copy" size="small" />
-            {props.t("boc.environments.copyUrl")}
-          </Menu.Item>
-          <Show when={!running()}>
-            <Menu.Item
-              class="text-v2-text-text-danger"
-              disabled={!!props.resource.state.acting}
-              onSelect={() => void props.actions.remove()}
-            >
-              <Icon name="trash" size="small" />
-              {props.t("boc.environments.remove")}
-            </Menu.Item>
-          </Show>
-        </Show>
       </Show>
       <Menu.Separator />
-      <Menu.Item
-        disabled={props.resource.state.loading || props.resource.state.refreshing}
-        onSelect={() => void props.resource.inspect()}
-      >
-        <Icon name="reset" size="small" />
-        {props.t("boc.environments.refresh")}
+      <Menu.Item onSelect={() => void props.actions.copyPath()}>
+        <Icon name="outline-copy" size="small" />
+        {props.t("boc.environments.copyPath")}
       </Menu.Item>
-      <Menu.Item onSelect={() => void props.actions.settings()}>
-        <Icon name="settings-gear" size="small" />
-        {props.t("boc.environments.configure")}
-      </Menu.Item>
-    </Show>
+      <Show when={props.actions.canOpenTerminal}>
+        <Menu.Item onSelect={() => void props.actions.openTerminal()}>
+          <Icon name="terminal" size="small" />
+          {props.t("boc.environments.openTerminal")}
+        </Menu.Item>
+      </Show>
+    </>
   )
 }
 
@@ -331,7 +353,12 @@ function EnvironmentAnnouncement(props: { t: BocTranslator; resource: Environmen
       aria-live="polite"
       aria-atomic="true"
     >
-      {resourceAnnouncement(props.t, props.resource.state.environment, props.resource.state.failed, props.resource.state.rejection)}
+      {resourceAnnouncement(
+        props.t,
+        props.resource.state.environment,
+        props.resource.state.failed,
+        props.resource.state.rejection,
+      )}
     </span>
   )
 }
@@ -346,6 +373,19 @@ function createEnvironmentActions(input: {
   const t = createBocTranslator(language.locale)
   const platform = usePlatform()
   const dialog = useDialog()
+  const copyPath = () =>
+    (
+      platform.writeClipboardText?.(input.target.session.location.directory) ??
+      navigator.clipboard.writeText(input.target.session.location.directory)
+    ).then(
+      () => showToast({ variant: "success", title: language.t("common.copied") }),
+      () => showToast({ variant: "error", title: language.t("common.requestFailed") }),
+    )
+  const canOpenTerminal = platform.platform === "desktop" && !!platform.openPath && platform.os === "macos"
+  const openTerminal = () =>
+    platform
+      .openPath?.(input.target.session.location.directory, "Terminal")
+      .catch(() => showToast({ variant: "error", title: language.t("common.requestFailed") }))
   const run = (action: "setup" | "start" | "stop") =>
     input.resource.run(action, input.target.session.id, { domain: action === "setup" ? input.domain() : undefined })
   const open = () => {
@@ -368,13 +408,7 @@ function createEnvironmentActions(input: {
   const details = async () => {
     const { EnvironmentDetailsDialog } = await import("./dialog")
     dialog.show(
-      () => (
-        <EnvironmentDetailsDialog
-          target={input.target}
-          resource={input.resource}
-          domain={input.domain}
-        />
-      ),
+      () => <EnvironmentDetailsDialog target={input.target} resource={input.resource} domain={input.domain} />,
       input.returnFocus,
     )
   }
@@ -384,10 +418,7 @@ function createEnvironmentActions(input: {
   }
   const remove = async () => {
     const { EnvironmentRemoveDialog } = await import("./dialog")
-    dialog.show(
-      () => <EnvironmentRemoveDialog target={input.target} resource={input.resource} />,
-      input.returnFocus,
-    )
+    dialog.show(() => <EnvironmentRemoveDialog target={input.target} resource={input.resource} />, input.returnFocus)
   }
   const settings = async () => {
     const { DialogEditProject } = await import("@/settings/workspaces/project-dialog")
@@ -412,6 +443,9 @@ function createEnvironmentActions(input: {
     details,
     remove,
     settings,
+    copyPath,
+    canOpenTerminal,
+    openTerminal,
   }
 }
 

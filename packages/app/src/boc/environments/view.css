@@ -1,0 +1,10 @@
+[data-boc-environment-control][data-expanded-label="true"] [data-component="split-button-v2-action"] {
+  width: auto;
+  min-width: 28px;
+  gap: 6px;
+  padding-inline: 8px;
+}
+
+[data-boc-environment-control] [data-component="split-button-v2-action"] > [data-component="icon"] {
+  flex-shrink: 0;
+}

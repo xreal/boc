@@ -1,0 +1,13 @@
+[data-component="dialog-v2"] [data-slot="dialog-container"].boc-environment-dialog {
+  width: min(760px, calc(100vw - 32px));
+  height: auto;
+  max-height: min(760px, calc(100dvh - 32px));
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].boc-environment-dialog [data-slot="dialog-body"] {
+  overflow-y: auto;
+
+  > * {
+    flex-shrink: 0;
+  }
+}

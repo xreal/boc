@@ -7,6 +7,7 @@ export type BergflowSelection = { server: string; project: string; directory: st
 export type BergflowServer = {
   key: string
   name: string
+  globalDirectories?: string[]
   projects: Array<{ directory: string; name: string; locations: string[] }>
 }
 export type BergflowConnection = {

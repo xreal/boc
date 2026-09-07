@@ -79,7 +79,7 @@ export const environmentFixtures = {
       startedAt: now - 15_000,
       endedAt: now - 3_000,
       exitCode: 0,
-      log: "$ devenv stop\nStopped 6 containers.\n",
+      log: "$ devenv stop\r\n\u001b[?25l\u001b[0G[+] stop 0/6\r\n\u001b[33mContainer shop Stopping\u001b[0m\r\n\u001b[32mStopped 6 containers.\u001b[0m\r\n",
       truncated: false,
     },
   },

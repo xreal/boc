@@ -38,8 +38,7 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
   })
 
   const valid = () => validEnvironmentDomain(draft.domain)
-  const changed = () =>
-    draft.enabled !== settings.settings.enabled || draft.domain.trim() !== settings.settings.domain
+  const changed = () => draft.enabled !== settings.settings.enabled || draft.domain.trim() !== settings.settings.domain
   const save = () => {
     if (!valid()) return
     settings.update({ enabled: draft.enabled, domain: draft.domain.trim() })
@@ -87,14 +86,14 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
           />
           <div
             id="boc-environment-domain-help"
-            class="min-h-4 text-11-regular leading-text-compact text-v2-text-text-danger"
+            class="min-h-4 text-11-regular leading-text-compact text-v2-state-fg-danger"
             role={!valid() ? "alert" : undefined}
           >
             {valid() ? "" : t("boc.environments.settings.domain.invalid")}
           </div>
         </Field>
 
-        <div class="flex items-start gap-2 rounded-md bg-v2-background-bg-inset px-3 py-2">
+        <div class="flex items-start gap-2 rounded-md bg-v2-background-bg-base px-3 py-2">
           <Icon name="info" size="small" class="mt-0.5 shrink-0 text-v2-icon-icon-muted" />
           <div class="flex min-w-0 flex-col gap-0.5">
             <span class="text-12-medium leading-text-compact text-v2-text-text-base">
@@ -110,12 +109,7 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
           <span class="text-11-regular leading-text-compact text-v2-text-text-muted" role="status" aria-live="polite">
             {draft.saved ? t("boc.environments.settings.saved") : ""}
           </span>
-          <Button
-            type="button"
-            variant="neutral"
-            disabled={!draft.loaded || !valid() || !changed()}
-            onClick={save}
-          >
+          <Button type="button" variant="neutral" disabled={!draft.loaded || !valid() || !changed()} onClick={save}>
             {t("boc.environments.settings.save")}
           </Button>
         </div>
