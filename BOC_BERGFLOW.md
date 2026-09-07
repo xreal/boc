@@ -12,6 +12,10 @@ Successful persistence is authoritative even if application or the final snapsho
 
 Native controls use existing authenticated server clients. Server/project/worktree selection is independent of session-tab changes and global Home selection. Missing remote plugins never trigger local fallback or installation. A session command supplies its explicit context. The screen supports search, category filters, override reset, application retry, read-only rows, orphan overrides, stale snapshots, and diagnosis. All product text uses the existing Boc English fallback dictionary.
 
+The native presentation uses theme-aware raised cards, a distinct project context panel, category filter chips with inventory counts, and semantic effective-state badges. Read-only rows are labeled directly, with visible explanations for agent and instruction categories. Agent transforms/reloads exist in the public plugin API, but the bundled service intentionally does not expose agent mutations until their update behavior is verified. The previous browser instruction switch filtered rendered text; that mechanism is not a supported source-level instruction toggle.
+
+Presentation follow-up verification: Boc/app/desktop typechecks, 195 Boc tests (one skipped), 15 app Boc tests, 122 desktop tests (one skipped), both production-screen component tests, app/desktop builds, and the fork-surface audit passed. Browser inspection covered light/dark desktop layouts and a 375px forced-RTL layout without horizontal overflow. Component checks cover keyboard toggle focus, instruction filtering, visible read-only explanations, and narrow context controls.
+
 ## Verification on 2026-09-07
 
 - Portable package: typecheck, 45 tests, clean production build, package-content/import checks.

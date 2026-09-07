@@ -1,5 +1,11 @@
 export const bergflowEnglish = {
   "boc.bergflow.title": "Bergflow Controls",
+  "boc.bergflow.subtitle": "Your project. Your capabilities.",
+  "boc.bergflow.readOnly": "Read-only",
+  "boc.bergflow.readOnly.agent":
+    "Agent switching is not supported by this Bergflow version. Agents are shown for reference.",
+  "boc.bergflow.readOnly.instruction":
+    "AGENTS.md switching is not supported by this Bergflow version. Discovered files are shown; their effect in a session is unconfirmed.",
   "boc.bergflow.openSession": "Open Bergflow Controls for this session",
   "boc.bergflow.contextFailed": "Could not open controls for this session",
   "boc.bergflow.scope": "Changes apply to all worktrees of this project on this server.",

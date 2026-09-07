@@ -25,6 +25,18 @@ function ControlsPreview() {
         mutable: true,
       },
       { kind: "agent", id: "build", name: "Build", source: "OpenCode", effect: "read_only", mutable: false },
+      { kind: "agent", id: "general", name: "General", source: "OpenCode", effect: "read_only", mutable: false },
+      {
+        kind: "instruction",
+        id: "/workspace/shop/AGENTS.md",
+        name: "AGENTS.md",
+        source: "/workspace/shop/AGENTS.md",
+        effect: "read_only",
+        mutable: false,
+        effective: "unknown",
+        defaultEnabled: null,
+        reason: "read_only",
+      },
       {
         kind: "mcp",
         id: "documentation",
