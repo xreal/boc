@@ -1,8 +1,8 @@
 import { expect, test } from "bun:test"
 import { createRoot, createSignal } from "solid-js"
-import type { ControlState } from "@bergflow/opencode/rpc"
-import type { BergflowHost } from "../host"
-import { createBergflowControls } from "./state"
+import type { ControlState } from "../host"
+import type { ControlsHost } from "../host"
+import { createProjectControls } from "./state"
 
 function snapshot(directory: string): ControlState {
   return {
@@ -63,8 +63,8 @@ function fixture(read: (directory: string) => Promise<ControlState>, write: () =
         attempt: () => 0,
         subscribe: () => () => {},
       }),
-    } as unknown as BergflowHost
-    const control = createBergflowControls(host)
+    } as unknown as ControlsHost
+    const control = createProjectControls(host)
     return { control, dispose, setStatus }
   })
 }

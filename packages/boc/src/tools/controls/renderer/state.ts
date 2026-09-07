@@ -1,7 +1,9 @@
-import { controlInfo, controlState, type ControlItem, type ControlState } from "@bergflow/opencode/rpc"
+import { BocControls } from "@opencode-ai/schema/boc/controls"
+import { Schema, Option } from "effect"
+import type { ControlItem, ControlState } from "../host"
 import { createEffect, createMemo, onCleanup, onMount, untrack } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
-import { controls, type BergflowHost, type BergflowSelection } from "../host"
+import type { ControlsHost, ControlsSelection } from "../host"
 
 export type ControlError =
   | "missing"
@@ -15,10 +17,10 @@ export type ControlError =
   | "rejected"
 type Snapshot = Omit<ControlState, "items"> & { items: Array<ControlItem & { key: string }> }
 
-export function createBergflowControls(host: BergflowHost, initial?: BergflowSelection) {
+export function createProjectControls(host: ControlsHost, initial?: ControlsSelection) {
   const [view, setView] = createStore({
     initialized: false,
-    selection: undefined as BergflowSelection | undefined,
+    selection: undefined as ControlsSelection | undefined,
     snapshot: undefined as Snapshot | undefined,
     loading: false,
     stale: false,
@@ -26,14 +28,14 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
     error: undefined as ControlError | undefined,
     rowError: undefined as { key: string; error: ControlError } | undefined,
   })
-  let automatic = true
+  let autoSelect = true
   let closed = false
   let epoch = 0
   let reading: AbortController | undefined
   let writing: AbortController | undefined
   let refreshAfterWrite = false
   const connection = createMemo(() => (view.selection ? host.connect(view.selection.server) : undefined))
-  const accept = (snapshot: ControlState) =>
+  const adopt = (snapshot: ControlState) =>
     setView(
       "snapshot",
       reconcile(
@@ -61,30 +63,25 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
     }
     setView("loading", true)
     try {
-      const info = controlInfo.parse(await client.info({}, options))
+      const info = await client.info({}, options)
       if (!info.operations.includes("getState")) throw { type: "unsupported" }
-      const state = controlState.parse(await client.getState({}, options))
+      const state = await client.getState({}, options)
       if (current !== epoch || identity !== transport.identity()) return
       if (state.info.project.id !== info.project.id || state.info.location.directory !== info.location.directory)
         throw { type: "unsupported" }
-      accept(state)
+      adopt(state)
       setView({ stale: false, error: view.error === "unknown" ? "reconciled" : undefined })
     } catch (error) {
       if (current !== epoch) return
-      const kind = failure(error)
-      setView({ stale: true, error: kind })
-      if (kind === "missing") {
-        const diagnosis = await transport.diagnose?.(selected.directory, options.signal).catch(() => undefined)
-        if (current === epoch && diagnosis === "disabled") setView("error", "disabled")
-      }
+      setView({ stale: true, error: failure(error) })
     } finally {
       if (current === epoch) setView("loading", false)
     }
   }
 
-  const select = (selection: BergflowSelection) => {
+  const select = (selection: ControlsSelection) => {
     if (view.pending) return false
-    automatic = false
+    autoSelect = false
     epoch++
     reading?.abort()
     setView({ selection, snapshot: undefined, error: undefined, rowError: undefined, stale: false })
@@ -95,11 +92,11 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
   onMount(async () => {
     const saved = initial ?? (await host.initial())
     if (closed) return
-    if (saved && automatic) select(saved)
+    if (saved && autoSelect) select(saved)
     setView("initialized", true)
   })
   createEffect(() => {
-    if (!automatic || !view.initialized || view.selection) return
+    if (!autoSelect || !view.initialized || view.selection) return
     const projects = host.servers().flatMap((server) =>
       server.projects.map((project) => ({
         server: server.key,
@@ -114,6 +111,7 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
     const selected = view.selection
     const transport = connection()
     const status = transport?.status()
+    // Re-run when the connection identity, attempt, or status changes.
     transport?.attempt()
     transport?.identity()
     untrack(() => {
@@ -144,8 +142,8 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
     if (!transport) return
     onCleanup(
       transport.subscribe((event) => {
-        const changed = controls.events.changed.schema.safeParse(event)
-        if (!changed.success || changed.data.projectID !== view.snapshot?.info.project.id) return
+        const changed = Schema.decodeUnknownOption(BocControls.Rpc.events.changed.schema)(event)
+        if (Option.isNone(changed) || changed.value.projectID !== view.snapshot?.info.project.id) return
         if (view.pending) {
           refreshAfterWrite = true
           return
@@ -185,13 +183,12 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
             ? await client.retryApply(target, options)
             : await client.setEnabled({ ...target, enabled: enabled === true }, options)
       if (current !== epoch || identity !== transport.identity()) return
-      const state = controlState.parse(result)
       if (
-        state.info.project.id !== snapshot.info.project.id ||
-        state.info.location.directory !== snapshot.info.location.directory
+        result.info.project.id !== snapshot.info.project.id ||
+        result.info.location.directory !== snapshot.info.location.directory
       )
         throw { type: "unsupported" }
-      accept(state)
+      adopt(result)
     } catch (error) {
       if (current !== epoch) return
       const kind = failure(error, true)
@@ -209,7 +206,7 @@ export function createBergflowControls(host: BergflowHost, initial?: BergflowSel
   }
   const clear = () => {
     if (view.pending) return
-    automatic = false
+    autoSelect = false
     epoch++
     reading?.abort()
     setView({

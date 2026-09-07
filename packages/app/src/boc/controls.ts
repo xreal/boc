@@ -1,4 +1,4 @@
-import { controls, type BergflowHost } from "@boc/extensions/bergflow"
+import { controls, type ControlsHost } from "@boc/extensions/controls"
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Schema } from "effect"
 import { useNavigate } from "@solidjs/router"
@@ -16,13 +16,14 @@ const preferences = Persistence.struct({
   ),
 })
 
-export function createBocControls(): BergflowHost {
+export function createBocControls(): ControlsHost {
   const servers = useServers()
   const global = useGlobal()
   const route = useCurrentRoute()
   const navigate = useNavigate()
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
+  // Keep the previous preference key so existing window selections survive the rename.
   const [saved, setSaved, , ready] = persisted(Persist.window("boc.bergflow"), preferences, {})
   return {
     servers: () =>
@@ -63,20 +64,16 @@ export function createBocControls(): BergflowHost {
         identity: () => sdk.api,
         status: sdk.connection.status,
         attempt: sdk.connection.attempt,
-        diagnose: async (directory, signal) =>
-          (await sdk.api.plugin.list({ location: { directory } }, { signal })).data.find(
-            (plugin) => plugin.id === "bergflow",
-          )?.state.status,
         subscribe: (changed) =>
           sdk.event.listen((event) => {
-            if (event.type === "rpc.bergflow.control.v1.changed") changed(event.data)
+            if (event.type === "rpc.boc.controls.v1.changed") changed(event.data)
           }),
       }
     },
     async openSession() {
       const current = route()
       if (current.type !== "session") {
-        navigate("/boc/bergflow")
+        navigate("/boc/controls")
         return
       }
       const server = servers.list.find((server) => ServerConnection.key(server) === current.server)
@@ -92,7 +89,7 @@ export function createBocControls(): BergflowHost {
           directory: session.location.directory,
         })
         navigate(
-          `/boc/bergflow?${new URLSearchParams({ server: current.server, project: project.worktree, directory: session.location.directory })}`,
+          `/boc/controls?${new URLSearchParams({ server: current.server, project: project.worktree, directory: session.location.directory })}`,
         )
       } catch {
         showToast({ title: t("boc.bergflow.contextFailed"), variant: "error" })

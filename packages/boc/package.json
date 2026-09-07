@@ -11,8 +11,7 @@
     "./worktrees/shared": "./src/worktrees/shared/index.ts",
     "./worktrees/server": "./src/worktrees/server/index.ts",
     "./environments/server": "./src/environments/index.ts",
-    "./bergflow/server": "./src/tools/bergflow/server.ts",
-    "./bergflow": "./src/tools/bergflow/host.ts"
+    "./controls": "./src/tools/controls/host.ts"
   },
   "scripts": {
     "rift:fetch": "bun run scripts/rift/fetch.ts",
@@ -32,7 +31,6 @@
     "marked": "catalog:",
     "solid-js": "catalog:",
     "yaml": "2.9.0",
-    "@bergflow/opencode": "file:./vendor/bergflow-opencode-0.2.1-ef3d3bd65d8f.tgz",
     "@opencode-ai/client": "workspace:*"
   },
   "devDependencies": {

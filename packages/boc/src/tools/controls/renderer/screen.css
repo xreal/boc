@@ -1,5 +1,5 @@
-[data-boc-bergflow] {
-  .bergflow-context {
+[data-boc-controls] {
+  .controls-context {
     display: grid;
     gap: 14px;
     padding: 18px;
@@ -9,21 +9,21 @@
     box-shadow: var(--shadow-xs);
   }
 
-  .bergflow-feedback:empty {
+  .controls-feedback:empty {
     display: none;
   }
 
-  .bergflow-filters {
+  .controls-filters {
     display: grid;
     gap: 14px;
   }
 
-  [data-component="text-input-v2"].bergflow-search {
+  [data-component="text-input-v2"].controls-search {
     width: 100%;
     min-width: 0;
   }
 
-  .bergflow-origin {
+  .controls-origin {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
@@ -33,7 +33,7 @@
     line-height: var(--line-height-compact);
   }
 
-  .bergflow-categories {
+  .controls-categories {
     display: flex;
     flex-wrap: wrap;
     gap: 6px;
@@ -68,7 +68,7 @@
     }
   }
 
-  .bergflow-notice {
+  .controls-notice {
     display: flex;
     align-items: center;
     gap: 8px;
@@ -79,7 +79,7 @@
     }
   }
 
-  .bergflow-category-icon {
+  .controls-category-icon {
     display: grid;
     place-items: center;
     width: 28px;
@@ -89,23 +89,23 @@
     color: var(--v2-icon-icon-accent);
   }
 
-  .bergflow-count {
+  .controls-count {
     margin-inline-start: auto;
     font-variant-numeric: tabular-nums;
   }
 
-  .bergflow-readonly-note {
+  .controls-readonly-note {
     margin-block: 0 12px;
   }
 
-  .bergflow-cards {
+  .controls-cards {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
     align-items: start;
     gap: 10px;
   }
 
-  .bergflow-card {
+  .controls-card {
     border: 1px solid var(--v2-border-border-base);
     border-radius: 12px;
     background: var(--v2-background-bg-base);
@@ -126,7 +126,7 @@
     }
   }
 
-  .bergflow-status {
+  .controls-status {
     display: inline-flex;
     align-items: center;
     gap: 6px;
@@ -155,7 +155,7 @@
     }
   }
 
-  .bergflow-readonly {
+  .controls-readonly {
     flex-shrink: 0;
     padding: 3px 7px;
     border: 1px solid var(--v2-border-border-base);
@@ -178,7 +178,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  [data-boc-bergflow] .bergflow-card {
+  [data-boc-controls] .controls-card {
     transition: none;
   }
 }

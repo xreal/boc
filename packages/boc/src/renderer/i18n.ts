@@ -1,5 +1,5 @@
 import { resolveTemplate, translator } from "@solid-primitives/i18n"
-import { bergflowEnglish } from "../tools/bergflow/i18n/en"
+import { controlsEnglish } from "../tools/controls/i18n/en"
 import { deploymentsEnglish } from "../tools/deployments/i18n/en"
 import { jiraEnglish } from "../tools/jira/i18n/en"
 import { worktreesEnglish } from "../worktrees/i18n/en"
@@ -15,7 +15,7 @@ export const bocEnglish = {
   "boc.extension.notFound.description": "This Boc extension is not registered.",
   "boc.extension.desktopRequired.title": "Desktop app required",
   "boc.extension.desktopRequired.description": "This Boc extension is available in the desktop app.",
-  ...bergflowEnglish,
+  ...controlsEnglish,
   ...deploymentsEnglish,
   ...jiraEnglish,
   ...worktreesEnglish,

@@ -1,7 +1,7 @@
 import { expect, story } from "../../storybook/playwright/story"
 
 story("places origin icons before names and focuses search with Ctrl/Cmd+F", async ({ mount, page }) => {
-  const component = await mount("boc-bergflow--default")
+  const component = await mount("boc-controls--default")
   for (const [name, origin] of [
     ["OpenCode guide", "System"],
     ["Global review", "Global"],
@@ -26,7 +26,7 @@ story("places origin icons before names and focuses search with Ctrl/Cmd+F", asy
 })
 
 story("applies a keyboard toggle and preserves focus on the capability", async ({ mount, page }) => {
-  const component = await mount("boc-bergflow--default")
+  const component = await mount("boc-controls--default")
   const toggle = component.getByRole("switch", { name: "Review changes" })
   await toggle.focus()
   await page.keyboard.press("Space")
@@ -35,7 +35,7 @@ story("applies a keyboard toggle and preserves focus on the capability", async (
   await expect(toggle).not.toBeChecked()
   await expect(component.getByRole("switch", { name: "Build", exact: true })).toHaveCount(0)
   await expect(
-    component.getByText("Agent switching is not supported by this Bergflow version. Agents are shown for reference."),
+    component.getByText("Agents are shown for reference. Agent switching is not yet available in Project Controls."),
   ).toBeVisible()
   await component.getByRole("button", { name: "Instructions 1", exact: true }).click()
   await expect(component.getByRole("heading", { name: "AGENTS.md", exact: true })).toBeVisible()
@@ -53,7 +53,7 @@ story("applies a keyboard toggle and preserves focus on the capability", async (
 
 story("keeps server, project, and worktree visible on a narrow screen", async ({ mount, page }) => {
   await page.setViewportSize({ width: 375, height: 850 })
-  const component = await mount("boc-bergflow--default")
+  const component = await mount("boc-controls--default")
   await expect(component.getByLabel("Server", { exact: true })).toBeVisible()
   await expect(component.getByLabel("Project", { exact: true })).toBeVisible()
   await expect(component.getByLabel("Worktree", { exact: true })).toBeVisible()

@@ -1,6 +1,7 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { connectBocService, inspectBocService } from "../../boc/background-service"
+import { bocServiceFile, isBocSourceBackend } from "../../boc/development"
 import { resolveRiftEnvironment } from "../../boc/rift"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
@@ -36,6 +37,8 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const runFork = Effect.runForkWith(yield* Effect.context())
   const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
   const cli = yield* desktopCli.resolve
+  const development = isBocSourceBackend(CHANNEL)
+  const boc = CHANNEL === "boc" || development
   const rift = yield* resolveRiftEnvironment
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
@@ -46,10 +49,12 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--port", "0"] : [])],
     env: {
       ...rift,
-      ...(CHANNEL === "boc" && isolatedService
+      ...(boc && isolatedService
         ? {
             XDG_STATE_HOME: app.getPath("userData"),
-            OPENCODE_DB: path.join(app.getPath("userData"), "opencode.db"),
+            OPENCODE_DB: development
+              ? (process.env.OPENCODE_DB ?? "opencode-local.db")
+              : path.join(app.getPath("userData"), "opencode.db"),
           }
         : {}),
     },
@@ -57,17 +62,17 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
       runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
   })
   const service = yield* Effect.tryPromise(() => {
-    if (CHANNEL !== "boc" || isolated) return client.Service.ensure(options(isolated))
+    if (!boc) return client.Service.ensure(options(isolated))
     return connectBocService({
       version: cli.version,
       mode,
-      discoverShared: () => client.Service.discover(),
+      discoverShared: () => (isolated ? Promise.resolve(undefined) : client.Service.discover()),
       discoverIsolated: () => client.Service.discover({ file: serviceFile(path, true) }),
-      inspect: (endpoint) =>
-        inspectBocService(endpoint, app.getPath("home"), client.Service.headers(endpoint)),
-      ensureShared: () => client.Service.ensure(options(false)),
+      inspect: (endpoint) => inspectBocService(endpoint, app.getPath("home"), client.Service.headers(endpoint)),
+      ensureShared: () => client.Service.ensure(options(isolated)),
       ensureIsolated: () => client.Service.ensure(options(true)),
       stopShared: () => client.Service.stop({ pty: "handoff" }),
+      stopIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "handoff" }),
     })
   })
   if (service.auth?.type !== "basic") throw new Error("V2 CLI background service did not provide authentication")
@@ -84,7 +89,8 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
 })
 
 function serviceFile(path: Path.Path, isolated: boolean) {
-  if (CHANNEL === "boc" && isolated) return path.join(app.getPath("userData"), "opencode", "service.json")
+  const boc = isolated ? bocServiceFile(CHANNEL, app.getPath("userData")) : undefined
+  if (boc) return boc
   if (isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
     return path.join(app.getPath("userData"), "opencode", "service-local.json")
   }

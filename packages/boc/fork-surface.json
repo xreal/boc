@@ -18,6 +18,22 @@
   ],
   "approved": [
     {
+      "path": "packages/desktop/src/main/service/desktop-cli.ts",
+      "reason": "Stage Boc backends by artifact identity and compile the native Boc backend for local desktop development"
+    },
+    {
+      "path": "packages/core/src/plugin/internal.ts",
+      "reason": "Register the Boc-only Project Controls built-in after configuration producers and provide its shared policy service"
+    },
+    {
+      "path": "packages/core/src/config/plugin/agent.ts",
+      "reason": "Attach the exact source document to agent metadata for native Boc controls"
+    },
+    {
+      "path": "packages/core/src/config/plugin/mcp.ts",
+      "reason": "Attach the winning configuration document to MCP metadata for native Boc controls"
+    },
+    {
       "path": "AGENTS.md",
       "reason": "Append-only Boc fork guidance above the upstream boundary"
     },
@@ -255,7 +271,7 @@
     },
     {
       "path": "packages/core/src/plugin/host.ts",
-      "reason": "Expose the optional versioned Boc selection facade with real instruction discovery and path classification dependencies"
+      "reason": "Expose the Boc instruction-selection facade and observe producer identity through Boc-only plugin-context decoration"
     },
     {
       "path": "packages/core/test/plugin/fixture.ts",
@@ -294,8 +310,8 @@
       "reason": "Export the existing module schema for adapting the portable bundled Bergflow plugin through the normal Promise plugin adapter"
     },
     {
-      "path": "packages/app/component-tests/bergflow.spec.ts",
-      "reason": "Exercise production Bergflow controls for keyboard mutation, ambient instruction availability and scope, focus retention, read-only capabilities, search, and narrow context selection"
+      "path": "packages/app/component-tests/controls.spec.ts",
+      "reason": "Exercise native Boc Project Controls for keyboard mutation, instruction scope, inline provenance, focus retention, search and narrow context selection"
     }
   ]
 }

@@ -92,8 +92,11 @@ import { VariantPlugin } from "./variant.js"
 import { VcsGitPlugin } from "./vcs/git.js"
 import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
+import { BocProjectControls } from "../boc/controls.js"
+import { BocControlPolicy } from "../boc/control-policy.js"
 
 const services = [
+  BocControlPolicy.Service,
   Agent.Service,
   AppProcess.Service,
   Catalog.Service,
@@ -143,6 +146,7 @@ const services = [
 export type Requirements = Context.Service.Identifier<(typeof services)[number]>
 
 export const requirements = LayerNode.group([
+  BocControlPolicy.node,
   Agent.node,
   AppProcess.node,
   Catalog.node,
@@ -240,6 +244,7 @@ const post = [
   ConfigWorktreePlugin.Plugin,
   VariantPlugin.Plugin,
   ConfigPolicyPlugin.Plugin,
+  BocProjectControls.Definition,
 ] as const satisfies readonly InternalPlugin[]
 
 export const list = Effect.fn("PluginInternal.list")(function* () {

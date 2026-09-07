@@ -13,8 +13,8 @@ test("distinguishes bundled skills, global configuration and project worktrees",
 })
 
 test("does not confuse adjacent paths or registry labels with provenance", () => {
-  expect(controlOrigin("/workspace/shop-other/AGENTS.md", directories)).toBe("unknown")
-  expect(controlOrigin("/builtin-other/review.md", directories)).toBe("unknown")
-  expect(controlOrigin("OpenCode tool registry", directories)).toBe("unknown")
-  expect(controlOrigin("OpenCode MCP configuration", directories)).toBe("unknown")
+  expect(controlOrigin("/workspace/shop-other/AGENTS.md", directories)).toBe("plugin")
+  expect(controlOrigin("/builtin-other/review.md", directories)).toBe("plugin")
+  expect(controlOrigin("OpenCode tool registry", directories)).toBe("plugin")
+  expect(controlOrigin("OpenCode MCP configuration", directories)).toBe("plugin")
 })

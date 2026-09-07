@@ -17,6 +17,7 @@ import type { LocationMutation } from "../../location-mutation.js"
 import type { ReadTool } from "../../tool/plugin/read.js"
 import type { EditTool } from "../../tool/plugin/edit.js"
 import { AbsolutePath } from "../../schema.js"
+import { BocControlSource } from "../../boc/control-source.js"
 
 const legacySources = [
   { pattern: "{agent,agents}/**/*.md", primary: false },
@@ -124,6 +125,7 @@ export const Plugin = define({
             if (item.permissions !== undefined) {
               agent.permissions.push(...expandPermissions(item.permissions, global.home))
             }
+            BocControlSource.file(agent, document.path)
           })
         }
       }

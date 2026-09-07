@@ -51,13 +51,7 @@ describe("Boc background service", () => {
     })
 
     expect(await connectBocService(lifecycle)).toBe(isolated)
-    expect(events).toEqual([
-      "discover",
-      "inspect:official",
-      "discover-isolated",
-      "ensure-isolated",
-      "inspect:isolated",
-    ])
+    expect(events).toEqual(["discover", "inspect:official", "discover-isolated", "ensure-isolated", "inspect:isolated"])
   })
 
   test("reuses an existing isolated fallback", async () => {
@@ -72,12 +66,7 @@ describe("Boc background service", () => {
     })
 
     expect(await connectBocService(lifecycle)).toBe(isolated)
-    expect(events).toEqual([
-      "discover",
-      "inspect:official",
-      "discover-isolated",
-      "inspect:isolated",
-    ])
+    expect(events).toEqual(["discover", "inspect:official", "discover-isolated", "inspect:isolated"])
   })
 
   test("updates an outdated isolated fallback without touching the shared service", async () => {
@@ -134,12 +123,66 @@ describe("Boc background service", () => {
       new Response(
         JSON.stringify({ available: false, backend: "boc/rift", reason: "project-mismatch", message: "missing" }),
       ),
+      new Response(
+        JSON.stringify({
+          output: {
+            protocol: 1,
+            version: "1",
+            project: { id: "project", canonical: "/project" },
+            location: { directory: "/project" },
+            source: "bundled",
+            scope: "project-on-server",
+            categories: ["tool"],
+            operations: ["info", "getState"],
+          },
+        }),
+      ),
     ]
 
     expect(await inspectBocService(official, "/project", undefined, async () => responseFrom(responses))).toEqual({
       version: "1.2.3",
       boc: true,
     })
+  })
+
+  test("rejects an older Boc backend even when its server version matches", async () => {
+    const requests: { url: URL; init?: RequestInit }[] = []
+    const responses = [
+      Response.json({ version: "1.2.3" }),
+      Response.json({ available: true }),
+      new Response("missing", { status: 404 }),
+    ]
+    expect(
+      await inspectBocService(boc, "/project", { Authorization: "Basic fixture" }, async (input, init) => {
+        requests.push({ url: new URL(String(input)), init })
+        return responseFrom(responses)
+      }),
+    ).toEqual({ version: "1.2.3", boc: false })
+    expect(requests[2]?.url.pathname).toBe("/api/rpc/boc.controls.v1/info")
+    expect(requests[2]?.url.searchParams.get("location[directory]")).toBe("/project")
+    expect(new Headers(requests[2]?.init?.headers).get("Authorization")).toBe("Basic fixture")
+  })
+
+  test("updates an isolated backend missing controls even at the same version", async () => {
+    const events: string[] = []
+    const current = endpoint("isolated-current")
+    const lifecycle = fixture(events, {
+      isolated,
+      isolatedReplacement: current,
+      inspections: {
+        isolated: { version: "1.2.3", boc: false },
+        "isolated-current": { version: "1.2.3", boc: true },
+      },
+    })
+    expect(await connectBocService(lifecycle)).toEqual(current)
+    expect(events).toEqual([
+      "discover",
+      "discover-isolated",
+      "inspect:isolated",
+      "stop-isolated",
+      "ensure-isolated",
+      "inspect:isolated-current",
+    ])
   })
 })
 
@@ -181,6 +224,9 @@ function fixture(
     },
     stopShared: async () => {
       events.push("stop-shared")
+    },
+    stopIsolated: async () => {
+      events.push("stop-isolated")
     },
   }
 }

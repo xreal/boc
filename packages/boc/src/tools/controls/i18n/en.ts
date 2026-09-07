@@ -1,15 +1,14 @@
-export const bergflowEnglish = {
+export const controlsEnglish = {
   "boc.bergflow.title": "Project Controls",
   "boc.bergflow.origin.system": "System · bundled with OpenCode",
   "boc.bergflow.origin.global": "Global · user configuration",
   "boc.bergflow.origin.project": "Project · checkout configuration",
-  "boc.bergflow.origin.unknown": "Origin not reported",
+  "boc.bergflow.origin.plugin": "Plugin · registered capability",
   "boc.bergflow.subtitle": "Your project. Your capabilities.",
   "boc.bergflow.readOnly": "Read-only",
   "boc.bergflow.readOnly.agent":
-    "Agent switching is not supported by this Bergflow version. Agents are shown for reference.",
-  "boc.bergflow.readOnly.instruction":
-    "AGENTS.md switching is not supported by this Bergflow version. Discovered files are shown; their effect in a session is unconfirmed.",
+    "Agents are shown for reference. Agent switching is not yet available in Project Controls.",
+  "boc.bergflow.readOnly.instruction": "Only project-owned automatic instruction files can be switched here.",
   "boc.bergflow.scope.instruction":
     "Project files affect future automatic instruction loads. Instructions already in session history and nested instructions loaded while reading files are unchanged.",
   "boc.bergflow.openSession": "Open Project Controls for this session",
@@ -58,12 +57,11 @@ export const bergflowEnglish = {
   "boc.bergflow.bundled": "Included with Boc",
   "boc.bergflow.package": "Installed package",
   "boc.bergflow.local": "Local path",
-  "boc.bergflow.version": "Bergflow {{version}} · Protocol {{protocol}}",
-  "boc.bergflow.error.missing": "Bergflow is not available on this server.",
-  "boc.bergflow.error.disabled":
-    "Bergflow is disabled in the server configuration. Its configuration choice is respected.",
+  "boc.bergflow.version": "Boc Project Controls · Protocol {{protocol}}",
+  "boc.bergflow.error.missing": "Project Controls could not connect to its backend. Refresh to try again.",
+  "boc.bergflow.error.disabled": "Project Controls is unavailable on this server.",
   "boc.bergflow.error.unsupported":
-    "This server's Bergflow protocol is not supported. Other Boc features remain available.",
+    "This server's Project Controls protocol is not supported. Update Boc Desktop and its server together.",
   "boc.bergflow.error.unavailable":
     "Could not load controls from the selected server. Check the connection and refresh.",
   "boc.bergflow.error.conflict":
@@ -97,7 +95,4 @@ export const bergflowEnglish = {
   "boc.bergflow.availability.needs_auth": "Sign-in required",
   "boc.bergflow.availability.pending": "Connection pending",
   "boc.bergflow.availability.failed": "Connection failed",
-  "boc.bergflow.admin": "Server setup instructions",
-  "boc.bergflow.adminText":
-    "On the selected server, install the tested Bergflow artifact and add its local directory to the plugins array in OpenCode configuration. TUI discovery is automatic. For a published package, the server administrator can use opencode2 plugin add with an exact package version; that command changes the global configuration. Boc does not install anything remotely or fall back to a local server.",
 } as const

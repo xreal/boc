@@ -1,4 +1,4 @@
-import type { ControlItem } from "@bergflow/opencode/rpc"
+import type { ControlItem } from "../host"
 import { Button } from "@opencode-ai/ui/button"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Switch } from "@opencode-ai/ui/switch"
@@ -8,7 +8,7 @@ import { createMemo, createUniqueId, For, onCleanup, onMount, Show } from "solid
 import { createStore } from "solid-js/store"
 import type { BocScreenProps } from "../../../registry"
 import { createBocTranslator, type BocTranslator } from "../../../renderer/i18n"
-import { createBergflowControls, type ControlError } from "./state"
+import { createProjectControls, type ControlError } from "./state"
 import { controlOrigin } from "./origin"
 import "./screen.css"
 
@@ -21,9 +21,9 @@ const categoryIcons = {
   instruction: "edit",
 } as const
 
-const originIcons = { system: "server", global: "settings-gear", project: "folder", unknown: "help" } as const
+const originIcons = { system: "server", global: "settings-gear", project: "folder", plugin: "sliders" } as const
 
-export default function BergflowScreen(props: BocScreenProps) {
+export default function ProjectControlsScreen(props: BocScreenProps) {
   const t = createBocTranslator(props.host.locale)
   const host = props.host.controls
   if (!host)
@@ -36,7 +36,7 @@ export default function BergflowScreen(props: BocScreenProps) {
   const server = query.get("server")
   const project = query.get("project")
   const directory = query.get("directory")
-  const control = createBergflowControls(
+  const control = createProjectControls(
     host,
     server && project && directory ? { server, project, directory } : undefined,
   )
@@ -62,6 +62,7 @@ export default function BergflowScreen(props: BocScreenProps) {
     ...new Set([...(projectInfo()?.locations ?? []), ...(view.selection ? [view.selection.directory] : [])]),
   ]
   const origin = (item: ControlItem) =>
+    item.origin ??
     controlOrigin(item.source, {
       project: [view.snapshot?.info.project.canonical ?? "", ...locations()],
       global: serverInfo()?.globalDirectories ?? [],
@@ -90,8 +91,8 @@ export default function BergflowScreen(props: BocScreenProps) {
   }
   return (
     <main
-      data-boc-bergflow
-      data-boc-screen="bergflow"
+      data-boc-controls
+      data-boc-screen="controls"
       class="mx-2 mb-[var(--shell-bottom-inset,8px)] mt-[var(--shell-top-inset,8px)] flex min-h-0 min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-[10px] bg-v2-background-bg-base text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
     >
       <header class="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-muted px-4">
@@ -109,7 +110,7 @@ export default function BergflowScreen(props: BocScreenProps) {
       </header>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-4 sm:p-6">
-          <div class="bergflow-context">
+          <div class="controls-context">
             <div class="flex flex-wrap gap-3" aria-busy={!!view.pending}>
               <label class="flex min-w-[160px] flex-1 flex-col gap-1 text-12-medium">
                 {t("boc.bergflow.server")}
@@ -141,7 +142,11 @@ export default function BergflowScreen(props: BocScreenProps) {
                 >
                   <option value="">{t("boc.bergflow.selectProject")}</option>
                   <For each={serverInfo()?.projects}>
-                    {(project) => <option value={project.directory}>{project.name}</option>}
+                    {(project) => (
+                      <option value={project.directory} selected={view.selection?.project === project.directory}>
+                        {project.name}
+                      </option>
+                    )}
                   </For>
                   <Show when={view.selection && !projectInfo()}>
                     <option value={view.selection?.project}>{view.selection?.project}</option>
@@ -179,18 +184,12 @@ export default function BergflowScreen(props: BocScreenProps) {
               </div>
             </Show>
           </div>
-          <div role="status" aria-live="polite" aria-atomic="true" class="bergflow-feedback text-13-regular">
+          <div role="status" aria-live="polite" aria-atomic="true" class="controls-feedback text-13-regular">
             <Show when={view.error}>{(error) => <p>{t(`boc.bergflow.error.${error()}`)}</p>}</Show>
             <Show when={view.stale && view.snapshot}>
               <p class="mt-1 text-v2-text-text-muted">{t("boc.bergflow.stale")}</p>
             </Show>
           </div>
-          <Show when={view.error === "missing" || view.error === "disabled" || view.error === "unsupported"}>
-            <details class="rounded-lg border border-v2-border-border-base p-3 text-13-regular">
-              <summary class="cursor-pointer">{t("boc.bergflow.admin")}</summary>
-              <p class="mt-2 leading-relaxed text-v2-text-text-muted">{t("boc.bergflow.adminText")}</p>
-            </details>
-          </Show>
           <Show
             when={view.selection}
             fallback={<p class="py-12 text-center text-v2-text-text-muted">{t("boc.bergflow.choose")}</p>}
@@ -206,17 +205,17 @@ export default function BergflowScreen(props: BocScreenProps) {
               }
             >
               <Show when={view.snapshot}>
-                <div class="bergflow-filters">
+                <div class="controls-filters">
                   <TextInput
                     ref={searchInput}
-                    class="bergflow-search"
+                    class="controls-search"
                     aria-label={t("boc.bergflow.search")}
                     leadingIcon={<Icon name="magnifying-glass" />}
                     value={filters.search}
                     onInput={(event) => setFilters("search", event.currentTarget.value)}
                     placeholder={t("boc.bergflow.search")}
                   />
-                  <div class="bergflow-categories" role="group" aria-label={t("boc.bergflow.filter")}>
+                  <div class="controls-categories" role="group" aria-label={t("boc.bergflow.filter")}>
                     <For each={["all", ...kinds] as const}>
                       {(kind) => (
                         <button
@@ -239,7 +238,7 @@ export default function BergflowScreen(props: BocScreenProps) {
                   </div>
                 </div>
                 <Show when={view.snapshot?.incomplete.length}>
-                  <p class="bergflow-notice text-12-regular">
+                  <p class="controls-notice text-12-regular">
                     <Icon name="info" />
                     {t("boc.bergflow.partial")}
                   </p>
@@ -251,29 +250,29 @@ export default function BergflowScreen(props: BocScreenProps) {
                       <Show when={items().length}>
                         <section class="min-w-0">
                           <h2 class="mb-2 flex items-center gap-2 text-14-medium">
-                            <span class="bergflow-category-icon" aria-hidden="true">
+                            <span class="controls-category-icon" aria-hidden="true">
                               <Icon name={categoryIcons[kind]} />
                             </span>
                             {t(`boc.bergflow.${kind}`)}{" "}
-                            <span class="bergflow-count text-12-regular text-v2-text-text-muted">{items().length}</span>
+                            <span class="controls-count text-12-regular text-v2-text-text-muted">{items().length}</span>
                           </h2>
                           <Show
                             when={
                               (kind === "agent" || kind === "instruction") && items().every((item) => !item.mutable)
                             }
                           >
-                            <p class="bergflow-readonly-note text-12-regular text-v2-text-text-muted">
+                            <p class="controls-readonly-note text-12-regular text-v2-text-text-muted">
                               {t(
                                 kind === "agent" ? "boc.bergflow.readOnly.agent" : "boc.bergflow.readOnly.instruction",
                               )}
                             </p>
                           </Show>
                           <Show when={kind === "instruction"}>
-                            <p class="bergflow-readonly-note text-12-regular text-v2-text-text-muted">
+                            <p class="controls-readonly-note text-12-regular text-v2-text-text-muted">
                               {t("boc.bergflow.scope.instruction")}
                             </p>
                           </Show>
-                          <div class="bergflow-cards">
+                          <div class="controls-cards">
                             <For each={items()}>
                               {(item) => (
                                 <ControlRow
@@ -356,20 +355,20 @@ function ControlRow(props: {
   disabled: boolean
   pending: boolean
   error?: ControlError | undefined
-  operations: string[]
+  operations: readonly string[]
   change: (action: "set" | "clear" | "retry", enabled?: boolean) => void
 }) {
   const statusID = createUniqueId()
   const desired = () => props.item.override ?? props.item.defaultEnabled ?? props.item.effective === "enabled"
   const showStatus = () => props.pending || props.item.application === "failed" || props.item.effective === "disabled"
   return (
-    <article class="bergflow-card min-w-0 p-3 sm:p-4" aria-busy={props.pending}>
+    <article class="controls-card min-w-0 p-3 sm:p-4" aria-busy={props.pending}>
       <div class="flex items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
           <h3 class="flex items-start gap-2 break-words text-14-medium" aria-label={props.item.name}>
             <Tooltip value={props.t(`boc.bergflow.origin.${props.origin}`)}>
               <span
-                class="bergflow-origin"
+                class="controls-origin"
                 data-origin={props.origin}
                 role="img"
                 aria-label={props.t(`boc.bergflow.origin.${props.origin}`)}
@@ -386,7 +385,7 @@ function ControlRow(props: {
           <Show when={showStatus()}>
             <p
               id={statusID}
-              class="bergflow-status mt-2 text-12-regular"
+              class="controls-status mt-2 text-12-regular"
               data-state={
                 props.pending ? "pending" : props.item.application === "failed" ? "failed" : props.item.effective
               }
@@ -415,7 +414,7 @@ function ControlRow(props: {
         </div>
         <Show
           when={props.item.mutable && props.operations.includes("setEnabled")}
-          fallback={<span class="bergflow-readonly text-12-medium">{props.t("boc.bergflow.readOnly")}</span>}
+          fallback={<span class="controls-readonly text-12-medium">{props.t("boc.bergflow.readOnly")}</span>}
         >
           <Switch
             hideLabel

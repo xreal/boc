@@ -6,6 +6,7 @@ import type { ServerConfig } from "@opencode-ai/schema/mcp"
 import { Effect, Stream } from "effect"
 import { Config } from "../../config.js"
 import { Mcp } from "../../mcp/index.js"
+import { BocControlSource } from "../../boc/control-source.js"
 
 export const Plugin = define({
   id: "opencode.config.mcp",
@@ -44,14 +45,17 @@ export const register = Effect.fn("ConfigMCPPlugin.register")(function* (
       ...documents.flatMap((entry) => (entry.info.mcp?.timeout ? [entry.info.mcp.timeout] : [])),
     )
     const servers = new Map<string, ServerConfig>()
+    const files = new Map<string, string | undefined>()
     for (const document of documents) {
       for (const [name, server] of Object.entries(document.info.mcp?.servers ?? {})) {
         servers.set(name, server)
+        files.set(name, document.path)
       }
     }
     for (const [name, server] of servers) {
       if (editor.get(name)) continue
       editor.set(name, { ...server, timeout: { ...timeout, ...server.timeout } })
+      BocControlSource.file(editor.get(name), files.get(name))
     }
   })
 })

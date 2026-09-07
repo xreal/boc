@@ -1,11 +1,11 @@
-import type { ControlState, BergflowHost } from "@boc/extensions/bergflow"
+import type { ControlState, ControlsHost } from "@boc/extensions/controls"
 import { BocScreen, BocHostProvider } from "@boc/extensions/renderer"
 
 function ControlsPreview() {
   let snapshot: ControlState = {
     info: {
       protocol: 1,
-      version: "0.2.1",
+      version: "1",
       project: { id: "fixture", canonical: "/workspace/shop" },
       location: { directory: "/workspace/shop" },
       source: "bundled",
@@ -14,7 +14,7 @@ function ControlsPreview() {
       operations: ["info", "getState", "setEnabled", "clearOverride", "retryApply"],
     },
     revision: 0,
-    incomplete: ["tool"],
+    incomplete: [],
     items: [
       {
         kind: "skill",
@@ -40,8 +40,24 @@ function ControlsPreview() {
         effect: "next_skill_request",
         mutable: true,
       },
-      { kind: "agent", id: "build", name: "Build", source: "OpenCode", effect: "read_only", mutable: false },
-      { kind: "agent", id: "general", name: "General", source: "OpenCode", effect: "read_only", mutable: false },
+      {
+        kind: "agent",
+        id: "build",
+        name: "Build",
+        source: "opencode.agent",
+        origin: "system",
+        effect: "read_only",
+        mutable: false,
+      },
+      {
+        kind: "agent",
+        id: "general",
+        name: "General",
+        source: "opencode.agent",
+        origin: "system",
+        effect: "read_only",
+        mutable: false,
+      },
       {
         kind: "instruction",
         id: "AGENTS.md",
@@ -54,7 +70,7 @@ function ControlsPreview() {
         kind: "mcp",
         id: "documentation",
         name: "Documentation",
-        source: "OpenCode MCP configuration",
+        source: "/workspace/shop/opencode.json",
         effect: "mcp_reconnect",
         mutable: true,
       },
@@ -107,7 +123,7 @@ function ControlsPreview() {
       attempt: () => 0,
       subscribe: () => () => {},
     }),
-  } as unknown as BergflowHost
+  } as unknown as ControlsHost
   return (
     <BocHostProvider
       value={{
@@ -115,19 +131,19 @@ function ControlsPreview() {
         platform: "web",
         locale: () => "en",
         navigate: () => {},
-        location: () => ({ pathname: "/boc/bergflow", search: "" }),
-        route: () => ({ type: "boc", id: "bergflow" }),
+        location: () => ({ pathname: "/boc/controls", search: "" }),
+        route: () => ({ type: "boc", id: "controls" }),
         openExternal: () => {},
       }}
     >
-      <BocScreen id="bergflow" />
+      <BocScreen id="controls" />
     </BocHostProvider>
   )
 }
 
 export default {
   title: "Boc/Project Controls",
-  id: "boc-bergflow",
+  id: "boc-controls",
   component: ControlsPreview,
   parameters: { layout: "fullscreen" },
 }

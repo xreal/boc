@@ -13,6 +13,7 @@ import { App } from "../app.js"
 import { Agent } from "../agent.js"
 import { AISDK } from "../aisdk.js"
 import { BocSelection } from "../boc/selection.js"
+import { BocControlSource } from "../boc/control-source.js"
 import { Catalog } from "../catalog.js"
 import { Command } from "../command.js"
 import { Credential } from "../credential.js"
@@ -537,6 +538,7 @@ export const make = Effect.fn("PluginHost.make")(function* (
       context: (input) => sessions.context(input.sessionID),
     },
   }
+  if (app.channel === "boc") return BocControlSource.remember(context, pluginID)
   return context
 })
 

@@ -7,6 +7,9 @@ import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import installer from "../../../../../install?raw"
 import { DesktopPaths } from "../paths"
 import { parseCliVersion } from "./cli-version"
+import { bocCliStage } from "../../boc/cli-stage"
+import { isBocSourceBackend } from "../../boc/development"
+import { CHANNEL } from "../constants"
 
 const execFileAsync = promisify(execFile)
 
@@ -55,6 +58,7 @@ const make = Effect.fn("DesktopCli.resolve")(function* () {
           "--cwd",
           development,
           `--define=OPENCODE_VERSION=${JSON.stringify(version)}`,
+          ...(isBocSourceBackend(CHANNEL) ? ['--define=OPENCODE_CHANNEL="boc"'] : []),
           "src/index.ts",
         ],
         binary: undefined,
@@ -108,7 +112,8 @@ export const cleanStages = Effect.fn("DesktopCli.cleanStages")(function* (binary
 const installCli = Effect.fn("DesktopCli.install")(function* (source: string, version: string) {
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
-  const directory = path.join(app.getPath("userData"), "cli", version.replace(/[^a-zA-Z0-9._-]/g, "-"))
+  const stage = CHANNEL === "boc" ? yield* Effect.promise(() => bocCliStage(source, version)) : version
+  const directory = path.join(app.getPath("userData"), "cli", stage.replace(/[^a-zA-Z0-9._-]/g, "-"))
   const destination = path.join(directory, executableName())
   if (yield* fs.exists(destination)) {
     yield* Effect.logInfo("v2 CLI staged executable reused", { path: destination, version })
