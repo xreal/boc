@@ -5,14 +5,19 @@ import type { IntegrationMethodRegistration } from "@opencode-ai/plugin/effect/i
 import { EventManifest } from "@opencode-ai/schema/event-manifest"
 import type { Event } from "@opencode-ai/schema/event"
 import { ServerConfig } from "@opencode-ai/schema/mcp"
-import { App } from "../app.js"
+import { LayerNode } from "@opencode-ai/util/effect/layer-node"
+import { FSUtil } from "@opencode-ai/util/fs-util"
+import { Global } from "@opencode-ai/util/global"
 import { Effect, Schema, Stream } from "effect"
+import { App } from "../app.js"
 import { Agent } from "../agent.js"
 import { AISDK } from "../aisdk.js"
+import { BocSelection } from "../boc/selection.js"
 import { Catalog } from "../catalog.js"
 import { Command } from "../command.js"
 import { Credential } from "../credential.js"
 import { Bus } from "../bus.js"
+import { InstructionDiscovery } from "../instruction-discovery.js"
 import { Integration } from "../integration.js"
 import { KV } from "../kv.js"
 import { Location } from "../location.js"
@@ -35,7 +40,6 @@ import { Generate } from "../generate.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "./hooks.js"
 import type { Interface } from "../plugin.js"
-import { LayerNode } from "@opencode-ai/util/effect/layer-node"
 
 const mutable = <T>(value: T) => value as DeepMutable<T>
 type RpcEvent = Event.Payload & {
@@ -71,6 +75,9 @@ export const make = Effect.fn("PluginHost.make")(function* (
   const persistentPty = yield* PersistentPty.Service
   const locations = yield* LocationServiceMap.Service
   const worktrees = yield* Worktree.Service
+  const fs = yield* FSUtil.Service
+  const global = yield* Global.Service
+  const instructionDiscovery = yield* InstructionDiscovery.Service
   const locationInfo = () =>
     new Location.Info({
       directory: location.directory,
@@ -421,6 +428,7 @@ export const make = Effect.fn("PluginHost.make")(function* (
           })
         }),
     },
+    selection: BocSelection.facade({ hooks, discovery: instructionDiscovery, fs, global, location }),
     skill: {
       list: () => response(skill.list()),
       reload: skill.reload,
@@ -556,6 +564,9 @@ export const requirements = LayerNode.group([
   Session.node,
   PersistentPty.node,
   LocationServiceMap.node,
+  FSUtil.node,
+  Global.node,
+  InstructionDiscovery.node,
 ])
 
 export function storage(kv: KV.Interface, pluginID: string): Plugin.Context["storage"] {

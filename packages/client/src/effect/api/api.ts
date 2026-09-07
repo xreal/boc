@@ -605,7 +605,10 @@ export type SessionLogOutput =
           readonly type: "session.execution.interrupted"
           readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
           readonly location?: Location.Ref | undefined
-          readonly data: { readonly sessionID: Session.ID; readonly reason: "user" | "shutdown" | "superseded" }
+          readonly data: {
+            readonly sessionID: Session.ID
+            readonly reason: "user" | "shutdown" | "superseded" | "inactivity"
+          }
         }
       | {
           readonly id: Event.ID
@@ -1426,6 +1429,7 @@ export type ProjectListOperation<E = never> = () => Effect.Effect<ProjectListOut
 
 export type ProjectUpdateInput = {
   readonly projectID: Project.ID
+  readonly canonical?: AbsolutePath | undefined
   readonly name?: string | undefined
   readonly icon?: Project.Icon | undefined
   readonly commands?: Project.Commands | undefined

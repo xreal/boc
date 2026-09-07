@@ -2,6 +2,7 @@ import type { IconProps } from "@opencode-ai/ui/icon"
 import type { Component } from "solid-js"
 import type { BocI18nKey } from "./renderer/i18n"
 import type { BocHost } from "./renderer/host"
+import { bergflowExtension } from "./tools/bergflow/extension"
 import { deploymentsExtension } from "./tools/deployments/extension"
 import { jiraExtension } from "./tools/jira/extension"
 
@@ -24,7 +25,7 @@ export type BocExtension = {
   desktopOnly?: boolean
 }
 
-export const bocExtensions: readonly BocExtension[] = [jiraExtension, deploymentsExtension]
+export const bocExtensions: readonly BocExtension[] = [jiraExtension, deploymentsExtension, bergflowExtension]
 
 export function byId(id: string): BocExtension | undefined {
   return bocExtensions.find((extension) => extension.id === id)

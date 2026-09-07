@@ -1,0 +1,170 @@
+[data-boc-bergflow] {
+  .bergflow-context {
+    display: grid;
+    gap: 14px;
+    padding: 18px;
+    border: 1px solid var(--v2-border-border-base);
+    border-radius: 12px;
+    background: var(--v2-background-bg-base);
+    box-shadow: var(--shadow-xs);
+  }
+
+  .bergflow-feedback:empty {
+    display: none;
+  }
+
+  .bergflow-filters {
+    display: grid;
+    gap: 14px;
+  }
+
+  .bergflow-categories {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+
+    button {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 6px 10px;
+      border: 1px solid var(--v2-border-border-base);
+      border-radius: 8px;
+      background: var(--v2-background-bg-base);
+      color: var(--v2-text-text-muted);
+      font-size: 12px;
+      line-height: var(--line-height-compact);
+      cursor: pointer;
+
+      &:hover {
+        background: var(--v2-background-bg-layer-01);
+      }
+
+      &[aria-pressed="true"] {
+        color: var(--v2-text-text-accent);
+        border-color: var(--v2-icon-icon-accent);
+        background: color-mix(in srgb, var(--v2-icon-icon-accent) 10%, var(--v2-background-bg-base));
+      }
+
+      span {
+        font-variant-numeric: tabular-nums;
+      }
+    }
+  }
+
+  .bergflow-notice {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--v2-text-text-muted);
+
+    [data-component="icon"] {
+      flex-shrink: 0;
+    }
+  }
+
+  .bergflow-category-icon {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: var(--v2-background-bg-layer-02);
+    color: var(--v2-icon-icon-accent);
+  }
+
+  .bergflow-count {
+    margin-inline-start: auto;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bergflow-readonly-note {
+    margin-block: 0 12px;
+  }
+
+  .bergflow-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+    align-items: start;
+    gap: 10px;
+  }
+
+  .bergflow-card {
+    border: 1px solid var(--v2-border-border-base);
+    border-radius: 12px;
+    background: var(--v2-background-bg-base);
+    box-shadow: var(--shadow-xs);
+    transition:
+      border-color 150ms,
+      box-shadow 150ms;
+
+    &:hover,
+    &:focus-within {
+      border-color: var(--v2-border-border-strong);
+      box-shadow: var(--shadow-md);
+    }
+
+    details[open] {
+      border-block-start: 1px solid var(--v2-border-border-base);
+      padding-block-start: 10px;
+    }
+  }
+
+  .bergflow-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--v2-background-bg-layer-02);
+    color: var(--v2-text-text-muted);
+
+    &::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      flex-shrink: 0;
+      border-radius: 50%;
+      background: currentColor;
+    }
+
+    &[data-state="pending"] {
+      background: var(--v2-state-bg-warning);
+      color: var(--v2-state-fg-warning);
+    }
+
+    &[data-state="failed"] {
+      background: var(--v2-state-bg-danger);
+      color: var(--v2-state-fg-danger);
+    }
+  }
+
+  .bergflow-readonly {
+    flex-shrink: 0;
+    padding: 3px 7px;
+    border: 1px solid var(--v2-border-border-base);
+    border-radius: 6px;
+    color: var(--v2-text-text-muted);
+  }
+
+  button:focus-visible,
+  summary:focus-visible {
+    outline: 2px solid var(--v2-border-border-focus);
+    outline-offset: 3px;
+  }
+
+  select:focus,
+  [data-component="input"][data-variant="normal"] [data-slot="input-wrapper"]:focus-within:not(:has([data-readonly])) {
+    border-color: var(--v2-border-border-focus);
+    outline: 2px solid var(--v2-border-border-focus);
+    outline-offset: 2px;
+    box-shadow: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-boc-bergflow] .bergflow-card {
+    transition: none;
+  }
+}

@@ -96,7 +96,7 @@ export function createEnvironmentStore(directory: string) {
     read: async (projectID: string, checkout: string) => {
       const cacheKey = key(projectID, checkout)
       const cached = records.get(cacheKey)
-      if (cached) return cached
+      if (cached) return structuredClone(cached)
       const value = await Bun.file(file(projectID, checkout))
         .json()
         .catch(() => undefined)
@@ -110,16 +110,18 @@ export function createEnvironmentStore(directory: string) {
             latestRun: decoded.latestRun ? { ...decoded.latestRun } : undefined,
           }
         : undefined
-      if (record && record.projectID === projectID && record.directory === checkout) records.set(cacheKey, record)
+      if (record && record.projectID === projectID && record.directory === checkout)
+        records.set(cacheKey, structuredClone(record))
       return record?.projectID === projectID && record.directory === checkout ? record : undefined
     },
     write: async (record: EnvironmentRecord) => {
+      const snapshot = structuredClone(record)
       await fs.mkdir(directory, { recursive: true })
-      const destination = file(record.projectID, record.directory)
+      const destination = file(snapshot.projectID, snapshot.directory)
       const temporary = `${destination}.${randomUUID()}.tmp`
-      await Bun.write(temporary, `${JSON.stringify(record, undefined, 2)}\n`)
+      await Bun.write(temporary, `${JSON.stringify(snapshot, undefined, 2)}\n`)
       await fs.rename(temporary, destination)
-      records.set(key(record.projectID, record.directory), record)
+      records.set(key(snapshot.projectID, snapshot.directory), snapshot)
     },
   }
 }

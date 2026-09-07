@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  BOC_SERVER_VERSION: 0.0.0-beta-19192
+  BOC_SERVER_VERSION: 0.0.0-beta-19234
 
 concurrency:
   group: boc-release
@@ -93,12 +93,12 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
         with:
-          bun-version: 1.4.1
+          bun-version: 1.4.2
 
       - name: Build bundled CLI binaries
         run: bun ./packages/cli/script/build.ts
         env:
-          BUN_COMPILE_RELEASE: bun-v1.4.1
+          BUN_COMPILE_RELEASE: bun-v1.4.2
           GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_CHANNEL: boc
           OPENCODE_VERSION: ${{ env.BOC_SERVER_VERSION }}

@@ -6,6 +6,7 @@ import type { ShellHooks } from "@opencode-ai/plugin/effect/shell"
 import type { ToolFailures, ToolHooks } from "@opencode-ai/plugin/effect/tool"
 import type { ModelHookOptions } from "@opencode-ai/plugin/effect/registration"
 import type { PermissionHooks } from "@opencode-ai/plugin/effect/permission"
+import type { BocSelection } from "../boc/selection.js"
 import { Context, Effect, Layer, Scope } from "effect"
 import { makeLocationNode } from "@opencode-ai/util/effect/app-node"
 import { State } from "../state.js"
@@ -16,6 +17,7 @@ export interface Domains {
   readonly permission: PermissionHooks
   readonly shell: ShellHooks
   readonly tool: ToolHooks
+  readonly selection: BocSelection.Hooks
 }
 
 type NoFailures<Spec> = { readonly [Name in keyof Spec]: never }
@@ -27,6 +29,7 @@ interface Failures extends Record<keyof Domains, unknown> {
   readonly permission: NoFailures<PermissionHooks>
   readonly shell: NoFailures<ShellHooks>
   readonly tool: ToolFailures
+  readonly selection: NoFailures<BocSelection.Hooks>
 }
 
 type Callback<Event, Error> = (event: Event) => Effect.Effect<void, Error>

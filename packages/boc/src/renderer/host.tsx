@@ -1,6 +1,9 @@
 import { createContext, useContext, type ParentProps } from "solid-js"
 
+import type { BergflowHost } from "../tools/bergflow/host"
+
 export type BocHost = {
+  controls?: BergflowHost
   sessions?: {
     projects(): { server: string; directory: string; label: string }[]
     start(input: {

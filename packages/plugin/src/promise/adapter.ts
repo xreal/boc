@@ -442,6 +442,20 @@ export function fromPromise(plugin: Plugin) {
             transform: transform(host.reference),
             reload: () => run(host.reference.reload()),
           },
+          ...(host.selection
+            ? {
+                selection: {
+                  version: host.selection.version,
+                  hook: (_name, callback) =>
+                    register(
+                      host.selection!.hook("instructions", (event) =>
+                        Effect.promise(() => Promise.resolve(callback(event))),
+                      ),
+                    ),
+                  listInstructions: () => run(host.selection!.listInstructions()),
+                },
+              }
+            : {}),
           rpc: yield* rpcFromEffect(host.rpc, streams),
           skill: {
             list: adaptApiMethod(SkillEndpoints["skill.list"], host.skill.list),

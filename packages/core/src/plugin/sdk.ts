@@ -8,6 +8,8 @@ import type { Generation } from "../plugin.js"
 
 export const Updated = Bus.ephemeral({ type: "sdk.plugin.updated", schema: {} })
 
+export type Registration = Generation & { readonly fallback?: boolean }
+
 /**
  * Holds the plugins an embedder (the `@opencode-ai/sdk` host) contributes,
  * so the application loader can add them on every Location boot through its
@@ -19,8 +21,9 @@ export const Updated = Bus.ephemeral({ type: "sdk.plugin.updated", schema: {} })
  * every Location in one host sees the same registrations.
  */
 export interface Interface {
-  readonly register: (plugin: Plugin) => Effect.Effect<void>
-  readonly all: () => readonly Generation[]
+  /** Fallbacks activate only when external plugin selection is complete and their ID is unclaimed. */
+  readonly register: (plugin: Plugin, options?: { readonly fallback?: boolean }) => Effect.Effect<void>
+  readonly all: () => readonly Registration[]
 }
 
 export class Service extends Context.Service<Service, Interface>()("@opencode/SdkPlugins") {}
@@ -29,12 +32,17 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const bus = yield* Bus.Service
-    const plugins = new Map<string, Generation>()
+    const plugins = new Map<string, Registration>()
     let revision = 0
     return Service.of({
-      register: (plugin) =>
+      register: (plugin, options) =>
         Effect.sync(() => {
-          plugins.set(plugin.id, { ...plugin, revision: String(++revision), source: { type: "sdk" } })
+          plugins.set(plugin.id, {
+            ...plugin,
+            revision: String(++revision),
+            source: { type: "sdk" },
+            ...(options?.fallback ? { fallback: true } : {}),
+          })
         }).pipe(Effect.andThen(bus.publish(Updated, {})), Effect.asVoid),
       all: () => [...plugins.values()],
     })
