@@ -32,7 +32,10 @@ export function createDeploymentHandlers(runtime: DeploymentHandlersRuntime) {
       BocDeploymentsDispatchPreparedReset: (payload) =>
         Effect.promise(() => runtime.service.dispatchPreparedReset(payload)),
       BocDeploymentsRedeployBranch: () => Effect.succeed(unavailable("github_workflow_dispatch")),
-      BocDeploymentsSetAutoSync: () => Effect.succeed(unavailable("bf_deploy_auto_sync")),
+      BocDeploymentsSetAutoSync: (payload) => Effect.promise(() => runtime.service.turnAutoSyncOff(payload)),
+      BocDeploymentsGetCacheRun: (payload) => Effect.sync(() => runtime.service.getCacheRun(payload)),
+      BocDeploymentsStartCacheRun: (payload) => Effect.sync(() => runtime.service.startCacheRun(payload)),
+      BocDeploymentsResolveCacheRun: (payload) => Effect.sync(() => runtime.service.resolveCacheRun(payload)),
     }),
   )
 }

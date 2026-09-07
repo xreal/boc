@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test"
 import { Schema } from "effect"
 import {
   DeploymentAutoSyncInput,
+  DeploymentCacheResult,
   DeploymentDraft,
   DeploymentRpcs,
   DeploymentSettings,
@@ -24,6 +25,9 @@ const deploymentTags = [
   "BocDeploymentsDispatchPreparedReset",
   "BocDeploymentsRedeployBranch",
   "BocDeploymentsSetAutoSync",
+  "BocDeploymentsGetCacheRun",
+  "BocDeploymentsStartCacheRun",
+  "BocDeploymentsResolveCacheRun",
 ] as const
 
 describe("Deployment RPC contracts", () => {
@@ -89,17 +93,20 @@ describe("Deployment RPC contracts", () => {
       Schema.decodeUnknownSync(DeploymentAutoSyncInput)({
         environment: "02",
         expected: "no-prune",
-        enabled: true,
         confirmed: true,
       }),
-    ).toEqual({ environment: "02", expected: "no-prune", enabled: true, confirmed: true })
+    ).toEqual({ environment: "02", expected: "no-prune", confirmed: true })
     expect(() =>
       Schema.decodeUnknownSync(DeploymentAutoSyncInput)({
         environment: "02",
         expected: "off",
-        enabled: true,
         confirmed: false,
       }),
     ).toThrow()
+  })
+
+  test("encodes a successful cache read with no active run", () => {
+    expect(Schema.encodeUnknownSync(DeploymentCacheResult)({ ok: true })).toEqual({ ok: true })
+    expect(() => Schema.encodeUnknownSync(DeploymentCacheResult)({ ok: true, run: undefined })).toThrow()
   })
 })

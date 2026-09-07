@@ -1,8 +1,8 @@
 import { Button } from "@opencode-ai/ui/button"
 import { Checkbox } from "@opencode-ai/ui/checkbox"
-import { Collapsible } from "@opencode-ai/ui/collapsible"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/dialog"
 import { Field } from "@opencode-ai/ui/field"
+import { Select } from "@opencode-ai/ui/select"
 import { Switch } from "@opencode-ai/ui/switch"
 import { TextInput } from "@opencode-ai/ui/text-input"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
@@ -10,7 +10,7 @@ import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocDesktopAPI } from "../../../desktop/renderer/api"
 import { createBocTranslator } from "../../../renderer/i18n"
-import { PREFERRED_DEPLOYMENT_WORKFLOW, isCommonDeploymentInput } from "../domain/workflows"
+import { PREFERRED_DEPLOYMENT_WORKFLOW } from "../domain/workflows"
 import type {
   DeploymentFailure,
   DeploymentPreparedPlan,
@@ -20,7 +20,7 @@ import type {
 import type { DeploymentOperationSummary } from "../domain/operations"
 import type { DeploymentSystem } from "../domain/systems"
 import { deploySubmitDisabledReason, deploymentDraftKey } from "./deploy-draft"
-import { DeploymentPreflightSummary, deploymentFailureMessage } from "./preflight-summary"
+import { deploymentFailureMessage } from "./deployment-failure"
 
 export type DeploymentDialogApi = Pick<
   BocDesktopAPI["deployments"],
@@ -36,12 +36,13 @@ export function DeploymentDialog(props: {
   api: DeploymentDialogApi
   locale: () => string
   system: DeploymentSystem
-  kind: "deploy" | "reset"
+  kind: "deploy" | "reset" | "redeploy"
   onQueued: (operation: DeploymentOperationSummary) => void
 }) {
   const dialog = useDialog()
   const t = createBocTranslator(props.locale)
   const locked = props.kind === "reset"
+  const branchLocked = locked || props.kind === "redeploy"
   const [form, setForm] = createStore({
     ref: locked ? "master" : (props.system.branch ?? ""),
     branches: [] as string[],
@@ -64,10 +65,7 @@ export function DeploymentDialog(props: {
       (target) => target.name.toLowerCase().includes(query) || target.filename.toLowerCase().includes(query),
     )
   }
-  const commonInputs = () =>
-    uniqueInputs(selectedTargets()).filter((input) => input.type === "boolean" && isCommonDeploymentInput(input.name))
-  const advancedInputs = () =>
-    uniqueInputs(selectedTargets()).filter((input) => !commonInputs().some((common) => common.name === input.name))
+  const workflowInputs = () => uniqueInputs(selectedTargets())
   const draftKey = () =>
     deploymentDraftKey({
       ref: form.ref,
@@ -144,6 +142,7 @@ export function DeploymentDialog(props: {
       environment: props.system.environment,
       ref: form.ref.trim(),
       workflows: form.selected.map((filename) => ({ filename, inputs: form.inputs })),
+      ...(props.kind === "redeploy" ? { expectedBranch: props.system.branch } : {}),
     })
     if (!result.ok) {
       setForm({ preparing: false, failure: result, plan: undefined })
@@ -171,7 +170,7 @@ export function DeploymentDialog(props: {
 
   createEffect(() => {
     const query = form.ref.trim()
-    if (locked) return
+    if (branchLocked) return
     const handle = setTimeout(() => void searchBranches(query), 300)
     onCleanup(() => clearTimeout(handle))
   })
@@ -190,6 +189,7 @@ export function DeploymentDialog(props: {
     <Dialog
       size="large"
       fit
+      class="!overflow-hidden"
       containerClass="!h-auto !max-h-[calc(100vh-2rem)] !w-[min(44rem,calc(100vw-2rem))]"
       data-boc-dialog="deployment-preflight"
     >
@@ -204,7 +204,7 @@ export function DeploymentDialog(props: {
           })}
         />
       </DialogHeader>
-      <DialogBody class="flex min-w-0 flex-col gap-4 overflow-x-hidden !overflow-y-auto px-4 pb-4">
+      <DialogBody class="flex min-h-0 min-w-0 flex-col gap-4 overflow-x-hidden !overflow-y-auto px-4 pb-4">
         <Show when={form.failure}>
           <p role="alert" class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-danger">
             {deploymentFailureMessage(t, form.failure!)}
@@ -214,12 +214,12 @@ export function DeploymentDialog(props: {
         <Field invalid={form.branchStatus === "invalid"}>
           <Field.Label>{t("boc.deployments.deploy.branch.label")}</Field.Label>
           <TextInput
-            autofocus={!locked}
+            autofocus={!branchLocked}
             class="!w-full"
             name="deployment-ref"
             autocomplete="off"
             spellcheck={false}
-            disabled={locked || form.dispatching}
+            disabled={branchLocked || form.dispatching}
             placeholder={t("boc.deployments.deploy.branch.placeholder")}
             value={form.ref}
             onInput={(event) => setForm({ ref: event.currentTarget.value, plan: undefined })}
@@ -275,33 +275,6 @@ export function DeploymentDialog(props: {
             value={form.workflowQuery}
             onInput={(event) => setForm("workflowQuery", event.currentTarget.value)}
           />
-          <Show when={!locked}>
-            <div class="flex gap-2">
-              <Button
-                type="button"
-                size="small"
-                variant="ghost"
-                disabled={form.dispatching}
-                onClick={() =>
-                  setForm({
-                    selected: form.targets.map((target) => target.filename),
-                    plan: undefined,
-                  })
-                }
-              >
-                {t("boc.deployments.deploy.workflows.selectAll")}
-              </Button>
-              <Button
-                type="button"
-                size="small"
-                variant="ghost"
-                disabled={form.dispatching}
-                onClick={() => setForm({ selected: [], plan: undefined })}
-              >
-                {t("boc.deployments.deploy.workflows.clear")}
-              </Button>
-            </div>
-          </Show>
           <ul class="max-h-40 overflow-auto rounded-md border border-v2-border-border-muted">
             <For each={visibleTargets()}>
               {(target) => (
@@ -332,71 +305,51 @@ export function DeploymentDialog(props: {
           </ul>
         </div>
 
-        <Show when={commonInputs().length > 0}>
+        <Show when={workflowInputs().length > 0}>
           <div class="flex flex-col gap-2">
             <h2 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
               {t("boc.deployments.deploy.inputs.label")}
             </h2>
-            <For each={commonInputs()}>
+            <For each={workflowInputs()}>
               {(input) => (
-                <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2">
-                  <span class="text-[13px] leading-[var(--line-height-compact)]">{input.label}</span>
-                  <Switch
-                    checked={form.inputs[input.name] === true}
-                    disabled={locked || form.dispatching}
-                    aria-label={input.label}
-                    onChange={(checked) => setForm("inputs", { ...form.inputs, [input.name]: checked })}
-                  />
-                </div>
+                <Show
+                  when={input.type === "boolean"}
+                  fallback={
+                    <Field>
+                      <Field.Label>{input.label}</Field.Label>
+                      <Select
+                        class="!w-full"
+                        disabled={locked || form.dispatching}
+                        options={[...(input.options ?? [])]}
+                        current={input.options?.find((option) => option === form.inputs[input.name])}
+                        value={(option) => option}
+                        label={(option) => option}
+                        onSelect={(option) => {
+                          if (option) setForm("inputs", { ...form.inputs, [input.name]: option })
+                        }}
+                      />
+                    </Field>
+                  }
+                >
+                  <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2">
+                    <span class="text-[13px] leading-[var(--line-height-compact)]">{input.label}</span>
+                    <Switch
+                      checked={form.inputs[input.name] === true}
+                      disabled={locked || form.dispatching}
+                      aria-label={input.label}
+                      onChange={(checked) => setForm("inputs", { ...form.inputs, [input.name]: checked })}
+                    />
+                  </div>
+                </Show>
               )}
             </For>
           </div>
         </Show>
-        <Show when={advancedInputs().length > 0}>
-          <Collapsible variant="ghost" defaultOpen={false}>
-            <Collapsible.Trigger>
-              <span>{t("boc.deployments.deploy.inputs.advanced")}</span>
-              <Collapsible.Arrow />
-            </Collapsible.Trigger>
-            <Collapsible.Content>
-              <div class="flex flex-col gap-2 pt-3">
-                <For each={advancedInputs()}>
-                  {(input) => (
-                    <Show
-                      when={input.type === "boolean"}
-                      fallback={
-                        <Field>
-                          <Field.Label>{input.label}</Field.Label>
-                          <TextInput
-                            class="!w-full"
-                            name={`deployment-input-${input.name}`}
-                            disabled={locked || form.dispatching}
-                            value={String(form.inputs[input.name] ?? "")}
-                            onInput={(event) =>
-                              setForm("inputs", { ...form.inputs, [input.name]: event.currentTarget.value })
-                            }
-                          />
-                        </Field>
-                      }
-                    >
-                      <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2">
-                        <span class="text-[13px] leading-[var(--line-height-compact)]">{input.label}</span>
-                        <Switch
-                          checked={form.inputs[input.name] === true}
-                          disabled={locked || form.dispatching}
-                          aria-label={input.label}
-                          onChange={(checked) => setForm("inputs", { ...form.inputs, [input.name]: checked })}
-                        />
-                      </div>
-                    </Show>
-                  )}
-                </For>
-              </div>
-            </Collapsible.Content>
-          </Collapsible>
+        <Show when={form.plan?.warnings.includes("unsafe-target") && !reviewing()}>
+          <p role="status" class="text-[12px] leading-[var(--line-height-compact)] text-v2-state-fg-warning">
+            {t("boc.deployments.deploy.warning.unsafe-target")}
+          </p>
         </Show>
-
-        <DeploymentPreflightSummary t={t} plan={form.plan} reviewing={reviewing()} expired={expired()} />
       </DialogBody>
       <DialogFooter>
         <p class="mr-auto max-w-[18rem] text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
@@ -439,7 +392,6 @@ function submitReasonCopy(
   reason?: ReturnType<typeof deploySubmitDisabledReason>,
 ) {
   if (reason === "dispatching") return t("boc.deployments.deploy.submit.dispatching")
-  if (reason === "reviewing") return t("boc.deployments.deploy.submit.reviewing")
   if (reason === "expired") return t("boc.deployments.deploy.submit.expired")
   if (reason === "ref") return t("boc.deployments.deploy.submit.ref")
   if (reason === "workflows") return t("boc.deployments.deploy.submit.workflows")

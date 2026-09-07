@@ -46,6 +46,12 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
         invoke("BocDeploymentsRedeployBranch", input),
       setAutoSync: (input: BocDesktopInvokeArgs<"BocDeploymentsSetAutoSync">[0]) =>
         invoke("BocDeploymentsSetAutoSync", input),
+      getCacheRun: (input: BocDesktopInvokeArgs<"BocDeploymentsGetCacheRun">[0]) =>
+        invoke("BocDeploymentsGetCacheRun", input),
+      startCacheRun: (input: BocDesktopInvokeArgs<"BocDeploymentsStartCacheRun">[0]) =>
+        invoke("BocDeploymentsStartCacheRun", input),
+      resolveCacheRun: (input: BocDesktopInvokeArgs<"BocDeploymentsResolveCacheRun">[0]) =>
+        invoke("BocDeploymentsResolveCacheRun", input),
     },
     jira: {
       getSessionInstructions: () => invoke("BocJiraGetSessionInstructions"),

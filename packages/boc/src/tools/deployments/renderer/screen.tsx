@@ -9,7 +9,7 @@ import { createBocTranslator } from "../../../renderer/i18n"
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { isBlockingDeploymentOperation, type DeploymentOperationSummary } from "../domain/operations"
 import { deploymentSystemFixtures } from "../fixtures/systems"
-import type { DeploymentFailure, DeploymentReadiness, DeploymentSettings } from "../rpcs"
+import type { DeploymentCacheRunSnapshot, DeploymentFailure, DeploymentReadiness, DeploymentSettings } from "../rpcs"
 import { createLatestDeploymentRequest } from "./latest-request"
 import { DeploymentDialog, createFixtureDeploymentApi } from "./deploy-dialog"
 import { DeploymentReadinessPanel } from "./readiness-panel"
@@ -24,6 +24,8 @@ import {
 } from "./surface"
 import { DeploymentsToolbar } from "./toolbar"
 import "./deployments.css"
+import { AutoSyncOffDialog } from "./auto-sync-dialog"
+import { CacheDialog } from "./cache-dialog"
 
 export default function DeploymentsScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
@@ -32,6 +34,8 @@ export default function DeploymentsScreen(props: BocScreenProps) {
   const fixtureEnabled = new URLSearchParams(props.host.location().search).has("fixture")
   const fixture = deploymentFixtureMode(props.host.location().search)
   let bootstrapGeneration = 0
+  let cacheTimer: ReturnType<typeof setTimeout> | undefined
+  let fixtureCacheRun: DeploymentCacheRunSnapshot | undefined
   const [view, setView] = createStore({
     search: "",
     availability: "all" as DeploymentAvailabilityFilter,
@@ -47,6 +51,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     refreshNotice: undefined as "success" | "failure" | undefined,
     queuedNotice: undefined as { system: string; state: DeploymentOperationSummary["state"] } | undefined,
     queuedOperations: {} as Record<string, DeploymentOperationSummary>,
+    cacheRuns: {} as Record<string, DeploymentCacheRunSnapshot | undefined>,
   })
 
   if (!desktop) return null
@@ -63,7 +68,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
         ...system,
         ...(operation ? { operation } : {}),
         allowedActions:
-          operation && isBlockingDeploymentOperation(operation.state) ? [] : (["deploy", "reset"] as const),
+          operation && isBlockingDeploymentOperation(operation.state) ? [] : (["deploy", "reset", "clear-cache"] as const),
       }
     })
   }
@@ -125,6 +130,17 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     }
     applyWorkspace(result.workspace)
     setView("loading", false)
+    void pollCacheRuns(result.workspace.systems)
+  }
+
+  const pollCacheRuns = async (targets = view.systems) => {
+    clearTimeout(cacheTimer)
+    const results = await Promise.all(
+      targets.map(async (system) => [system.environment, await desktop.deployments.getCacheRun({ environment: system.environment }).catch(() => undefined)] as const),
+    )
+    const runs = Object.fromEntries(results.flatMap(([environment, result]) => result?.ok && result.run ? [[environment, result.run]] : []))
+    setView("cacheRuns", runs)
+    if (Object.values(runs).some((run) => run.state === "running")) cacheTimer = setTimeout(() => void pollCacheRuns(), 1000)
   }
 
   const refresh = async (force = true) => {
@@ -151,7 +167,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     })
   }
 
-  const openDeploy = (system: DeploymentSystem, kind: "deploy" | "reset") => {
+  const openDeploy = (system: DeploymentSystem, kind: "deploy" | "reset" | "redeploy") => {
     void dialog.show(() => (
       <DeploymentDialog
         api={fixtureEnabled ? createFixtureDeploymentApi() : desktop.deployments}
@@ -187,11 +203,60 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     ))
   }
 
+  const openAutoSyncOff = (system: DeploymentSystem) => {
+    void dialog.show(() => (
+      <AutoSyncOffDialog
+        t={t}
+        system={system}
+        run={() =>
+          desktop.deployments.setAutoSync({ environment: system.environment, expected: system.autoSync, confirmed: true })
+        }
+        onSuccess={(result) => {
+          setView({
+            systems: result.systems,
+            readiness: result.readiness,
+            fetchedAt: result.fetchedAt,
+            staleFailure: result.staleFailure,
+            refreshNotice: result.staleFailure ? "failure" : "success",
+          })
+        }}
+      />
+    ))
+  }
+
+  const openClearCache = (system: DeploymentSystem) => {
+    const get = async () => ({ ok: true as const, run: fixtureCacheRun })
+    const start = async () => {
+      fixtureCacheRun = {
+        environment: system.environment,
+        state: "running" as const,
+        output: "Connecting to the fixture host…\nRunning full hard cache flush…\n",
+        startedAt: new Date().toISOString(),
+      }
+      return { ok: true as const, run: fixtureCacheRun }
+    }
+    const resolve = async () => {
+      if (fixtureCacheRun?.state === "unknown") fixtureCacheRun = { ...fixtureCacheRun, state: "resolved" as const }
+      return { ok: true as const, run: fixtureCacheRun }
+    }
+    void dialog.show(() => (
+      <CacheDialog
+        t={t}
+        system={system}
+        get={fixtureEnabled ? get : () => desktop.deployments.getCacheRun({ environment: system.environment })}
+        start={fixtureEnabled ? start : () => desktop.deployments.startCacheRun({ environment: system.environment })}
+        resolve={fixtureEnabled ? resolve : (startedAt) => desktop.deployments.resolveCacheRun({ environment: system.environment, startedAt, confirmedEnded: true })}
+        onUpdate={(run) => setView("cacheRuns", system.environment, run)}
+      />
+    ))
+  }
+
   onMount(() => {
     if (!fixtureEnabled) void bootstrap()
     onCleanup(() => {
       bootstrapGeneration += 1
       requests.invalidate()
+      clearTimeout(cacheTimer)
     })
   })
 
@@ -313,6 +378,10 @@ export default function DeploymentsScreen(props: BocScreenProps) {
             }
             onDeploy={(system) => openDeploy(system, "deploy")}
             onReset={(system) => openDeploy(system, "reset")}
+            onRedeploy={(system) => openDeploy(system, "redeploy")}
+            onTurnAutoSyncOff={openAutoSyncOff}
+            cacheRuns={view.cacheRuns}
+            onClearCache={openClearCache}
           />
         </Show>
         <Show when={surface() === "loading"}>

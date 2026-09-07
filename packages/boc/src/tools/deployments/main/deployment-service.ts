@@ -1,4 +1,9 @@
-import { isReservedDevEnvironment, type AllowedDevEnvironment } from "../domain/environments"
+import path from "node:path"
+import {
+  DEPLOYMENT_KUBE_CONTEXT,
+  isReservedDevEnvironment,
+  type AllowedDevEnvironment,
+} from "../domain/environments"
 import { deploymentFailure, type DeploymentFailure } from "../domain/failures"
 import {
   isBlockingDeploymentOperation,
@@ -7,7 +12,7 @@ import {
   type DeploymentOperationSummary,
   type DeploymentWorkflowOperation,
 } from "../domain/operations"
-import { deploymentTicketKey, type DeploymentSystem } from "../domain/systems"
+import { deploymentTicketKey, type DeploymentRowAction, type DeploymentSystem } from "../domain/systems"
 import {
   normalizeDeploymentWorkflowInputs,
   PREFERRED_DEPLOYMENT_WORKFLOW,
@@ -30,6 +35,8 @@ import type {
 } from "../rpcs"
 import { readArgoFleet, verifyArgoDevTarget, type ArgoCliRuntime } from "./argo-cli"
 import type { DeploymentCommandRunner } from "./command-runner"
+import { deploymentCommandFailure } from "./command-failure"
+import type { CacheRunSnapshot } from "./cache-runner"
 import {
   DEPLOYMENT_WORKFLOW_CACHE_MS,
   dispatchGithubWorkflow,
@@ -62,6 +69,7 @@ export type DeploymentRuntime = {
   now?: () => number
   createId?: () => string
   fileExists?: DeploymentFileExists
+  runCache?: (environment: AllowedDevEnvironment, onUpdate: (snapshot: CacheRunSnapshot) => void) => void
 }
 
 type FleetSnapshot = {
@@ -93,6 +101,7 @@ type StoredPreparedPlan = {
     inputs: Readonly<Record<string, DeploymentWorkflowInputValue>>
   }>
   expiresAt: number
+  expectedBranch?: string
 }
 
 export function createDeploymentService(runtime: DeploymentRuntime) {
@@ -109,6 +118,8 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const prepared = new Map<string, StoredPreparedPlan>()
   const preparing = new Map<AllowedDevEnvironment, symbol>()
   const dispatching = new Set<AllowedDevEnvironment>()
+  const changingAutoSync = new Set<AllowedDevEnvironment>()
+  const cacheRuns = new Map<AllowedDevEnvironment, CacheRunSnapshot>()
   let writes = Promise.resolve()
 
   const operations = () => readDeploymentOperations(runtime.store, now())
@@ -131,7 +142,20 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const attachSystems = (systems: readonly DeploymentSystem[], readiness: DeploymentReadiness) =>
     systems.map((system) => {
       const operation = blockingOperation(system.environment)
-      const allowed = readiness.deploymentReady && !operation ? (["deploy", "reset"] as const) : []
+      const redeploy =
+        system.branch && system.branch.trim().toLowerCase() !== "master" && !isReservedDevEnvironment(system.environment)
+          ? (["redeploy"] as const)
+          : []
+      const autoSync =
+        system.autoSync !== "off" &&
+        !isReservedDevEnvironment(system.environment) &&
+        readiness.capabilities.find((item) => item.capability === "bf_deploy_auto_sync")?.status === "available"
+          ? (["auto-sync"] as const)
+          : []
+      const cacheBlocked = cacheRunBlocks(system.environment)
+      const allowed: readonly DeploymentRowAction[] = !operation && !changingAutoSync.has(system.environment) && !cacheBlocked
+        ? [...(readiness.deploymentReady ? (["deploy", "reset", ...redeploy] as const) : []), ...autoSync, ...(!isReservedDevEnvironment(system.environment) && runtime.runCache ? (["clear-cache"] as const) : [])]
+        : []
       return {
         ...system,
         ...(operation ? { operation } : {}),
@@ -297,6 +321,12 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     draft: DeploymentDraft,
     signal?: AbortSignal,
   ): Promise<{ ok: true; plan: DeploymentPreparedPlan } | DeploymentFailure> => {
+    if (conflictingMutation(draft.environment)) {
+      return deploymentFailure("conflict", {
+        capability: "github_workflow_dispatch",
+        context: { environment: draft.environment },
+      })
+    }
     const request = Symbol()
     preparing.set(draft.environment, request)
     for (const [preflightId, stored] of prepared) {
@@ -307,13 +337,24 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     if (githubFailure) return githubFailure
 
     const settings = readDeploymentSettings(runtime.store)
-    const target = await verifyArgoDevTarget(argo, settings, signal)
-    if (!target.ok) return target.failure
+    if (kind === "redeploy") {
+      if (draft.ref !== draft.expectedBranch) {
+        return deploymentFailure("invalid-input", {
+          capability: "github_workflow_dispatch",
+          context: { field: "ref" },
+        })
+      }
+      const current = await verifyRedeployTarget(settings, draft.environment, draft.expectedBranch, signal)
+      if (!current.ok) return current
+    } else {
+      const target = await verifyArgoDevTarget(argo, settings, signal)
+      if (!target.ok) return target.failure
+    }
 
     const ref = await validateGithubRef(github, draft.ref, signal)
     if (!ref.ok) return ref
 
-    if (dispatching.has(draft.environment) || blockingOperation(draft.environment)) {
+    if (conflictingMutation(draft.environment)) {
       return deploymentFailure("conflict", {
         capability: "github_workflow_dispatch",
         context: { environment: draft.environment },
@@ -380,6 +421,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
         filename: item.workflow.target.filename,
         inputs: { ...item.inputs.values, ...item.bound },
       })),
+      ...(kind === "redeploy" ? { expectedBranch: draft.expectedBranch } : {}),
     })
     return { ok: true, plan }
   }
@@ -401,9 +443,22 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     const githubFailure = await requireGithub()
     if (githubFailure) return githubFailure
     const settings = readDeploymentSettings(runtime.store)
-    const target = await verifyArgoDevTarget(argo, settings)
-    if (!target.ok) return target.failure
-    if (dispatching.has(stored.public.environment) || blockingOperation(stored.public.environment)) {
+    if (kind === "redeploy") {
+      if (stored.public.ref !== stored.expectedBranch) {
+        return deploymentFailure("invalid-input", {
+          capability: "github_workflow_dispatch",
+          context: { field: "ref" },
+        })
+      }
+      const current = await verifyRedeployTarget(settings, stored.public.environment, stored.expectedBranch)
+      if (!current.ok) return current
+    } else {
+      const target = await verifyArgoDevTarget(argo, settings)
+      if (!target.ok) return target.failure
+    }
+    if (
+      conflictingMutation(stored.public.environment)
+    ) {
       return deploymentFailure("conflict", {
         capability: "github_workflow_dispatch",
         context: { environment: stored.public.environment },
@@ -531,8 +586,12 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       if (!listed.ok) return listed
       return { ok: true as const, targets: listed.targets.map((item) => item.target) }
     },
-    prepareDeployment: (draft: DeploymentDraft, signal?: AbortSignal) => preparePlan("deploy", draft, signal),
-    dispatchPrepared: (input: { preflightId: string }) => dispatchPlan(input.preflightId, "deploy"),
+    prepareDeployment: (draft: DeploymentDraft, signal?: AbortSignal) =>
+      preparePlan(draft.expectedBranch === undefined ? "deploy" : "redeploy", draft, signal),
+    dispatchPrepared: (input: { preflightId: string }) => {
+      const kind = prepared.get(input.preflightId)?.public.kind
+      return dispatchPlan(input.preflightId, kind === "redeploy" ? "redeploy" : "deploy")
+    },
     async prepareReset(input: { environment: AllowedDevEnvironment }, signal?: AbortSignal) {
       const githubFailure = await requireGithub(signal)
       if (githubFailure) return githubFailure
@@ -561,7 +620,177 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       )
     },
     dispatchPreparedReset: (input: { preflightId: string }) => dispatchPlan(input.preflightId, "reset"),
+    async turnAutoSyncOff(input: { environment: AllowedDevEnvironment; expected: "on" | "no-prune" | "off" }) {
+      if (isReservedDevEnvironment(input.environment)) {
+        return deploymentFailure("unsafe-target", {
+          capability: "bf_deploy_auto_sync",
+          context: { environment: input.environment },
+        })
+      }
+      if (input.expected === "off") {
+        return deploymentFailure("invalid-input", {
+          capability: "bf_deploy_auto_sync",
+          context: { environment: input.environment, reason: "already-off" },
+        })
+      }
+      if (conflictingMutation(input.environment)) {
+        return deploymentFailure("conflict", {
+          capability: "bf_deploy_auto_sync",
+          context: { environment: input.environment },
+        })
+      }
+
+      changingAutoSync.add(input.environment)
+      try {
+        const settings = readDeploymentSettings(runtime.store)
+        const capability = await autoSyncCapability(settings, runtime.fileExists)
+        if (capability.status !== "available" || !settings.devenvPath) {
+          return deploymentFailure(capability.failure ?? "not-found", {
+            capability: "bf_deploy_auto_sync",
+            context: capability.context,
+          })
+        }
+        const target = await verifyArgoDevTarget(argo, settings)
+        if (!target.ok) return target.failure
+        const fleet = await readArgoFleet(argo, settings)
+        if (!fleet.ok) return fleet.failure
+        const system = fleet.systems.find((item) => item.environment === input.environment)
+        if (!system) {
+          return deploymentFailure("not-found", {
+            capability: "bf_deploy_auto_sync",
+            context: { environment: input.environment },
+          })
+        }
+        if (system.autoSync !== input.expected) {
+          return deploymentFailure("conflict", {
+            capability: "bf_deploy_auto_sync",
+            context: { environment: input.environment, reason: "state-changed" },
+          })
+        }
+        if (dispatching.has(input.environment) || blockingOperation(input.environment) || cacheRuns.get(input.environment)?.state === "running") {
+          return deploymentFailure("conflict", {
+            capability: "bf_deploy_auto_sync",
+            context: { environment: input.environment },
+          })
+        }
+
+        // bf-deploy inherits kubectl's current context and does not receive our fixed Argo flags.
+        // Refuse the mutation unless that inherited context is exactly the approved development context.
+        const currentContext = await runtime.run({ executable: "kubectl", args: ["config", "current-context"] })
+        if (!currentContext.ok) return deploymentCommandFailure(currentContext, "dev_target_verified")
+        if (currentContext.stdout.trim() !== DEPLOYMENT_KUBE_CONTEXT) {
+          return deploymentFailure("unsafe-target", {
+            capability: "dev_target_verified",
+            context: { expectedContext: DEPLOYMENT_KUBE_CONTEXT, reason: "bf-deploy-current-context" },
+          })
+        }
+
+        const result = await runtime.run({
+          executable: "python3",
+          args: [
+            path.join(settings.devenvPath, "src", "tools", "bf-deploy", "__main__.py"),
+            "argo",
+            "--auto-sync",
+            "off",
+            "-e",
+            input.environment,
+            "--deployment",
+            "shop",
+          ],
+          cwd: path.join(settings.devenvPath, "src"),
+        })
+        if (!result.ok) return deploymentCommandFailure(result, "bf_deploy_auto_sync")
+        changingAutoSync.delete(input.environment)
+        invalidate()
+        const refreshed = await listSystems({ requestId: `auto-sync-${input.environment}`, refresh: true })
+        if (!refreshed.ok) return refreshed
+        if (refreshed.staleFailure) return refreshed.staleFailure
+        const updated = refreshed.systems.find((item) => item.environment === input.environment)
+        if (updated?.autoSync !== "off") {
+          return deploymentFailure("unknown", {
+            capability: "bf_deploy_auto_sync",
+            context: { environment: input.environment, reason: "state-unconfirmed" },
+          })
+        }
+        return refreshed
+      } finally {
+        changingAutoSync.delete(input.environment)
+      }
+    },
+    getCacheRun(input: { environment: AllowedDevEnvironment }) {
+      if (isReservedDevEnvironment(input.environment)) {
+        return deploymentFailure("unsafe-target", { capability: "ssh", context: { environment: input.environment } })
+      }
+      const run = cacheRuns.get(input.environment)
+      return run ? { ok: true as const, run } : { ok: true as const }
+    },
+    startCacheRun(input: { environment: AllowedDevEnvironment }) {
+      if (isReservedDevEnvironment(input.environment) || !runtime.runCache) {
+        return deploymentFailure(isReservedDevEnvironment(input.environment) ? "unsafe-target" : "not-found", {
+          capability: "ssh",
+          context: { environment: input.environment },
+        })
+      }
+      const existing = cacheRuns.get(input.environment)
+      if (existing?.state === "running") return { ok: true as const, run: existing }
+      if (conflictingMutation(input.environment)) {
+        return deploymentFailure("conflict", { capability: "ssh", context: { environment: input.environment } })
+      }
+      runtime.runCache(input.environment, (snapshot) => cacheRuns.set(input.environment, snapshot))
+      const run = cacheRuns.get(input.environment)
+      return run ? { ok: true as const, run } : { ok: true as const }
+    },
+    resolveCacheRun(input: { environment: AllowedDevEnvironment; startedAt: string; confirmedEnded: true }) {
+      const existing = cacheRuns.get(input.environment)
+      if (!existing || existing.state !== "unknown" || existing.startedAt !== input.startedAt) {
+        return deploymentFailure("conflict", {
+          capability: "ssh",
+          context: { environment: input.environment, reason: "cache-run-changed" },
+        })
+      }
+      const resolved = { ...existing, state: "resolved" as const, finishedAt: new Date(now()).toISOString() }
+      cacheRuns.set(input.environment, resolved)
+      return { ok: true as const, run: resolved }
+    },
     invalidate,
+  }
+
+  function conflictingMutation(environment: AllowedDevEnvironment) {
+    return (
+      dispatching.has(environment) ||
+      changingAutoSync.has(environment) ||
+      blockingOperation(environment) !== undefined ||
+      cacheRunBlocks(environment)
+    )
+  }
+
+  function cacheRunBlocks(environment: AllowedDevEnvironment) {
+    const state = cacheRuns.get(environment)?.state
+    return state === "running" || state === "unknown"
+  }
+
+  async function verifyRedeployTarget(
+    settings: DeploymentSettings,
+    environment: AllowedDevEnvironment,
+    expectedBranch?: string,
+    signal?: AbortSignal,
+  ): Promise<{ ok: true } | DeploymentFailure> {
+    if (!expectedBranch || expectedBranch.trim().toLowerCase() === "master" || isReservedDevEnvironment(environment)) {
+      return deploymentFailure("unsafe-target", {
+        capability: "dev_target_verified",
+        context: { environment, reason: "redeploy-target" },
+      })
+    }
+    const fleet = await readArgoFleet(argo, settings, signal)
+    if (!fleet.ok) return fleet.failure
+    const current = fleet.systems.find((system) => system.environment === environment)
+    if (!current?.branch || current.branch !== expectedBranch) {
+      return deploymentFailure("conflict", {
+        capability: "github_workflow_dispatch",
+        context: { environment, reason: "branch-changed" },
+      })
+    }
+    return { ok: true }
   }
 }
 

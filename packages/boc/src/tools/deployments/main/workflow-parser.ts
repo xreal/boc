@@ -87,8 +87,8 @@ function parseWorkflowInput(name: string, spec: unknown) {
   const type = typeof fields.type === "string" ? fields.type : "string"
   const required = fields.required === true
   const label = typeof fields.description === "string" && fields.description.trim() ? fields.description.trim() : name
-  const bound = type === "string" ? boundDeploymentWorkflowInput(name) : undefined
-  if (bound) return { bound }
+  const bound = boundDeploymentWorkflowInput(name)
+  if (bound && (type === "string" || (bound === "environment" && type === "choice"))) return { bound }
 
   if (type === "boolean") {
     const defaultValue = booleanDefault(fields.default)

@@ -7,7 +7,7 @@ import {
 } from "../fixtures/github"
 
 describe("deployment workflow YAML parser", () => {
-  test("decodes supported boolean inputs and binds required environment strings", () => {
+  test("decodes supported boolean inputs and binds environment inputs", () => {
     const parsed = parseWorkflowDispatchContract({
       filename: "app-shop.yml",
       name: "Shop",
@@ -21,6 +21,22 @@ describe("deployment workflow YAML parser", () => {
     ])
     expect(parsed?.boundInputs).toEqual({ environment: "environment" })
     expect(parsed?.issues).toEqual([])
+
+    const choiceEnvironment = parseWorkflowDispatchContract({
+      filename: "app-shop.yml",
+      name: "Shop",
+      source: `on:
+  workflow_dispatch:
+    inputs:
+      ENVIRONMENT:
+        type: choice
+        required: true
+        options: ['01', '02', '03', '04']
+`,
+    })
+    expect(choiceEnvironment?.target.inputs).toEqual([])
+    expect(choiceEnvironment?.boundInputs).toEqual({ ENVIRONMENT: "environment" })
+    expect(choiceEnvironment?.issues).toEqual([])
   })
 
   test("accepts workflow_dispatch without inputs and rejects required unknown types", () => {

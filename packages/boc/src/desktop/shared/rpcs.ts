@@ -21,6 +21,7 @@ export {
   BocDeploymentsDispatchPrepared,
   BocDeploymentsDispatchPreparedReset,
   BocDeploymentsGetSettings,
+  BocDeploymentsGetCacheRun,
   BocDeploymentsGetWorkspace,
   BocDeploymentsListBranches,
   BocDeploymentsListOperations,
@@ -31,6 +32,8 @@ export {
   BocDeploymentsRedeployBranch,
   BocDeploymentsSaveSettings,
   BocDeploymentsSetAutoSync,
+  BocDeploymentsStartCacheRun,
+  BocDeploymentsResolveCacheRun,
   DeploymentRpcs,
 } from "../../tools/deployments/rpcs"
 

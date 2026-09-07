@@ -146,10 +146,11 @@ export const DeploymentDraft = Schema.Struct({
   environment: AllowedDevEnvironment,
   ref: DeploymentRef,
   workflows: Schema.Array(DeploymentWorkflowSelection).check(Schema.isMinLength(1), Schema.isMaxLength(32)),
+  expectedBranch: Schema.optionalKey(DeploymentRef),
 })
 export type DeploymentDraft = typeof DeploymentDraft.Type
 
-export const DeploymentPreparedKind = Schema.Literals(["deploy", "reset"])
+export const DeploymentPreparedKind = Schema.Literals(["deploy", "reset", "redeploy"])
 export type DeploymentPreparedKind = typeof DeploymentPreparedKind.Type
 
 export const DeploymentPreparedWorkflow = Schema.Struct({
@@ -194,9 +195,20 @@ export type DeploymentRedeployInput = typeof DeploymentRedeployInput.Type
 export const DeploymentAutoSyncInput = Schema.Struct({
   environment: AllowedDevEnvironment,
   expected: DeploymentAutoSyncState,
-  enabled: Schema.Boolean,
   confirmed: Schema.Literal(true),
 })
+export const DeploymentCacheRunSnapshot = Schema.Struct({
+  environment: AllowedDevEnvironment,
+  state: Schema.Literals(["running", "succeeded", "failed", "unknown", "resolved"]),
+  output: Schema.String,
+  startedAt: Schema.String,
+  finishedAt: Schema.optionalKey(Schema.String),
+})
+export type DeploymentCacheRunSnapshot = typeof DeploymentCacheRunSnapshot.Type
+export const DeploymentCacheResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), run: Schema.optionalKey(DeploymentCacheRunSnapshot) }),
+  DeploymentFailure,
+])
 export type DeploymentAutoSyncInput = typeof DeploymentAutoSyncInput.Type
 
 export const BocDeploymentsGetWorkspace = Rpc.make("BocDeploymentsGetWorkspace", {
@@ -269,6 +281,22 @@ export const BocDeploymentsSetAutoSync = Rpc.make("BocDeploymentsSetAutoSync", {
   payload: DeploymentAutoSyncInput,
   success: DeploymentSystemsResult,
 })
+export const BocDeploymentsGetCacheRun = Rpc.make("BocDeploymentsGetCacheRun", {
+  payload: DeploymentEnvironmentInput,
+  success: DeploymentCacheResult,
+})
+export const BocDeploymentsStartCacheRun = Rpc.make("BocDeploymentsStartCacheRun", {
+  payload: DeploymentEnvironmentInput,
+  success: DeploymentCacheResult,
+})
+export const BocDeploymentsResolveCacheRun = Rpc.make("BocDeploymentsResolveCacheRun", {
+  payload: Schema.Struct({
+    environment: AllowedDevEnvironment,
+    startedAt: Schema.String,
+    confirmedEnded: Schema.Literal(true),
+  }),
+  success: DeploymentCacheResult,
+})
 
 export const DeploymentRpcs = RpcGroup.make(
   BocDeploymentsGetWorkspace,
@@ -286,4 +314,7 @@ export const DeploymentRpcs = RpcGroup.make(
   BocDeploymentsDispatchPreparedReset,
   BocDeploymentsRedeployBranch,
   BocDeploymentsSetAutoSync,
+  BocDeploymentsGetCacheRun,
+  BocDeploymentsStartCacheRun,
+  BocDeploymentsResolveCacheRun,
 )

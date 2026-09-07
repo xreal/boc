@@ -7,6 +7,173 @@ import { deploymentShopWorkflowYaml, deploymentUnsupportedWorkflowYaml } from ".
 const help = "--core --kube-context string --output string --prompts-enabled --selector string"
 
 describe("deployment preflight and dispatch", () => {
+  test("turns auto-sync off with fixed bf-deploy arguments and refreshes the actual state", async () => {
+    const commands: DeploymentCommand[] = []
+    let automated = true
+    const run: DeploymentCommandRunner = async (command) => {
+      commands.push(command)
+      if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
+      if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
+      if (command.executable === "kubectl") return success("dev\n")
+      if (command.executable === "argocd") return success(application("02", "SHOP-42", automated))
+      if (command.executable === "python3") {
+        automated = false
+        return success("updated")
+      }
+      if (command.executable === "gh") return { ok: false, reason: "not-found", stdout: "", stderr: "" }
+      return success("")
+    }
+    const service = createDeploymentService({
+      store: memoryDeploymentStore({
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      }),
+      platform: "darwin",
+      fileExists: async () => true,
+      run,
+    })
+
+    const result = await service.turnAutoSyncOff({ environment: "02", expected: "on" })
+
+    expect(result).toMatchObject({ ok: true, systems: [{ environment: "02", autoSync: "off" }] })
+    expect(commands.find((command) => command.executable === "python3")).toEqual({
+      executable: "python3",
+      args: [
+        "/work/devenv/src/tools/bf-deploy/__main__.py",
+        "argo",
+        "--auto-sync",
+        "off",
+        "-e",
+        "02",
+        "--deployment",
+        "shop",
+      ],
+      cwd: "/work/devenv/src",
+    })
+    expect(result.ok && result.readiness.deploymentReady).toBe(false)
+  })
+
+  test("rejects stale state and blocking operations before running bf-deploy", async () => {
+    const commands: DeploymentCommand[] = []
+    const store = memoryDeploymentStore(
+      {
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      },
+      [{
+        id: "active",
+        environment: "02",
+        branch: "SHOP-42",
+        workflows: [],
+        state: "queued",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }],
+    )
+    const service = createDeploymentService({
+      store,
+      platform: "darwin",
+      fileExists: async () => true,
+      run: combinedRunner(commands, githubState()),
+    })
+
+    expect(await service.turnAutoSyncOff({ environment: "02", expected: "on" })).toMatchObject({
+      ok: false,
+      category: "conflict",
+    })
+    expect(commands.some((command) => command.executable === "python3")).toBe(false)
+  })
+
+  test("refuses bf-deploy when kubectl's inherited current context is not dev", async () => {
+    const commands: DeploymentCommand[] = []
+    const run: DeploymentCommandRunner = async (command) => {
+      commands.push(command)
+      if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
+      if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
+      if (command.executable === "kubectl" && command.args.includes("get-contexts")) return success("dev\nprod\n")
+      if (command.executable === "kubectl") return success("prod\n")
+      if (command.executable === "argocd") return success(application("02", "SHOP-42", true))
+      throw new Error(`Unexpected command: ${command.executable}`)
+    }
+    const service = createDeploymentService({
+      store: memoryDeploymentStore({
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      }),
+      platform: "darwin",
+      fileExists: async () => true,
+      run,
+    })
+
+    expect(await service.turnAutoSyncOff({ environment: "02", expected: "on" })).toMatchObject({
+      ok: false,
+      category: "unsafe-target",
+      context: { expectedContext: "dev", reason: "bf-deploy-current-context" },
+    })
+    expect(commands.some((command) => command.executable === "python3")).toBe(false)
+  })
+
+  test("blocks deployment preparation while auto-sync is changing and returns unlocked actions afterward", async () => {
+    const commands: DeploymentCommand[] = []
+    let releaseAdapter: (() => void) | undefined
+    let automated = true
+    const adapter = new Promise<void>((resolve) => {
+      releaseAdapter = resolve
+    })
+    const run: DeploymentCommandRunner = async (command) => {
+      commands.push(command)
+      if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
+      if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
+      if (command.executable === "kubectl") return success("dev\n")
+      if (command.executable === "argocd") return success(application("02", "SHOP-42", automated))
+      if (command.executable === "python3") {
+        await adapter
+        automated = false
+        return success("updated")
+      }
+      if (command.executable === "gh" && command.args[0] === "--version") return success("gh version 2.100.0")
+      if (command.executable === "gh" && command.args[0] === "auth") return success("Logged in to github.com")
+      if (command.executable === "gh" && command.args[1] === "repos/bergfreunde/shop") {
+        return success(JSON.stringify({ full_name: "bergfreunde/shop" }))
+      }
+      if (command.executable === "gh" && command.args[0] === "workflow" && command.args[1] === "list") {
+        return success(JSON.stringify([{ name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" }]))
+      }
+      throw new Error(`Unexpected command: ${command.executable}`)
+    }
+    const service = createDeploymentService({
+      store: memoryDeploymentStore({
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      }),
+      platform: "darwin",
+      fileExists: async () => true,
+      run,
+    })
+
+    const changing = service.turnAutoSyncOff({ environment: "02", expected: "on" })
+    while (!commands.some((command) => command.executable === "python3")) await Promise.resolve()
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "conflict" })
+    releaseAdapter?.()
+    const result = await changing
+    expect(result).toMatchObject({ ok: true, systems: [{ environment: "02", autoSync: "off" }] })
+    expect(result.ok && result.systems[0]?.allowedActions).toContain("deploy")
+  })
+
   test("prepares a normalized single-use plan and rejects expiry, replay, and draft replacement", async () => {
     let now = 1_000
     let ids = 0
@@ -395,6 +562,58 @@ describe("deployment preflight and dispatch", () => {
     expect(commands.filter((command) => command.executable === "kubectl")).toHaveLength(2)
     expect(commands.some((command) => command.args[1] === "run")).toBe(false)
   })
+
+  test("redeploys only the unchanged non-master branch after two fresh Argo reads", async () => {
+    const commands: DeploymentCommand[] = []
+    let branch = "SHOP-42"
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "redeploy-1",
+      run: combinedRunner(commands, { ...githubState(), applicationBranch: () => branch }),
+    })
+    const prepared = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      expectedBranch: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    expect(prepared).toMatchObject({ ok: true, plan: { kind: "redeploy", ref: "SHOP-42" } })
+    if (!prepared.ok) throw new Error("expected redeploy plan")
+
+    branch = "SHOP-43"
+    expect(await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })).toMatchObject({
+      ok: false,
+      category: "conflict",
+    })
+    expect(
+      commands.filter(
+        (command) => command.executable === "argocd" && command.args[1] === "list" && !command.args.includes("--help"),
+      ),
+    ).toHaveLength(2)
+    expect(commands.some((command) => command.args[1] === "run")).toBe(false)
+  })
+
+  test("rejects master, unknown, and reserved redeploy targets", async () => {
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: combinedRunner([], githubState()),
+    })
+    const draft = { workflows: [{ filename: "app-shop.yml" as const, inputs: {} }] }
+    expect(
+      await service.prepareDeployment({ environment: "02", ref: "master", expectedBranch: "master", ...draft }),
+    ).toMatchObject({ ok: false, category: "unsafe-target" })
+    expect(
+      await service.prepareDeployment({ environment: "02", ref: "SHOP-42", expectedBranch: "SHOP-42", ...draft }),
+    ).toMatchObject({ ok: false, category: "conflict" })
+    expect(
+      await service.prepareDeployment({ environment: "20", ref: "SHOP-42", expectedBranch: "SHOP-42", ...draft }),
+    ).toMatchObject({ ok: false, category: "unsafe-target" })
+    expect(
+      await service.prepareDeployment({ environment: "02", ref: "SHOP-43", expectedBranch: "SHOP-42", ...draft }),
+    ).toMatchObject({ ok: false, category: "invalid-input" })
+  })
 })
 
 type GithubState = {
@@ -404,6 +623,7 @@ type GithubState = {
   yamlByFile?: Record<string, string>
   run?: DeploymentCommandResult | (() => DeploymentCommandResult)
   contexts?: () => string
+  applicationBranch?: () => string | undefined
 }
 
 function githubState(overrides: GithubState = {}): GithubState {
@@ -422,7 +642,7 @@ function combinedRunner(commands: DeploymentCommand[], github: GithubState): Dep
     if (command.executable === "argocd" && command.args[0] === "version") return success("argocd: v3.1.7")
     if (command.executable === "argocd" && command.args.includes("--help")) return success(help)
     if (command.executable === "kubectl") return success(github.contexts?.() ?? "dev\n")
-    if (command.executable === "argocd") return success(application("02"))
+    if (command.executable === "argocd") return success(application("02", github.applicationBranch?.() ?? "master"))
     if (command.executable !== "gh") throw new Error(`Unexpected command: ${command.executable}`)
     if (command.args[0] === "--version") return success("gh version 2.100.0")
     if (command.args[0] === "auth") return success("Logged in to github.com")
@@ -450,11 +670,15 @@ function combinedRunner(commands: DeploymentCommand[], github: GithubState): Dep
   }
 }
 
-function application(environment: string) {
+function application(environment: string, branch: string, automated = false) {
   return JSON.stringify([
     {
       metadata: { name: `shop-dev-${environment}`, labels: { app: "shop", environment } },
-      spec: { destination: { namespace: environment }, source: { targetRevision: "master" } },
+      spec: {
+        destination: { namespace: environment },
+        source: { targetRevision: branch },
+        ...(automated ? { syncPolicy: { automated: { prune: true } } } : {}),
+      },
       status: { sync: { status: "Synced" }, health: { status: "Healthy" } },
     },
   ])

@@ -213,7 +213,10 @@ test("maps the renderer API to every typed Deployment RPC", async () => {
   await api.deployments.prepareReset({ environment: "02" })
   await api.deployments.dispatchPreparedReset({ preflightId: "reset" })
   await api.deployments.redeployBranch({ environment: "02", expectedBranch: "SHOP-42", confirmed: true })
-  await api.deployments.setAutoSync({ environment: "02", expected: "off", enabled: true, confirmed: true })
+  await api.deployments.setAutoSync({ environment: "02", expected: "off", confirmed: true })
+  await api.deployments.getCacheRun({ environment: "02" })
+  await api.deployments.startCacheRun({ environment: "02" })
+  await api.deployments.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })
 
   expect(called.map((entry) => entry.tag)).toEqual([
     "BocDeploymentsGetWorkspace",
@@ -231,5 +234,8 @@ test("maps the renderer API to every typed Deployment RPC", async () => {
     "BocDeploymentsDispatchPreparedReset",
     "BocDeploymentsRedeployBranch",
     "BocDeploymentsSetAutoSync",
+    "BocDeploymentsGetCacheRun",
+    "BocDeploymentsStartCacheRun",
+    "BocDeploymentsResolveCacheRun",
   ])
 })

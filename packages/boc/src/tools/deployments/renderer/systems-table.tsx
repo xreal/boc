@@ -9,6 +9,8 @@ import type { BocTranslator } from "../../../renderer/i18n"
 import { isBlockingDeploymentOperation, type DeploymentOperationState } from "../domain/operations"
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { DeploymentRowDetails } from "./row-details"
+import { autoSyncOffMenuVisible, redeployMenuVisible } from "./action-visibility"
+import type { DeploymentCacheRunSnapshot } from "../rpcs"
 
 export function DeploymentSystemsTable(props: {
   t: BocTranslator
@@ -17,6 +19,10 @@ export function DeploymentSystemsTable(props: {
   onToggleDetails: (environment: string) => void
   onDeploy?: (system: DeploymentSystem) => void
   onReset?: (system: DeploymentSystem) => void
+  onRedeploy?: (system: DeploymentSystem) => void
+  onTurnAutoSyncOff?: (system: DeploymentSystem) => void
+  onClearCache?: (system: DeploymentSystem) => void
+  cacheRuns?: Record<string, DeploymentCacheRunSnapshot | undefined>
 }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-auto">
@@ -63,7 +69,9 @@ export function DeploymentSystemsTable(props: {
                           icon={<Icon name={expanded() ? "chevron-down" : "chevron-right"} />}
                           onClick={() => props.onToggleDetails(system.environment)}
                         />
-                        <span class="whitespace-nowrap tabular-nums">{system.name}</span>
+                        <span class={`${availabilityTextTone(system.availability)} whitespace-nowrap tabular-nums`}>
+                          {system.name}
+                        </span>
                       </span>
                     </td>
                     <td data-deployment-column="branch" class="border-b border-v2-border-border-muted px-3">
@@ -104,7 +112,16 @@ export function DeploymentSystemsTable(props: {
                       <SystemState t={props.t} system={system} />
                     </td>
                     <td data-deployment-column="actions" class="border-b border-v2-border-border-muted pl-3 pr-4">
-                      <SystemActions t={props.t} system={system} onDeploy={props.onDeploy} onReset={props.onReset} />
+                      <SystemActions
+                        t={props.t}
+                        system={system}
+                        onDeploy={props.onDeploy}
+                        onReset={props.onReset}
+                        onRedeploy={props.onRedeploy}
+                        onTurnAutoSyncOff={props.onTurnAutoSyncOff}
+                        onClearCache={props.onClearCache}
+                        cacheRun={props.cacheRuns?.[system.environment]}
+                      />
                     </td>
                   </tr>
                   <Show when={expanded()}>
@@ -187,7 +204,11 @@ function SystemState(props: { t: BocTranslator; system: DeploymentSystem }) {
       </Badge>
     )
   }
-  return <Badge>{props.t(`boc.deployments.availability.${props.system.availability}`)}</Badge>
+  return (
+    <Badge classList={availabilityBadgeClasses(props.system.availability)}>
+      {props.t(`boc.deployments.availability.${props.system.availability}`)}
+    </Badge>
+  )
 }
 
 function SystemActions(props: {
@@ -195,9 +216,14 @@ function SystemActions(props: {
   system: DeploymentSystem
   onDeploy?: (system: DeploymentSystem) => void
   onReset?: (system: DeploymentSystem) => void
+  onRedeploy?: (system: DeploymentSystem) => void
+  onTurnAutoSyncOff?: (system: DeploymentSystem) => void
+  onClearCache?: (system: DeploymentSystem) => void
+  cacheRun?: DeploymentCacheRunSnapshot
 }) {
   const canDeploy = () => props.system.allowedActions?.includes("deploy") === true
   const canReset = () => props.system.allowedActions?.includes("reset") === true
+  const canRedeploy = () => props.system.allowedActions?.includes("redeploy") === true
   const blocked = () =>
     props.system.operation !== undefined && isBlockingDeploymentOperation(props.system.operation.state)
   const deployReason = () => {
@@ -243,18 +269,30 @@ function SystemActions(props: {
             >
               {props.t("boc.deployments.action.reset")}
             </Menu.Item>
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
-              {props.t("boc.deployments.action.redeploy")}
-            </Menu.Item>
+            <Show when={redeployMenuVisible(props.system)}>
+              <Menu.Item
+                disabled={!canRedeploy()}
+                badge={canRedeploy() ? undefined : props.t("boc.deployments.action.unavailable.short")}
+                onSelect={() => props.onRedeploy?.(props.system)}
+              >
+                {props.t("boc.deployments.action.redeploy")}
+              </Menu.Item>
+            </Show>
             <Menu.Separator />
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
-              {props.t(
-                props.system.autoSync === "off"
-                  ? "boc.deployments.action.autoSync.on"
-                  : "boc.deployments.action.autoSync.off",
-              )}
-            </Menu.Item>
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
+            <Show when={autoSyncOffMenuVisible(props.system)}>
+              <Menu.Item
+                disabled={blocked() || !props.system.allowedActions?.includes("auto-sync")}
+                badge={blocked() || !props.system.allowedActions?.includes("auto-sync") ? props.t("boc.deployments.action.unavailable.short") : undefined}
+                onSelect={() => props.onTurnAutoSyncOff?.(props.system)}
+              >
+                {props.t("boc.deployments.action.autoSync.off")}
+              </Menu.Item>
+            </Show>
+            <Menu.Item
+              disabled={!props.system.allowedActions?.includes("clear-cache") && !props.cacheRun}
+              badge={props.cacheRun ? props.t(`boc.deployments.cache.state.${props.cacheRun.state}`) : undefined}
+              onSelect={() => props.onClearCache?.(props.system)}
+            >
               {props.t("boc.deployments.action.clearCache")}
             </Menu.Item>
             <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
@@ -287,6 +325,23 @@ function healthTone(health: DeploymentSystem["health"]): "success" | "warning" |
   if (health === "progressing" || health === "suspended") return "warning"
   if (health === "degraded" || health === "missing") return "danger"
   return "muted"
+}
+
+function availabilityTextTone(availability: DeploymentSystem["availability"]) {
+  if (availability === "free") return "text-v2-state-fg-success"
+  if (availability === "occupied") return "text-v2-state-fg-warning"
+  return "text-v2-text-text-muted"
+}
+
+function availabilityBadgeClasses(availability: DeploymentSystem["availability"]) {
+  return {
+    "text-v2-state-fg-success": availability === "free",
+    "bg-v2-state-bg-success": availability === "free",
+    "border-v2-state-border-success": availability === "free",
+    "text-v2-state-fg-warning": availability === "occupied",
+    "bg-v2-state-bg-warning": availability === "occupied",
+    "border-v2-state-border-warning": availability === "occupied",
+  }
 }
 
 function operationTone(state: DeploymentOperationState) {

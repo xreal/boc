@@ -4,6 +4,7 @@ import { createDeploymentCommandRunner } from "./command-runner"
 import { createDeploymentService } from "./deployment-service"
 import { createDeploymentHandlers } from "./handlers"
 import { DEPLOYMENT_STORE_NAME } from "./store"
+import { createCacheRunner } from "./cache-runner"
 
 let file: Store | undefined
 
@@ -28,6 +29,7 @@ const service = createDeploymentService({
   // Desktop initialization imports the login-shell environment into process.env before IPC starts.
   run: createDeploymentCommandRunner(() => process.env),
   platform: process.platform,
+  runCache: createCacheRunner(),
 })
 
 export const deploymentHandlers = createDeploymentHandlers({ service })

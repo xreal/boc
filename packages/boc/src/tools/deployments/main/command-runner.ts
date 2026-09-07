@@ -27,6 +27,19 @@ export type DeploymentCommandResult =
 
 export type DeploymentCommandRunner = (command: DeploymentCommand) => Promise<DeploymentCommandResult>
 
+// Long-running mutations consume their streams directly instead of inheriting the bounded probe defaults below.
+export function spawnDeploymentStream(command: readonly string[]) {
+  const child = spawn(command[0]!, command.slice(1), { shell: false, stdio: ["ignore", "pipe", "pipe"] })
+  return {
+    stdout: child.stdout,
+    stderr: child.stderr,
+    exited: new Promise<{ code: number | null; signal: NodeJS.Signals | null }>((resolve, reject) => {
+      child.once("error", reject)
+      child.once("exit", (code, signal) => resolve({ code, signal }))
+    }),
+  }
+}
+
 const packagedAppKeys = ["APPDIR", "APPIMAGE", "ARGV0", "CHROME_DESKTOP", "GSETTINGS_SCHEMA_DIR", "OWD"] as const
 const packagedPathKeys = ["PATH", "LD_LIBRARY_PATH", "XDG_DATA_DIRS"] as const
 const packagedPythonKeys = ["PYTHONHOME", "PYTHONPATH"] as const

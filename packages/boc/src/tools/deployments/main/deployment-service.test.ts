@@ -2,10 +2,53 @@ import { describe, expect, test } from "bun:test"
 import type { DeploymentCommand, DeploymentCommandResult, DeploymentCommandRunner } from "./command-runner"
 import { createDeploymentService } from "./deployment-service"
 import { memoryDeploymentStore } from "./store"
+import type { CacheRunSnapshot } from "./cache-runner"
 
 const help = "--core --kube-context string --output string --prompts-enabled --selector string"
 
 describe("deployment fleet service", () => {
+  test("keeps one cache mutation per system, blocks other mutations, and exposes the same run when reopened", async () => {
+    let starts = 0
+    let update: ((snapshot: CacheRunSnapshot) => void) | undefined
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: healthyRunner(() => application("02")),
+      runCache: (environment, onUpdate) => {
+        starts += 1
+        update = onUpdate
+        onUpdate({ environment, state: "running", output: "started", startedAt: "2026-09-07T00:00:00.000Z" })
+      },
+    })
+
+    expect(service.startCacheRun({ environment: "02" })).toMatchObject({ ok: true, run: { state: "running" } })
+    expect(service.startCacheRun({ environment: "02" })).toMatchObject({ ok: true, run: { output: "started" } })
+    expect(starts).toBe(1)
+    expect(service.getCacheRun({ environment: "02" })).toMatchObject({ ok: true, run: { output: "started" } })
+    expect(await service.prepareDeployment({ environment: "02", ref: "SHOP-42", workflows: [{ filename: "app-shop.yml", inputs: {} }] })).toMatchObject({ ok: false, category: "conflict" })
+    expect(await service.turnAutoSyncOff({ environment: "02", expected: "on" })).toMatchObject({ ok: false, category: "conflict" })
+    expect(service.startCacheRun({ environment: "20" })).toMatchObject({ ok: false, category: "unsafe-target" })
+    expect(starts).toBe(1)
+
+    update?.({ environment: "02", state: "unknown", output: "disconnected", startedAt: "2026-09-07T00:00:00.000Z" })
+    expect(await service.prepareDeployment({ environment: "02", ref: "SHOP-42", workflows: [{ filename: "app-shop.yml", inputs: {} }] })).toMatchObject({ ok: false, category: "conflict" })
+    expect(service.startCacheRun({ environment: "02" })).toMatchObject({ ok: false, category: "conflict" })
+    expect(service.resolveCacheRun({ environment: "02", startedAt: "stale", confirmedEnded: true })).toMatchObject({ ok: false, category: "conflict" })
+    expect(service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })).toMatchObject({ ok: true, run: { state: "resolved", output: "disconnected" } })
+    expect(service.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })).toMatchObject({ ok: false, category: "conflict" })
+  })
+
+  test("omits the optional run field when no cache run exists", () => {
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: healthyRunner(() => application("02")),
+      runCache: () => {},
+    })
+
+    expect(service.getCacheRun({ environment: "02" })).toEqual({ ok: true })
+  })
+
   test("caches successful reads for thirty seconds and bypasses the cache on refresh", async () => {
     let now = 0
     let lists = 0

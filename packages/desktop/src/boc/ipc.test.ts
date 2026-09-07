@@ -37,7 +37,10 @@ const deploymentTags = [
   "BocDeploymentsPrepareReset",
   "BocDeploymentsDispatchPreparedReset",
   "BocDeploymentsRedeployBranch",
-  "BocDeploymentsSetAutoSync",
+    "BocDeploymentsSetAutoSync",
+    "BocDeploymentsGetCacheRun",
+    "BocDeploymentsStartCacheRun",
+    "BocDeploymentsResolveCacheRun",
 ] as const
 
 test("merges BOC RPCs into the desktop RPC group", () => {
