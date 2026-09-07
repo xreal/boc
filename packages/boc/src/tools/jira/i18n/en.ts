@@ -2,6 +2,7 @@ export const jiraEnglish = {
   "boc.jira.settings.tab.connection": "Connection",
   "boc.jira.settings.tab.boards": "Boards",
   "boc.jira.settings.tab.prompts": "Session prompts",
+  "boc.jira.settings.tab.models": "Models",
   "boc.jira.settings.boards.connect": "Connect Jira in the Connection tab to manage saved boards.",
   "boc.jira.sessions.defaults.title": "Session prompt defaults",
   "boc.jira.sessions.defaults.description":
@@ -27,7 +28,21 @@ export const jiraEnglish = {
   "boc.jira.sessions.startFailed": "Could not prepare the session.",
   "boc.jira.sessions.linkFailed": "The session is available, but its Jira link could not be saved.",
   "boc.jira.sessions.noProject": "Open a project from Home before starting a ticket session.",
+  "boc.jira.sessions.projectRequired":
+    "Assign this Jira board to a project in Jira settings before starting a session.",
+  "boc.jira.sessions.projectUnavailable": "The project assigned to this Jira board is no longer available.",
   "boc.jira.sessions.unavailable": "This session or its server is no longer available.",
+  "boc.jira.sessions.difficulty": "Ticket difficulty",
+  "boc.jira.sessions.difficulty.low": "Low",
+  "boc.jira.sessions.difficulty.default": "Default",
+  "boc.jira.sessions.difficulty.high": "High",
+  "boc.jira.sessions.models.description":
+    "These models are selected when a Jira session is prepared. Unprotected values adopt new Boc defaults when those defaults change in an update.",
+  "boc.jira.sessions.models.preserveOnUpdate": "Keep this model when Boc defaults change",
+  "boc.jira.sessions.models.invalid": "Enter each model as provider/model with an optional #variant.",
+  "boc.jira.sessions.models.reset": "Use suggested models",
+  "boc.jira.sessions.models.save": "Save models",
+  "boc.jira.sessions.models.saved": "Models saved.",
 
   "boc.jira.title": "Jira",
   "boc.jira.placeholder.title": "Jira board",
@@ -139,4 +154,7 @@ export const jiraEnglish = {
   "boc.jira.board.savedBoards.default": "Default",
   "boc.jira.board.savedBoards.setDefault": "Set as default",
   "boc.jira.board.savedBoards.setDefaultLabel": "Set {{board}} as default",
+  "boc.jira.board.project.label": "Project for {{board}}",
+  "boc.jira.board.project.title": "Session project",
+  "boc.jira.board.project.placeholder": "Select a project",
 } as const

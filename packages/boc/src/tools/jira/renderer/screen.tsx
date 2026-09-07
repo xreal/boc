@@ -248,8 +248,10 @@ export default function JiraScreen(props: BocScreenProps) {
           locale={props.host.locale}
           kind={kind}
           excludeIds={kind === "add" ? view.preferences.savedBoards.map((board) => board.id) : undefined}
-          onSaved={(board) => {
+          onSaved={(board, preferences) => {
+            setView("preferences", preferences)
             if (kind === "add") setView("selectedBoardId", board.id)
+            if (kind === "default") setView("selectedBoardId", preferences.defaultBoardId)
             dialog.close()
           }}
         />
@@ -264,6 +266,7 @@ export default function JiraScreen(props: BocScreenProps) {
         api={desktop.jira}
         locale={props.host.locale}
         openExternal={(url) => props.host.openExternal(url)}
+        projects={props.host.sessions?.projects() ?? []}
         onChanged={() => void bootstrap()}
         onNeedsDefaultBoard={() => openPickBoard("default")}
       />
@@ -359,6 +362,7 @@ export default function JiraScreen(props: BocScreenProps) {
               t={t}
               locale={props.host.locale()}
               issueKey={view.selectedIssueKey!}
+              boardId={view.selectedBoardId!}
               issue={view.issue}
               loading={view.loading === "issue"}
               overlay={!view.wide}

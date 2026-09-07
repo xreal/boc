@@ -1,8 +1,7 @@
 import { createBocTranslator, useBocDesktop, type BocHost } from "@boc/extensions/renderer"
 import { useLanguage } from "@/runtime/i18n/language"
-import { ServerConnection, useServers } from "@/runtime/server/registry"
+import { serverName, ServerConnection, useServers } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
-import { useLayout } from "@/shell/state/layout"
 import { useTabs } from "@/shell/tabs/tabs"
 import { showToast } from "@/shell/notifications/toast"
 
@@ -10,25 +9,31 @@ export function createBocSessions(): BocHost["sessions"] {
   const desktop = useBocDesktop()
   const servers = useServers()
   const global = useGlobal()
-  const layout = useLayout()
   const tabs = useTabs()
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   if (!desktop) return
 
   return {
+    projects() {
+      return servers.visible.flatMap((conn) =>
+        global
+          .ensureServerCtx(conn)
+          .projects.list()
+          .map((project) => ({
+            server: ServerConnection.key(conn),
+            directory: project.worktree,
+            label: `${serverName(conn)} — ${project.worktree}`,
+          })),
+      )
+    },
     async start(input) {
-      const selection = layout.home.selection()
-      const conn = servers.visible.find((item) => ServerConnection.key(item) === selection.server) ?? servers.visible[0]
-      if (!conn) throw new Error(t("boc.jira.sessions.noProject"))
+      const conn = servers.visible.find((item) => ServerConnection.key(item) === input.target.server)
+      if (!conn) throw new Error(t("boc.jira.sessions.projectUnavailable"))
       const ctx = global.ensureServerCtx(conn)
-      const projects = ctx.projects.list()
-      const directory =
-        projects.find((project) => project.worktree === selection.directory)?.worktree ??
-        ctx.projects.last() ??
-        projects[0]?.worktree
-      if (!directory) throw new Error(t("boc.jira.sessions.noProject"))
-      const tab = await tabs.newDraft({ server: ServerConnection.key(conn), directory }, input.prompt)
+      const directory = ctx.projects.list().find((project) => project.worktree === input.target.directory)?.worktree
+      if (!directory) throw new Error(t("boc.jira.sessions.projectUnavailable"))
+      const tab = await tabs.newDraft({ server: ServerConnection.key(conn), directory }, input.prompt, input.model)
       await desktop.jira
         .saveSessionLink({
           issueUrl: input.issueUrl,

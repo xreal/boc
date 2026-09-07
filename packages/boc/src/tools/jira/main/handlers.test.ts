@@ -6,6 +6,7 @@ import { memoryVault, sealToken } from "./credentials"
 import { memoryJiraStore, readStoredConnection } from "./store"
 import { JiraRpcs } from "../rpcs"
 import { containsSecret } from "../domain/errors"
+import { defaultJiraSessionInstructions } from "../domain/sessions"
 import {
   EMAIL_FIXTURE,
   SITE_FIXTURE,
@@ -306,7 +307,14 @@ describe("Jira board handlers", () => {
       jira,
       Effect.gen(function* () {
         const client = yield* RpcTest.makeClient(JiraRpcs)
-        const saved = yield* client.BocJiraSavePreferences({ savedBoards, defaultBoardId: 3 })
+        const saved = yield* client.BocJiraSavePreferences({
+          savedBoards,
+          defaultBoardId: 3,
+          projectTargets: [
+            { boardId: 3, server: "local", directory: "/workspace/shop" },
+            { boardId: 12, server: "local", directory: "/workspace/not-saved" },
+          ],
+        })
         const loaded = yield* client.BocJiraGetPreferences()
         yield* client.BocJiraDisconnect()
         const after = yield* client.BocJiraGetPreferences()
@@ -316,6 +324,7 @@ describe("Jira board handlers", () => {
 
     expect(result.saved.savedBoards).toHaveLength(10)
     expect(result.saved.defaultBoardId).toBe(3)
+    expect(result.saved.projectTargets).toEqual([{ boardId: 3, server: "local", directory: "/workspace/shop" }])
     expect(result.loaded).toEqual(result.saved)
     expect(result.after).toEqual({ savedBoards: [] })
   })
@@ -370,7 +379,11 @@ test("keeps multiple ticket sessions across handler restarts and disconnects wit
 
 test("persists prompt defaults independently of connection and board settings, including intentionally empty instructions", async () => {
   const jira = runtime()
-  const custom = { before: "Investigate the ticket before changing code.", after: "Run relevant checks. Ask before committing." }
+  const custom = {
+    ...defaultJiraSessionInstructions,
+    before: "Investigate the ticket before changing code.",
+    after: "Run relevant checks. Ask before committing.",
+  }
   await runJira(jira, Effect.gen(function* () {
     const client = yield* RpcTest.makeClient(JiraRpcs)
     const defaults = yield* client.BocJiraGetSessionInstructions()
@@ -384,7 +397,7 @@ test("persists prompt defaults independently of connection and board settings, i
     yield* client.BocJiraSavePreferences({ savedBoards: [] })
     yield* client.BocJiraDisconnect()
     expect(yield* client.BocJiraGetSessionInstructions()).toEqual(custom)
-    yield* client.BocJiraSaveSessionInstructions({ before: "", after: "" })
-    expect(yield* client.BocJiraGetSessionInstructions()).toEqual({ before: "", after: "" })
+    yield* client.BocJiraSaveSessionInstructions({ ...custom, before: "", after: "" })
+    expect(yield* client.BocJiraGetSessionInstructions()).toEqual({ ...custom, before: "", after: "" })
   }))
 })

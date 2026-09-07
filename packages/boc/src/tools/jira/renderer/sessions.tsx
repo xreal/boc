@@ -6,20 +6,35 @@ import { useBocHost } from "../../../renderer/host"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail } from "../domain/board"
 import { JiraSessionInstructionFields } from "./session-instructions"
-import { jiraSessionPrompt } from "../domain/sessions"
+import {
+  defaultJiraSessionInstructions,
+  jiraSessionDifficulties,
+  jiraSessionModel,
+  jiraSessionPrompt,
+  type JiraSessionDifficulty,
+} from "../domain/sessions"
 
-export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTranslator }) {
+export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: number; t: BocTranslator }) {
   const host = useBocHost()
   const desktop = useBocDesktop()
-  const [form, setForm] = createStore({ before: "", after: "", busy: false, error: "" })
+  const [form, setForm] = createStore({
+    ...defaultJiraSessionInstructions,
+    difficulty: "default" as JiraSessionDifficulty,
+    busy: false,
+    error: "",
+  })
   const [defaults, { refetch: retryDefaults }] = createResource(() =>
     desktop?.jira.getSessionInstructions().catch(() => undefined),
+  )
+  const [preferences, { refetch: retryProject }] = createResource(() =>
+    desktop?.jira.getPreferences().catch(() => undefined),
   )
   createEffect(() => {
     const value = defaults()
     if (value) setForm(value)
   })
-  const disabled = () => form.busy || defaults.loading || !defaults()
+  const target = () => preferences()?.projectTargets?.find((item) => item.boardId === props.boardId)
+  const disabled = () => form.busy || defaults.loading || preferences.loading || !defaults() || !target()
   const [sessions, { refetch }] = createResource(
     () => props.issue.url,
     async (issueUrl) => {
@@ -32,13 +47,16 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTransla
   )
 
   async function start() {
-    if (disabled() || !host.sessions) return
+    const project = target()
+    if (disabled() || !host.sessions || !project) return
     setForm({ busy: true, error: "" })
     await host.sessions
       .start({
         issueUrl: props.issue.url,
         title: `${props.issue.key}: ${props.issue.summary}`,
         prompt: jiraSessionPrompt(props.issue, form.before, form.after),
+        model: jiraSessionModel(form.models[form.difficulty].model),
+        target: project,
       })
       .catch((error: unknown) => {
         setForm("error", error instanceof Error ? error.message : props.t("boc.jira.sessions.startFailed"))
@@ -50,6 +68,30 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTransla
     <Show when={host.sessions}>
       <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
         <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.sessions.title")}</h3>
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+            {props.t("boc.jira.sessions.difficulty")}
+          </span>
+          <div role="radiogroup" aria-label={props.t("boc.jira.sessions.difficulty")} class="flex flex-wrap gap-1">
+            <For each={jiraSessionDifficulties}>
+              {(difficulty) => (
+                <Button
+                  size="small"
+                  variant={form.difficulty === difficulty ? "neutral" : "ghost-muted"}
+                  role="radio"
+                  aria-checked={form.difficulty === difficulty}
+                  disabled={disabled()}
+                  onClick={() => setForm("difficulty", difficulty)}
+                >
+                  {props.t(`boc.jira.sessions.difficulty.${difficulty}`)}
+                </Button>
+              )}
+            </For>
+          </div>
+          <span class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-faint">
+            {form.models[form.difficulty].model}
+          </span>
+        </div>
         <details>
           <summary class="cursor-pointer text-v2-text-text-muted">{props.t("boc.jira.sessions.instructions")}</summary>
           <JiraSessionInstructionFields
@@ -63,6 +105,14 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; t: BocTransla
           {props.t("boc.jira.sessions.start")}
         </Button>
         <p class="text-[12px] text-v2-text-text-faint">{props.t("boc.jira.sessions.review")}</p>
+        <Show when={!preferences.loading && !target()}>
+          <p role="alert">{props.t("boc.jira.sessions.projectRequired")}</p>
+          <Show when={!preferences()}>
+            <Button size="small" variant="ghost-muted" onClick={() => void retryProject()}>
+              {props.t("boc.jira.board.refresh")}
+            </Button>
+          </Show>
+        </Show>
         <Show when={!defaults.loading && !defaults()}>
           <p role="alert">{props.t("boc.jira.sessions.defaults.loadFailed")}</p>
           <Button size="small" variant="ghost-muted" onClick={() => void retryDefaults()}>

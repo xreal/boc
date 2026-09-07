@@ -2,13 +2,14 @@ import { JiraSessionDefaultsSettings } from "./session-defaults"
 import { Button } from "@opencode-ai/ui/button"
 import { Dialog, DialogBody, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/dialog"
 import { Field } from "@opencode-ai/ui/field"
+import { Select } from "@opencode-ai/ui/select"
 import { Tabs } from "@opencode-ai/ui/tabs"
 import { TextInput } from "@opencode-ai/ui/text-input"
 import { createEffect, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocDesktopAPI } from "../../../desktop/renderer/api"
 import { createBocTranslator } from "../../../renderer/i18n"
-import { normalizeSavedBoards, type JiraBoardSummary } from "../domain/board"
+import { normalizeSavedBoards, type JiraBoardSummary, type JiraProjectTarget } from "../domain/board"
 import type { JiraConnectionAttempt, JiraConnectionStatus } from "../rpcs"
 import { jiraConnectionMessage, jiraConnectionMessageKind, type JiraConnectionBusy } from "./status"
 
@@ -18,6 +19,7 @@ export function JiraSettingsDialog(props: {
   api: BocDesktopAPI["jira"]
   locale: () => string
   openExternal: (url: string) => void
+  projects: { server: string; directory: string; label: string }[]
   onChanged?: () => void
   onNeedsDefaultBoard?: () => void
 }) {
@@ -87,10 +89,14 @@ export function JiraSettingsDialog(props: {
     props.onChanged?.()
   }
 
-  const savePreferences = async (savedBoards: readonly JiraBoardSummary[], defaultBoardId?: number) => {
+  const savePreferences = async (
+    savedBoards: readonly JiraBoardSummary[],
+    defaultBoardId?: number,
+    projectTargets: readonly JiraProjectTarget[] = preferences()?.projectTargets ?? [],
+  ) => {
     if (busy()) return
     setForm("savingPreferences", true)
-    await props.api.savePreferences(normalizeSavedBoards(savedBoards, defaultBoardId))
+    await props.api.savePreferences(normalizeSavedBoards(savedBoards, defaultBoardId, projectTargets))
     setForm("savingPreferences", false)
     void refetchPreferences()
     props.onChanged?.()
@@ -114,7 +120,7 @@ export function JiraSettingsDialog(props: {
 
   return (
     <Dialog
-      containerClass="!w-[min(34rem,calc(100vw-2rem))] !h-[min(34rem,calc(100dvh-2rem))]"
+      containerClass="!w-[min(34rem,calc(100vw-2rem))] !h-[min(36.5rem,calc(100dvh-2rem))]"
       data-boc-dialog="jira-settings"
     >
       <DialogHeader closeLabel={t("boc.jira.connection.close")}>
@@ -129,6 +135,7 @@ export function JiraSettingsDialog(props: {
             <Tabs.Trigger value="connection">{t("boc.jira.settings.tab.connection")}</Tabs.Trigger>
             <Tabs.Trigger value="boards">{t("boc.jira.settings.tab.boards")}</Tabs.Trigger>
             <Tabs.Trigger value="prompts">{t("boc.jira.settings.tab.prompts")}</Tabs.Trigger>
+            <Tabs.Trigger value="models">{t("boc.jira.settings.tab.models")}</Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="connection" forceMount class="pt-4" classList={{ hidden: form.tab !== "connection" }}>
             <div class="flex flex-col gap-4">
@@ -271,41 +278,74 @@ export function JiraSettingsDialog(props: {
                       {(board) => (
                         <li
                           data-boc-saved-board={board.id}
-                          class="flex flex-wrap items-center gap-2 text-[13px] leading-[var(--line-height-compact)]"
+                          class="flex flex-col gap-2 border-b border-v2-border-border-muted pb-3 text-[13px] leading-[var(--line-height-compact)] last:border-b-0 last:pb-0"
                         >
-                          <span class="min-w-0 flex-1 truncate">{board.name}</span>
-                          <Show
-                            when={preferences()?.defaultBoardId === board.id}
-                            fallback={
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="small"
-                                disabled={busy()}
-                                aria-label={t("boc.jira.board.savedBoards.setDefaultLabel", { board: board.name })}
-                                onClick={() => void savePreferences(preferences()?.savedBoards ?? [], board.id)}
-                              >
-                                {t("boc.jira.board.savedBoards.setDefault")}
-                              </Button>
-                            }
-                          >
-                            <span class="text-v2-text-text-muted">{t("boc.jira.board.savedBoards.default")}</span>
-                          </Show>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="small"
-                            disabled={busy()}
-                            aria-label={t("boc.jira.board.savedBoards.removeLabel", { board: board.name })}
-                            onClick={() =>
-                              void savePreferences(
-                                (preferences()?.savedBoards ?? []).filter((entry) => entry.id !== board.id),
-                                preferences()?.defaultBoardId,
-                              )
-                            }
-                          >
-                            {t("boc.jira.board.savedBoards.remove")}
-                          </Button>
+                          <div class="flex flex-wrap items-center gap-2">
+                            <span class="min-w-0 flex-1 truncate">{board.name}</span>
+                            <Show
+                              when={preferences()?.defaultBoardId === board.id}
+                              fallback={
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="small"
+                                  disabled={busy()}
+                                  aria-label={t("boc.jira.board.savedBoards.setDefaultLabel", { board: board.name })}
+                                  onClick={() => void savePreferences(preferences()?.savedBoards ?? [], board.id)}
+                                >
+                                  {t("boc.jira.board.savedBoards.setDefault")}
+                                </Button>
+                              }
+                            >
+                              <span class="text-v2-text-text-muted">{t("boc.jira.board.savedBoards.default")}</span>
+                            </Show>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="small"
+                              disabled={busy()}
+                              aria-label={t("boc.jira.board.savedBoards.removeLabel", { board: board.name })}
+                              onClick={() =>
+                                void savePreferences(
+                                  (preferences()?.savedBoards ?? []).filter((entry) => entry.id !== board.id),
+                                  preferences()?.defaultBoardId,
+                                )
+                              }
+                            >
+                              {t("boc.jira.board.savedBoards.remove")}
+                            </Button>
+                          </div>
+                          <div class="flex min-w-0 flex-col gap-1">
+                            <span class="text-v2-text-text-muted">{t("boc.jira.board.project.title")}</span>
+                            <Select
+                              class="!w-full min-w-0"
+                              valueClass="block min-w-0 truncate"
+                              contentClass="!w-[min(30rem,calc(100vw-2rem))] !max-w-[calc(100vw-2rem)]"
+                              placement="bottom-start"
+                              aria-label={t("boc.jira.board.project.label", { board: board.name })}
+                              options={props.projects}
+                              current={props.projects.find((project) => {
+                                const target = preferences()?.projectTargets?.find((item) => item.boardId === board.id)
+                                return project.server === target?.server && project.directory === target.directory
+                              })}
+                              value={(project) => `${project.server}:${project.directory}`}
+                              label={(project) => project.label}
+                              placeholder={t("boc.jira.board.project.placeholder")}
+                              disabled={busy()}
+                              onSelect={(project) => {
+                                if (!project) return
+                                const targets = (preferences()?.projectTargets ?? []).filter(
+                                  (target) => target.boardId !== board.id,
+                                )
+                                void savePreferences(preferences()?.savedBoards ?? [], preferences()?.defaultBoardId, [
+                                  ...targets,
+                                  { boardId: board.id, server: project.server, directory: project.directory },
+                                ])
+                              }}
+                            >
+                              {(project) => <span class="block min-w-0 truncate">{project.label}</span>}
+                            </Select>
+                          </div>
                         </li>
                       )}
                     </For>
@@ -314,9 +354,7 @@ export function JiraSettingsDialog(props: {
               </div>
             </Show>
           </Tabs.Content>
-          <Tabs.Content value="prompts" forceMount class="pt-4" classList={{ hidden: form.tab !== "prompts" }}>
-            <JiraSessionDefaultsSettings api={props.api} t={t} onSaved={props.onChanged} />
-          </Tabs.Content>
+          <JiraSessionDefaultsSettings api={props.api} t={t} activeTab={form.tab} onSaved={props.onChanged} />
         </Tabs>
       </DialogBody>
     </Dialog>

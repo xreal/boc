@@ -90,8 +90,18 @@ export type JiraBoardView = typeof JiraBoardView.Type
 export const JiraPreferences = Schema.Struct({
   savedBoards: Schema.Array(JiraBoardSummary),
   defaultBoardId: Schema.optionalKey(Schema.Number),
+  projectTargets: Schema.optionalKey(
+    Schema.Array(
+      Schema.Struct({
+        boardId: Schema.Number,
+        server: Schema.String,
+        directory: Schema.String,
+      }),
+    ),
+  ),
 })
 export type JiraPreferences = typeof JiraPreferences.Type
+export type JiraProjectTarget = NonNullable<JiraPreferences["projectTargets"]>[number]
 
 export type JiraIssueFilters = {
   search?: string
@@ -401,7 +411,11 @@ export function selectableSprints(sprints: readonly JiraSprintSummary[]) {
   return sortSprints(sprints.filter((sprint) => sprint.state === "active" || sprint.state === "future"))
 }
 
-export function normalizeSavedBoards(boards: readonly JiraBoardSummary[], defaultBoardId?: number): JiraPreferences {
+export function normalizeSavedBoards(
+  boards: readonly JiraBoardSummary[],
+  defaultBoardId?: number,
+  projectTargets: readonly JiraProjectTarget[] = [],
+): JiraPreferences {
   const savedBoards: JiraBoardSummary[] = []
   const seen = new Set<number>()
   for (const board of boards) {
@@ -410,10 +424,18 @@ export function normalizeSavedBoards(boards: readonly JiraBoardSummary[], defaul
     savedBoards.push(board)
     if (savedBoards.length === MAX_SAVED_JIRA_BOARDS) break
   }
-  if (defaultBoardId === undefined || !savedBoards.some((board) => board.id === defaultBoardId)) {
-    return { savedBoards }
+  const saved = new Set(savedBoards.map((board) => board.id))
+  const targets = projectTargets.filter(
+    (target, index) =>
+      saved.has(target.boardId) &&
+      target.directory.length > 0 &&
+      projectTargets.findIndex((item) => item.boardId === target.boardId) === index,
+  )
+  return {
+    savedBoards,
+    ...(defaultBoardId !== undefined && saved.has(defaultBoardId) ? { defaultBoardId } : {}),
+    ...(targets.length > 0 ? { projectTargets: targets } : {}),
   }
-  return { savedBoards, defaultBoardId }
 }
 
 export function resolveSelectedBoardId(

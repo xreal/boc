@@ -28,15 +28,23 @@ const electronJiraRuntime: JiraRuntime = {
       getStore().delete("connection")
       getStore().delete("savedBoards")
       getStore().delete("defaultBoardId")
+      getStore().delete("projectTargets")
     },
-    readPreferences: () => ({
-      savedBoards: getStore().get("savedBoards"),
-      defaultBoardId: getStore().get("defaultBoardId"),
-    }),
+    readPreferences: () => {
+      const defaultBoardId = getStore().get("defaultBoardId")
+      const projectTargets = getStore().get("projectTargets")
+      return {
+        savedBoards: getStore().get("savedBoards") ?? [],
+        ...(defaultBoardId === undefined ? {} : { defaultBoardId }),
+        ...(projectTargets === undefined ? {} : { projectTargets }),
+      }
+    },
     writePreferences: (value) => {
       getStore().set("savedBoards", value.savedBoards)
       if (value.defaultBoardId === undefined) getStore().delete("defaultBoardId")
       else getStore().set("defaultBoardId", value.defaultBoardId)
+      if (value.projectTargets === undefined) getStore().delete("projectTargets")
+      else getStore().set("projectTargets", value.projectTargets)
     },
   },
   vault: {

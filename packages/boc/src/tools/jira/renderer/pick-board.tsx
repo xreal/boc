@@ -7,7 +7,7 @@ import { For, createEffect, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocDesktopAPI } from "../../../desktop/renderer/api"
 import { createBocTranslator } from "../../../renderer/i18n"
-import { normalizeSavedBoards, type JiraBoardSummary } from "../domain/board"
+import { normalizeSavedBoards, type JiraBoardSummary, type JiraPreferences } from "../domain/board"
 import type { JiraConnectionFailure } from "../rpcs"
 import { createLatestRequest } from "./latest-request"
 import { jiraConnectionErrorKey } from "./status"
@@ -17,7 +17,7 @@ export function JiraPickBoardDialog(props: {
   locale: () => string
   kind: "default" | "add"
   excludeIds?: readonly number[]
-  onSaved: (board: JiraBoardSummary) => void
+  onSaved: (board: JiraBoardSummary, preferences: JiraPreferences) => void
 }) {
   const t = createBocTranslator(props.locale)
   const requests = createLatestRequest({
@@ -83,8 +83,10 @@ export function JiraPickBoardDialog(props: {
       ? current.savedBoards
       : [...current.savedBoards, board]
     const defaultBoardId = adding() ? current.defaultBoardId : board.id
-    await props.api.savePreferences(normalizeSavedBoards(savedBoards, defaultBoardId ?? board.id))
-    props.onSaved(board)
+    const preferences = await props.api.savePreferences(
+      normalizeSavedBoards(savedBoards, defaultBoardId ?? board.id, current.projectTargets),
+    )
+    props.onSaved(board, preferences)
   }
 
   const onKeyDown = (event: KeyboardEvent) => {

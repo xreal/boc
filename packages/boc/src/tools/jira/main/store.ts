@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import { JiraSessionLink, JiraSessionInstructions, defaultJiraSessionInstructions } from "../domain/sessions"
+import { JiraSessionLink, JiraSessionInstructions, normalizeJiraSessionInstructions } from "../domain/sessions"
 import { JiraPreferences, normalizeSavedBoards } from "../domain/board"
 
 export const JIRA_STORE_NAME = "boc.jira"
@@ -14,7 +14,6 @@ export type JiraStoredConnection = typeof JiraStoredConnection.Type
 
 const decodeStoredConnection = Schema.decodeUnknownOption(JiraStoredConnection)
 const decodePreferences = Schema.decodeUnknownOption(JiraPreferences)
-const decodeSessionInstructions = Schema.decodeUnknownOption(JiraSessionInstructions)
 const decodeSessionLinks = Schema.decodeUnknownOption(Schema.Array(JiraSessionLink))
 
 export type JiraStore = {
@@ -35,7 +34,7 @@ export function readStoredConnection(store: JiraStore) {
 
 export function readStoredPreferences(store: JiraStore): JiraPreferences {
   const stored = Option.getOrUndefined(decodePreferences(store.readPreferences()))
-  return normalizeSavedBoards(stored?.savedBoards ?? [], stored?.defaultBoardId)
+  return normalizeSavedBoards(stored?.savedBoards ?? [], stored?.defaultBoardId, stored?.projectTargets)
 }
 
 export function memoryJiraStore(initial?: JiraStoredConnection, preferences?: JiraPreferences): JiraStore {
@@ -68,10 +67,7 @@ export function memoryJiraStore(initial?: JiraStoredConnection, preferences?: Ji
 }
 
 export function readSessionInstructions(store: JiraStore): JiraSessionInstructions {
-  return Option.getOrElse(
-    decodeSessionInstructions(store.readSessionInstructions()),
-    () => defaultJiraSessionInstructions,
-  )
+  return normalizeJiraSessionInstructions(store.readSessionInstructions())
 }
 
 export function readSessionLinks(store: JiraStore): readonly JiraSessionLink[] {

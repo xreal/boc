@@ -18,6 +18,7 @@ export function JiraIssueInspector(props: {
   t: BocTranslator
   locale: string
   issueKey: string
+  boardId: number
   issue?: JiraIssueDetail
   loading: boolean
   overlay: boolean
@@ -149,7 +150,7 @@ export function JiraIssueInspector(props: {
                 </Property>
               </dl>
 
-              <JiraIssueSessions issue={issue()} t={props.t} />
+              <JiraIssueSessions issue={issue()} boardId={props.boardId} t={props.t} />
 
               <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
                 <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">

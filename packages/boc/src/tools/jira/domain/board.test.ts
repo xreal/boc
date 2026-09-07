@@ -256,6 +256,17 @@ describe("saved boards", () => {
     expect(normalizeSavedBoards(saved.slice(0, 3), 2).defaultBoardId).toBe(2)
   })
 
+  test("keeps one project target per saved board and drops stale targets", () => {
+    const target = { boardId: 2, server: "local", directory: "/workspace/shop" }
+    expect(
+      normalizeSavedBoards([board(2), board(3)], 2, [
+        target,
+        { ...target, directory: "/workspace/duplicate" },
+        { boardId: 9, server: "local", directory: "/workspace/stale" },
+      ]).projectTargets,
+    ).toEqual([target])
+  })
+
   test("resolves the default board, then the first saved board still available", () => {
     const available = [board(4), board(8), board(2)]
     expect(resolveSelectedBoardId(undefined, { savedBoards: [board(8), board(2)], defaultBoardId: 2 }, available)).toBe(2)

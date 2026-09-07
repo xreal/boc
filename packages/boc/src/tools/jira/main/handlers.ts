@@ -169,7 +169,7 @@ export async function getIssue(
 }
 
 export function savePreferences(runtime: JiraRuntime, payload: JiraPreferences) {
-  const preferences = normalizeSavedBoards(payload.savedBoards, payload.defaultBoardId)
+  const preferences = normalizeSavedBoards(payload.savedBoards, payload.defaultBoardId, payload.projectTargets)
   runtime.store.writePreferences(preferences)
   return preferences
 }

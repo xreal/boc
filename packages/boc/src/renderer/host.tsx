@@ -2,7 +2,14 @@ import { createContext, useContext, type ParentProps } from "solid-js"
 
 export type BocHost = {
   sessions?: {
-    start(input: { prompt: string; title: string; issueUrl: string }): Promise<void>
+    projects(): { server: string; directory: string; label: string }[]
+    start(input: {
+      prompt: string
+      title: string
+      issueUrl: string
+      model: { providerID: string; modelID: string; variant?: string }
+      target: { server: string; directory: string }
+    }): Promise<void>
     open(server: string, sessionID: string): Promise<void>
   }
   navigate(to: string): void
