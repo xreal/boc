@@ -13,6 +13,7 @@ export function JiraIssueCard(props: {
   locale: string
   index: number
   selected: boolean
+  deployedHosts?: readonly string[]
   onSelect: (returnFocus: HTMLButtonElement) => void
   onOpenExternal: (url: string) => void
 }) {
@@ -55,6 +56,11 @@ export function JiraIssueCard(props: {
         <span class="line-clamp-3 text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-base">
           {props.issue.summary}
         </span>
+        <Show when={props.deployedHosts && props.deployedHosts.length > 0}>
+          <span class="truncate text-[12px] leading-[var(--line-height-compact)] [font-weight:530] text-v2-state-fg-success">
+            {props.t("boc.jira.board.card.deployed", { hosts: props.deployedHosts!.join(", ") })}
+          </span>
+        </Show>
         <span class="flex w-full items-center gap-2 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
           <Show when={props.issue.storyPoints !== undefined}>
             <Badge>{props.t("boc.jira.board.storyPoints", { count: props.issue.storyPoints ?? 0 })}</Badge>

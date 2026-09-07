@@ -37,6 +37,7 @@ export function DeploymentDialog(props: {
   locale: () => string
   system: DeploymentSystem
   kind: "deploy" | "reset" | "redeploy"
+  initialRef?: string
   onQueued: (operation: DeploymentOperationSummary) => void
 }) {
   const dialog = useDialog()
@@ -44,7 +45,7 @@ export function DeploymentDialog(props: {
   const locked = props.kind === "reset"
   const branchLocked = locked || props.kind === "redeploy"
   const [form, setForm] = createStore({
-    ref: locked ? "master" : (props.system.branch ?? ""),
+    ref: locked ? "master" : (props.initialRef ?? props.system.branch ?? ""),
     branches: [] as string[],
     branchStatus: "idle" as "idle" | "checking" | "valid" | "invalid" | "network",
     workflowQuery: "",

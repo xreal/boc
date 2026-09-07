@@ -20,6 +20,11 @@ import {
   type JiraPreferences,
 } from "../domain/board"
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
+import {
+  deploymentTicketKey,
+  type DeploymentSystem,
+} from "../../deployments/domain/systems"
+import { DeploymentDialog } from "../../deployments/renderer/deploy-dialog"
 import { JiraBoardColumns } from "./columns"
 import { JiraIssueInspector } from "./inspector"
 import { createJiraBoardLanes } from "./lanes"
@@ -50,6 +55,7 @@ export default function JiraScreen(props: BocScreenProps) {
     board: undefined as JiraBoardView | undefined,
     sprintId: undefined as number | undefined,
     issues: [] as readonly JiraBoardIssue[],
+    deploymentSystems: [] as readonly DeploymentSystem[],
     lane: "stories" as JiraBoardLane,
     search: "",
     assignee: undefined as string | undefined,
@@ -279,6 +285,62 @@ export default function JiraScreen(props: BocScreenProps) {
     queueMicrotask(() => inspectorReturnFocus?.focus())
   }
 
+  const loadDeployments = async (force = false) => {
+    if (!desktop) return
+    const result = await desktop.deployments
+      .listSystems({ requestId: "jira-screen", refresh: force })
+      .catch(() => undefined)
+    if (result?.ok) {
+      setView("deploymentSystems", result.systems)
+    }
+  }
+
+  const systemsByTicketKey = () => {
+    const map = new Map<string, DeploymentSystem[]>()
+    for (const system of view.deploymentSystems) {
+      const key = system.ticketKey ?? deploymentTicketKey(system.branch)
+      if (!key) continue
+      const upper = key.toUpperCase()
+      const existing = map.get(upper)
+      if (existing) {
+        existing.push(system)
+      } else {
+        map.set(upper, [system])
+      }
+    }
+    return map
+  }
+
+  const deployedHostsForIssue = (issueKey: string): readonly string[] | undefined => {
+    const list = systemsByTicketKey().get(issueKey.toUpperCase())
+    if (!list || list.length === 0) return undefined
+    return list.map((item) => item.name)
+  }
+
+  const deployedSystemsForIssue = (issueKey: string): readonly DeploymentSystem[] | undefined => {
+    return systemsByTicketKey().get(issueKey.toUpperCase())
+  }
+
+  const openDeploy = (system?: DeploymentSystem) => {
+    const target =
+      system ??
+      view.deploymentSystems.find((entry) => entry.availability === "free") ??
+      view.deploymentSystems[0]
+    if (!target) return
+    void dialog.show(() => (
+      <DeploymentDialog
+        api={desktop.deployments}
+        locale={props.host.locale}
+        system={target}
+        kind={target.branch ? "redeploy" : "deploy"}
+        initialRef={system ? undefined : view.selectedIssueKey}
+        onQueued={() => {
+          void loadDeployments(true)
+        }}
+      />
+    ))
+  }
+
   onMount(() => {
     const wide = window.matchMedia("(min-width: 56rem)")
     const syncWide = () => setView("wide", wide.matches)
@@ -294,9 +356,14 @@ export default function JiraScreen(props: BocScreenProps) {
     window.addEventListener("offline", syncOnline)
     window.addEventListener("keydown", onKeyDown)
     void bootstrap()
+    void loadDeployments(false)
+    const deploymentTimer = setInterval(() => {
+      if (view.online) void loadDeployments(false)
+    }, 30_000)
     onCleanup(() => {
       boardRequests.invalidate()
       issueRequests.invalidate()
+      clearInterval(deploymentTimer)
       wide.removeEventListener("change", syncWide)
       window.removeEventListener("online", syncOnline)
       window.removeEventListener("offline", syncOnline)
@@ -317,7 +384,10 @@ export default function JiraScreen(props: BocScreenProps) {
         preferences={view.preferences}
         selectedBoardId={view.selectedBoardId}
         loading={refreshing()}
-        onRefresh={() => void bootstrap()}
+        onRefresh={() => {
+          void bootstrap()
+          void loadDeployments(true)
+        }}
         onAddBoard={() => openPickBoard("add")}
         onSelectBoard={(boardId) => void loadBoard(boardId)}
         onOpenSettings={openSettings}
@@ -354,6 +424,7 @@ export default function JiraScreen(props: BocScreenProps) {
             locale={props.host.locale()}
             groups={groups()}
             selectedIssueKey={view.selectedIssueKey}
+            deployedHosts={deployedHostsForIssue}
             onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
             onOpenExternal={(url) => props.host.openExternal(url)}
           />
@@ -367,6 +438,8 @@ export default function JiraScreen(props: BocScreenProps) {
               loading={view.loading === "issue"}
               overlay={!view.wide}
               failure={view.issueFailure}
+              deployedSystems={deployedSystemsForIssue(view.selectedIssueKey!)}
+              onDeploy={openDeploy}
               onClose={closeInspector}
               onOpenExternal={(url) => props.host.openExternal(url)}
             />

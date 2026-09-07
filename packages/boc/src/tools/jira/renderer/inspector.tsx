@@ -9,8 +9,10 @@ import { createEffect, For, Show, type JSX } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail } from "../domain/board"
 import type { JiraConnectionFailure } from "../rpcs"
+import type { DeploymentSystem } from "../../deployments/domain/systems"
 import { jiraConnectionErrorKey } from "./status"
 import { JiraIssueDescription } from "./description"
+import { JiraIssueDeployments } from "./deployments"
 import { jiraRelativeTime } from "./time"
 import { jiraPriorityTone, jiraToneText } from "./tone"
 
@@ -23,6 +25,8 @@ export function JiraIssueInspector(props: {
   loading: boolean
   overlay: boolean
   failure?: JiraConnectionFailure
+  deployedSystems?: readonly DeploymentSystem[]
+  onDeploy?: (system?: DeploymentSystem) => void
   onClose: () => void
   onOpenExternal: (url: string) => void
 }) {
@@ -151,6 +155,13 @@ export function JiraIssueInspector(props: {
               </dl>
 
               <JiraIssueSessions issue={issue()} boardId={props.boardId} t={props.t} />
+
+              <JiraIssueDeployments
+                t={props.t}
+                locale={props.locale}
+                systems={props.deployedSystems}
+                onDeploy={props.onDeploy}
+              />
 
               <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
                 <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
