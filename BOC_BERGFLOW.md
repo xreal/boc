@@ -47,7 +47,7 @@ The vendor filename includes the archive SHA-256 prefix so Bun cannot reuse an o
 
 ### Agent and instruction API audit — 2026-09-07
 
-The follow-up audit used clean Boc `5a8cc02781` and portable Bergflow `1130767` working trees. The release pin is still `0.0.0-beta-19192`. No portable implementation, package version, archive, or application capability changed during this audit.
+The follow-up audit used clean Boc `5a8cc02781` and portable Bergflow `1130767` working trees. The subsequent upstream sync advanced the release pin to the already-tested `0.0.0-beta-19234`. No portable implementation, package version, archive, or application capability changed during this audit.
 
 A disposable local plugin was exercised through authenticated RPC in isolated original `19192` and `19234` servers, with independent home/config/data/database directories. Both produced the same results:
 

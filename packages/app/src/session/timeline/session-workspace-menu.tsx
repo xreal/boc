@@ -7,7 +7,6 @@ import type { Project } from "@/runtime/server/types"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServerSDK } from "@/runtime/server/client"
 import { useData } from "@/runtime/server/current"
-import { useSettingsDialog } from "@/settings/command"
 import { pathKey } from "@/workspaces/path-key"
 import { showToast } from "@/shell/notifications/toast"
 import { containsDirectory, sameDirectory, workspaceDirectories } from "@/workspaces/paths"
@@ -31,7 +30,6 @@ export function SessionWorkspaceMenu(props: {
   const serverSDK = useServerSDK()
   const data = useData()
   const worktreeStrategy = useBocWorktreeStrategy()
-  const openWorkspaces = useSettingsDialog("workspaces")
   const [store, setStore] = createStore({ selected: undefined as string | undefined })
   const [directories, setDirectories] = createSignal(workspaceDirectories(props.project))
   const blocked = () => props.eligible === false || data.session.status(props.sessionID) === "running"
@@ -103,14 +101,14 @@ export function SessionWorkspaceMenu(props: {
               </Menu.Item>
             </Show>
             <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move("create")}>
-              <Icon name="workspace-new" />
+              <Icon name="plus" />
               <span class="min-w-0 flex-1 truncate">{language.t("workspace.new")}</span>
               <BocWorktreeCreationBadge projectID={props.project.id} />
             </Menu.Item>
             <Show when={workspaces().length > 0}>
               <Menu.Sub gutter={0} overlap overflowPadding={8}>
                 <Menu.SubTrigger>
-                  <Icon name="workspace-isolated" />
+                  <Icon name="outline-worktree" />
                   {language.t("session.new.workspace.existing").replace(/(…|\.{3})$/, "")}
                 </Menu.SubTrigger>
                 <Menu.Portal>
@@ -118,7 +116,7 @@ export function SessionWorkspaceMenu(props: {
                     <For each={workspaces()}>
                       {(workspace) => (
                         <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move(workspace)}>
-                          <Icon name="workspace-isolated" />
+                          <Icon name="outline-worktree" />
                           <span class="min-w-0 flex-1 truncate">{getFilename(workspace)}</span>
                         </Menu.Item>
                       )}
@@ -128,10 +126,6 @@ export function SessionWorkspaceMenu(props: {
               </Menu.Sub>
             </Show>
           </Menu.Group>
-          <Menu.Separator class="h-[0.5px] bg-v2-border-border-base" />
-          <Menu.Item onSelect={() => openWorkspaces()}>
-            <span class="min-w-0 flex-1 truncate">{language.t("common.viewAll")}</span>
-          </Menu.Item>
         </Menu.Content>
       </Menu.Portal>
     </Menu>
