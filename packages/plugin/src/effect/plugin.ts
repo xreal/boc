@@ -1,6 +1,7 @@
 import type { ExperimentalApi, GenerateApi, PluginApi } from "@opencode-ai/client/effect/api"
 import type { Location } from "@opencode-ai/schema/location"
 import type { Effect, Scope } from "effect"
+import type { EffectDomain } from "../boc/selection.js"
 import type { PluginOptions } from "../options.js"
 import type { App } from "../app.js"
 import type { AgentDomain } from "./agent.js"
@@ -41,6 +42,7 @@ export interface Context {
   readonly plugin: Pick<PluginApi<unknown>, "list">
   readonly reference: ReferenceDomain
   readonly rpc: RpcDomain
+  readonly selection?: EffectDomain
   readonly session: SessionDomain
   readonly shell: ShellDomain
   readonly skill: SkillDomain

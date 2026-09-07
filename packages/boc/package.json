@@ -32,7 +32,7 @@
     "marked": "catalog:",
     "solid-js": "catalog:",
     "yaml": "2.9.0",
-    "@bergflow/opencode": "file:./vendor/bergflow-opencode-0.2.0-ae41c0880d38.tgz",
+    "@bergflow/opencode": "file:./vendor/bergflow-opencode-0.2.1-ef3d3bd65d8f.tgz",
     "@opencode-ai/client": "workspace:*"
   },
   "devDependencies": {

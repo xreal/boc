@@ -112,7 +112,7 @@
       "name": "@boc/extensions",
       "version": "0.0.0",
       "dependencies": {
-        "@bergflow/opencode": "file:./vendor/bergflow-opencode-0.2.0-ae41c0880d38.tgz",
+        "@bergflow/opencode": "file:./vendor/bergflow-opencode-0.2.1-ef3d3bd65d8f.tgz",
         "@opencode-ai/client": "workspace:*",
         "@opencode-ai/core": "workspace:*",
         "@opencode-ai/plugin": "workspace:*",
@@ -1630,7 +1630,7 @@
 
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
-    "@bergflow/opencode": ["@bergflow/opencode@./vendor/bergflow-opencode-0.2.0-ae41c0880d38.tgz", { "dependencies": { "@opencode-ai/plugin": "0.0.0-beta-18743", "@opencode-ai/schema": "0.0.0-beta-18743", "mysql2": "3.20.0", "node-sql-parser": "5.4.0", "yaml": "^2.8.1", "zod": "4.1.8" }, "peerDependencies": { "@opencode-ai/theme": "^0.0.0-beta-18743", "@opentui/core": ">=0.5.9", "@opentui/solid": ">=0.5.9", "solid-js": ">=1.9.0" } }, "sha512-rgoVb11J0B75r/oTIe9T1ByTWn08qeOcWUJNcVRBkhyTHsXGxM7L+tjzyZZMrUXBl5+Pl8R1xiGtKSdUaB7uiQ=="],
+    "@bergflow/opencode": ["@bergflow/opencode@./vendor/bergflow-opencode-0.2.1-ef3d3bd65d8f.tgz", { "dependencies": { "@opencode-ai/plugin": "0.0.0-beta-18743", "@opencode-ai/schema": "0.0.0-beta-18743", "mysql2": "3.20.0", "node-sql-parser": "5.4.0", "yaml": "^2.8.1", "zod": "4.1.8" }, "peerDependencies": { "@opencode-ai/theme": "^0.0.0-beta-18743", "@opentui/core": ">=0.5.9", "@opentui/solid": ">=0.5.9", "solid-js": ">=1.9.0" } }, "sha512-PIVGbBTG70GyQk/xotsvNF57KbW5ver2WSuOWsgkdIOXhY8DObXL5Bdv7XiTDNDDn8qN3vE+jmVQ7PpFubAJrQ=="],
 
     "@boc/extensions": ["@boc/extensions@workspace:packages/boc"],
 

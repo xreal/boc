@@ -244,6 +244,11 @@ export default function BergflowScreen(props: BocScreenProps) {
                               )}
                             </p>
                           </Show>
+                          <Show when={kind === "instruction"}>
+                            <p class="bergflow-readonly-note text-12-regular text-v2-text-text-muted">
+                              {t("boc.bergflow.scope.instruction")}
+                            </p>
+                          </Show>
                           <div class="bergflow-cards">
                             <For each={items()}>
                               {(item) => (

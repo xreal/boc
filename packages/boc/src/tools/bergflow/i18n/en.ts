@@ -6,6 +6,8 @@ export const bergflowEnglish = {
     "Agent switching is not supported by this Bergflow version. Agents are shown for reference.",
   "boc.bergflow.readOnly.instruction":
     "AGENTS.md switching is not supported by this Bergflow version. Discovered files are shown; their effect in a session is unconfirmed.",
+  "boc.bergflow.scope.instruction":
+    "Project files affect future automatic instruction loads. Instructions already in session history and nested instructions loaded while reading files are unchanged.",
   "boc.bergflow.openSession": "Open Project Controls for this session",
   "boc.bergflow.contextFailed": "Could not open controls for this session",
   "boc.bergflow.scope": "Changes apply to all worktrees of this project on this server.",
@@ -81,6 +83,8 @@ export const bergflowEnglish = {
     "This inventory contains observed registry tools. Session-specific tools may be absent. Enabled does not guarantee availability in every session.",
   "boc.bergflow.effect.next_model_request":
     "Applies to future model requests and tool execution. Already running calls continue.",
+  "boc.bergflow.effect.next_instruction_request":
+    "Applies to future automatic project-instruction loads. Existing session history and read-triggered nested instructions are retained.",
   "boc.bergflow.effect.next_skill_request":
     "Applies to the skill inventory and future native skill requests. Existing conversation content is retained.",
   "boc.bergflow.effect.mcp_reconnect":

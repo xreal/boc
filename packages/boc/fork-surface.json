@@ -1,6 +1,9 @@
 {
   "owned": [
     "packages/boc/**",
+    "packages/core/src/boc/**",
+    "packages/core/test/boc/**",
+    "packages/plugin/src/boc/**",
     "packages/app/src/boc/**",
     "packages/schema/src/boc/**",
     "packages/protocol/src/boc/**",
@@ -239,6 +242,34 @@
       "reason": "Verify the generated Promise client exposes the Boc capability groups"
     },
     {
+      "path": "packages/core/src/instruction-discovery.ts",
+      "reason": "Apply Boc's optional structured selection hook to ambient instruction files before rendering"
+    },
+    {
+      "path": "packages/core/src/plugin/hooks.ts",
+      "reason": "Register the Boc ambient instruction selection event in the existing Location-scoped hook lifecycle"
+    },
+    {
+      "path": "packages/core/src/plugin/host.ts",
+      "reason": "Expose the optional versioned Boc selection facade with real instruction discovery and path classification dependencies"
+    },
+    {
+      "path": "packages/core/test/plugin/fixture.ts",
+      "reason": "Provide instruction discovery and global path services now consumed by the plugin host fixture"
+    },
+    {
+      "path": "packages/plugin/src/effect/plugin.ts",
+      "reason": "Expose the optional Boc selection facade to Effect plugins"
+    },
+    {
+      "path": "packages/plugin/src/promise/plugin.ts",
+      "reason": "Expose the optional Boc selection facade to portable Promise plugins"
+    },
+    {
+      "path": "packages/plugin/src/promise/adapter.ts",
+      "reason": "Adapt the optional Boc selection facade and its scoped hooks for Promise plugins"
+    },
+    {
       "path": "packages/core/src/plugin/sdk.ts",
       "reason": "Opt-in host fallback registration for bundled plugins; regular host registrations retain their precedence"
     },
@@ -260,7 +291,7 @@
     },
     {
       "path": "packages/app/component-tests/bergflow.spec.ts",
-      "reason": "Exercise production Bergflow controls for keyboard mutation, focus retention, read-only capabilities, search, and narrow context selection"
+      "reason": "Exercise production Bergflow controls for keyboard mutation, ambient instruction availability and scope, focus retention, read-only capabilities, search, and narrow context selection"
     }
   ]
 }

@@ -14,10 +14,10 @@ story("applies a keyboard toggle and preserves focus on the capability", async (
   ).toBeVisible()
   await component.getByRole("button", { name: "Instructions 1", exact: true }).click()
   await expect(component.getByRole("heading", { name: "AGENTS.md", exact: true })).toBeVisible()
-  await expect(component.getByRole("switch", { name: "AGENTS.md", exact: true })).toHaveCount(0)
+  await expect(component.getByRole("switch", { name: "AGENTS.md", exact: true })).toBeChecked()
   await expect(
     component.getByText(
-      "AGENTS.md switching is not supported by this Bergflow version. Discovered files are shown; their effect in a session is unconfirmed.",
+      "Project files affect future automatic instruction loads. Instructions already in session history and nested instructions loaded while reading files are unchanged.",
     ),
   ).toBeVisible()
   await component.getByRole("textbox", { name: "Search capabilities" }).fill("no matching capability")

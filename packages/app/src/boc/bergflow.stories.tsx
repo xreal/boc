@@ -5,7 +5,7 @@ function ControlsPreview() {
   let snapshot: ControlState = {
     info: {
       protocol: 1,
-      version: "0.2.0",
+      version: "0.2.1",
       project: { id: "fixture", canonical: "/workspace/shop" },
       location: { directory: "/workspace/shop" },
       source: "bundled",
@@ -28,14 +28,11 @@ function ControlsPreview() {
       { kind: "agent", id: "general", name: "General", source: "OpenCode", effect: "read_only", mutable: false },
       {
         kind: "instruction",
-        id: "/workspace/shop/AGENTS.md",
+        id: "AGENTS.md",
         name: "AGENTS.md",
         source: "/workspace/shop/AGENTS.md",
-        effect: "read_only",
-        mutable: false,
-        effective: "unknown",
-        defaultEnabled: null,
-        reason: "read_only",
+        effect: "next_instruction_request",
+        mutable: true,
       },
       {
         kind: "mcp",
