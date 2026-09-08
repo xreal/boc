@@ -7,6 +7,7 @@ import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
 import { createRiftBackend } from "./backend"
+import { metadataKey } from "./metadata"
 
 const binary = process.env.BOC_RIFT_TEST_BINARY
 
@@ -34,6 +35,10 @@ describe("Rift backend", () => {
         await $`git remote add origin https://github.com/example/project.git`.cwd(source).quiet()
         await $`git remote set-url --push origin ssh://git@github.com/example/project.git`.cwd(source).quiet()
         await Bun.write(path.join(source, "dirty.txt"), "source-only\n")
+
+        const legacyTemplate = path.join(checkouts, ".boc-rift", metadataKey(source), "template")
+        await fs.mkdir(legacyTemplate, { recursive: true })
+        await Bun.write(path.join(legacyTemplate, ".rift"), "unknown-registry-entry\n")
 
         const backend = createRiftBackend({ binary, stateDirectory: path.join(root, "state") })
         const destination = AbsolutePath.make(path.join(checkouts, "rift-checkout"))

@@ -2,6 +2,7 @@ import { Git } from "@opencode-ai/core/git"
 import { AbsolutePath } from "@opencode-ai/core/schema"
 import { Worktree } from "@opencode-ai/core/worktree"
 import { Context, Effect } from "effect"
+import { randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
 import { Global } from "@opencode-ai/util/global"
@@ -131,7 +132,7 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
     const sourceDirectory = AbsolutePath.make(sourceRecord?.sourceDirectory ?? input.sourceDirectory)
     const commit = await resolveCommit(input.sourceDirectory, input.branch)
     const templateDirectory = AbsolutePath.make(
-      path.join(destination.parent, ".boc-rift", metadataKey(sourceDirectory), "template"),
+      path.join(destination.parent, ".boc-rift", metadataKey(sourceDirectory), await templateNamespace(), "template"),
     )
 
     await prepareTemplate(input.sourceDirectory, sourceDirectory, templateDirectory, commit)
@@ -252,6 +253,27 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
     await requireGit(template, ["checkout", "--detach", "--force", commit], "Rift template checkout failed")
     await requireGit(template, ["reset", "--hard", commit], "Rift template reset failed")
     await requireGit(template, ["clean", "-fdx", "-e", ".rift"], "Rift template cleanup failed")
+  }
+
+  async function templateNamespace() {
+    await fs.mkdir(options.stateDirectory, { recursive: true })
+    const file = path.join(options.stateDirectory, "template-namespace")
+    const existing = await fs.readFile(file, "utf8").catch(() => undefined)
+    if (existing && isTemplateNamespace(existing.trim())) return existing.trim()
+
+    const namespace = randomUUID()
+    const created = await fs.writeFile(file, `${namespace}\n`, { flag: "wx" }).then(
+      () => true,
+      (error: NodeJS.ErrnoException) => {
+        if (error.code === "EEXIST") return false
+        throw error
+      },
+    )
+    if (created) return namespace
+
+    const concurrent = (await fs.readFile(file, "utf8")).trim()
+    if (isTemplateNamespace(concurrent)) return concurrent
+    throw new RiftOperationError("Rift template namespace is invalid.")
   }
 
   async function syncRemotes(source: AbsolutePath, template: AbsolutePath) {
@@ -399,4 +421,8 @@ function lines(value: string) {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
+}
+
+function isTemplateNamespace(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
 }
