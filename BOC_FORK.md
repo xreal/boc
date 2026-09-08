@@ -9,6 +9,7 @@ This is the operational map of Boc's deliberate differences from `upstream/beta`
 - Keep product code in fork-owned paths. If an upstream-owned file must change, keep the change narrow and record it here and in `packages/boc/fork-surface.json`.
 - Prefer a supported upstream extension point over a Boc workaround. Remove obsolete seams when upstream makes them unnecessary.
 - Treat `packages/boc/fork-surface.json` as the exact machine-readable path list and this file as the explanation of intent and coupling.
+- The surface audit compares the working tree against the common upstream baseline, includes untracked non-ignored files, and rejects duplicate, stale and unlisted approvals. It checks both sides of renames against the ownership rules.
 
 ## Implemented capabilities
 
