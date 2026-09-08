@@ -15,6 +15,8 @@
   },
   "scripts": {
     "rift:fetch": "bun run scripts/rift/fetch.ts",
+    "test:components": "playwright test --config playwright.components.config.ts",
+    "test:service": "bun test ./service-tests",
     "typecheck": "tsgo --noEmit",
     "test": "bun test --conditions=browser --conditions=solid --preload ./happydom.ts ./src ./scripts"
   },
@@ -34,6 +36,7 @@
     "@opencode-ai/client": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "catalog:",
     "@happy-dom/global-registrator": "20.0.11",
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",

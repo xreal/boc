@@ -38,14 +38,6 @@
       "reason": "Append-only Boc fork guidance above the upstream boundary"
     },
     {
-      "path": ".gitignore",
-      "reason": "Exclude local root Wrangler state from the fork worktree"
-    },
-    {
-      "path": "packages/storybook/.gitignore",
-      "reason": "Exclude generated Playwright helper declarations from the fork worktree"
-    },
-    {
       "path": "bun.lock",
       "reason": "Lock the BOC workspace and its app and desktop dependency edges"
     },
@@ -58,16 +50,8 @@
       "reason": "Map the Boc channel to the compatible standard service registration and port"
     },
     {
-      "path": "packages/cli/test/service.test.ts",
-      "reason": "Verify the Boc channel shares the standard managed service identity"
-    },
-    {
       "path": "packages/app/package.json",
       "reason": "Register the BOC workspace dependency"
-    },
-    {
-      "path": "packages/app/component-tests/environments.spec.ts",
-      "reason": "Verify the Boc environment controls, retry flow, focus return, and removal confirmation"
     },
     {
       "path": "packages/app/src/env.d.ts",
@@ -124,10 +108,6 @@
     {
       "path": "packages/app/src/workspaces/create.ts",
       "reason": "Resolve an optional Boc checkout strategy and use the Boc tracked preparation route for local pending sessions"
-    },
-    {
-      "path": "packages/app/src/workspaces/create.test.ts",
-      "reason": "Verify the optional checkout strategy preserves creation and cache behavior"
     },
     {
       "path": "packages/app/src/shell/routes/routes.tsx",
@@ -292,10 +272,6 @@
     {
       "path": "packages/desktop/scripts/dev.ts",
       "reason": "Prepare the Boc source backend and bundled Rift for isolated local desktop development"
-    },
-    {
-      "path": "packages/app/component-tests/controls.spec.ts",
-      "reason": "Exercise native Boc Project Controls for keyboard mutation, instruction scope, inline provenance, focus retention, search and narrow context selection"
     }
   ]
 }

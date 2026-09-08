@@ -27,7 +27,6 @@ a.out
 target
 .scripts
 .cache
-/.wrangler/
 .direnv/
 
 # Local dev files
