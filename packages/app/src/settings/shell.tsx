@@ -18,6 +18,8 @@ import { SettingsProjects } from "./workspaces/projects"
 import { SettingsExtensions } from "./providers/extensions"
 import { SettingsAbout } from "./about/about"
 import { SettingsServerScope } from "./server-scope"
+import { BocSettings } from "@/boc/settings"
+import { createBocTranslator } from "@boc/extensions/renderer"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { useLayout } from "@/shell/state/layout"
 import { useTabs } from "@/shell/tabs/tabs"
@@ -37,6 +39,7 @@ const sections = [
     { value: "servers", icon: "server", label: "status.popover.tab.servers" },
     { value: "projects", icon: "folder", label: "settings.tab.projects" },
     { value: "workspaces", icon: "outline-worktree", label: "settings.tab.workspaces" },
+    { value: "boc", icon: "workspace-isolated", label: "boc.settings.title", boc: true },
   ],
   [
     { value: "providers", icon: "providers", label: "settings.providers.title" },
@@ -49,6 +52,7 @@ const sections = [
 
 export const SettingsScreen: Component = () => {
   const language = useLanguage()
+  const boc = createBocTranslator(language.locale)
   const dialog = useDialog()
   const surface = useSettingsSurface()
   const layout = useLayout()
@@ -99,6 +103,8 @@ export const SettingsScreen: Component = () => {
     dialog.close()
     surface.open("providers")
   }
+  const sectionLabel = (section: (typeof sections)[number][number]) =>
+    "boc" in section ? boc(section.label) : language.t(section.label)
 
   return (
     <div
@@ -127,9 +133,8 @@ export const SettingsScreen: Component = () => {
           <Menu placement="bottom-end" gutter={8}>
             <Menu.Trigger as={Button} size="normal" variant="outline" class="settings-mobile-menu-trigger">
               <span>
-                {language.t(
-                  sections.flat().find((section) => section.value === surface.tab())?.label ??
-                    "settings.tab.preferences",
+                {sectionLabel(
+                  sections.flat().find((section) => section.value === surface.tab()) ?? sections[0][0],
                 )}
               </span>
               <Icon name="chevron-down" size="small" />
@@ -157,7 +162,7 @@ export const SettingsScreen: Component = () => {
                               }}
                             >
                               <Icon name={section.icon} />
-                              {language.t(section.label)}
+                              {sectionLabel(section)}
                             </Menu.RadioItem>
                           )}
                         </For>
@@ -188,7 +193,7 @@ export const SettingsScreen: Component = () => {
                           }}
                         >
                           <Icon name={section.icon} />
-                          {language.t(section.label)}
+                          {sectionLabel(section)}
                         </Tabs.Trigger>
                       )}
                     </For>
@@ -221,6 +226,9 @@ export const SettingsScreen: Component = () => {
           <SettingsProjects />
         </Tabs.Content>
         <SettingsServerScope directory={directory()}>
+          <Tabs.Content value="boc" class="settings-panel">
+            <BocSettings directory={directory()} />
+          </Tabs.Content>
           <Tabs.Content value="workspaces" class="settings-panel">
             <SettingsWorkspaces
               activeDirectory={directory()}

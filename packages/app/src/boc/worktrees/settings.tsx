@@ -1,8 +1,11 @@
 import { createBocTranslator, useBocDesktop, type BocTranslator } from "@boc/extensions/renderer"
 import { Badge } from "@opencode/ui/badge"
 import { Button } from "@opencode/ui/button"
+import { Dialog, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
 import { Icon } from "@opencode/ui/icon"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { useQuery } from "@tanstack/solid-query"
 import { Project } from "@opencode/schema/project"
 import { RIFT_BACKEND_VERSION } from "@opencode/schema/boc/rift"
 import { getDirectory } from "@opencode/util/path"
@@ -15,6 +18,7 @@ import { useServer } from "@/runtime/server/current"
 import { useServerSDK } from "@/runtime/server/client"
 import type { LocalProject } from "@/shell/state/layout"
 import { SettingsRow } from "@/settings/row"
+import { showToast } from "@/shell/notifications/toast"
 import { backendName, capabilityReason, type RiftCapability, type WorktreeProjectBackend } from "./policy"
 
 export function BocWorktreeDefaultSetting() {
@@ -265,6 +269,111 @@ export function BocWorktreeProjectSetting(props: { project: LocalProject; server
         </div>
       </section>
     </Show>
+  )
+}
+
+export function BocRiftCleanupSetting() {
+  const dialog = useDialog()
+  const language = useLanguage()
+  const serverSDK = useServerSDK()
+  const t = createBocTranslator(language.locale)
+  const [state, setState] = createStore({ cleaning: false })
+  const trash = useQuery(() => ({
+    queryKey: [serverSDK.scope, "boc-rift-trash"] as const,
+    enabled: serverSDK.connection.status() === "connected" && ServerConnection.local(serverSDK.server),
+    queryFn: () => serverSDK.api.rpc(BocWorktreeRpc.Rpc).riftTrash({}),
+    refetchOnMount: "always",
+  }))
+  const cleanup = async () => {
+    if (state.cleaning) return
+    setState("cleaning", true)
+    await serverSDK.api
+      .rpc(BocWorktreeRpc.Rpc)
+      .cleanupRiftTrash({})
+      .then(async (result) => {
+        if (!result.completed) {
+          showToast({
+            variant: "error",
+            title: t("boc.worktrees.cleanup.title"),
+            description: t("boc.worktrees.cleanup.failed"),
+          })
+          return
+        }
+        await trash.refetch()
+        showToast({
+          title: t("boc.worktrees.cleanup.title"),
+          description: t("boc.worktrees.cleanup.succeeded"),
+        })
+      })
+      .catch(() =>
+        showToast({
+          variant: "error",
+          title: t("boc.worktrees.cleanup.title"),
+          description: t("boc.worktrees.cleanup.failed"),
+        }),
+      )
+    setState("cleaning", false)
+  }
+  const confirm = () => {
+    const count = trash.data?.checkouts
+    if (!count || state.cleaning) return
+    dialog.push(() => <DialogCleanupRiftTrash count={count} onCleanup={cleanup} />)
+  }
+
+  return (
+    <Show when={ServerConnection.local(serverSDK.server)}>
+      <SettingsRow title={t("boc.worktrees.cleanup.title")} description={t("boc.worktrees.cleanup.description")}>
+        <div class="flex w-full items-center justify-end gap-3 sm:w-[300px]">
+          <span class="text-11-regular leading-text-compact text-v2-text-text-muted">
+            {t("boc.worktrees.cleanup.summary", { count: trash.data?.checkouts ?? 0 })}
+          </span>
+          <Button
+            type="button"
+            variant="neutral"
+            disabled={trash.isPending || !trash.data?.checkouts || state.cleaning}
+            onClick={confirm}
+          >
+            {t("boc.worktrees.cleanup.action")}
+          </Button>
+        </div>
+      </SettingsRow>
+    </Show>
+  )
+}
+
+function DialogCleanupRiftTrash(props: { count: number; onCleanup: () => Promise<void> }) {
+  const dialog = useDialog()
+  const language = useLanguage()
+  const t = createBocTranslator(language.locale)
+  const cleanup = () => {
+    const cleaning = props.onCleanup()
+    dialog.close()
+    void cleaning
+  }
+
+  return (
+    <Dialog fit>
+      <DialogHeader>
+        <DialogTitleGroup
+          title={t("boc.worktrees.cleanup.title")}
+          description={
+            <>
+              {t("boc.worktrees.cleanup.summary", { count: props.count })}
+              <br />
+              {t("boc.worktrees.cleanup.description")}
+            </>
+          }
+        />
+      </DialogHeader>
+      <DialogFooter>
+        <Button type="button" variant="neutral" onClick={() => dialog.close()}>
+          {language.t("common.cancel")}
+        </Button>
+        <Button type="button" variant="danger" onClick={cleanup}>
+          {t("boc.worktrees.cleanup.action")}
+        </Button>
+      </DialogFooter>
+    </Dialog>
   )
 }
 

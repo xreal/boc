@@ -86,16 +86,8 @@
       "reason": "Render the channel-aware Boc brand mark in the empty file panel"
     },
     {
-      "path": "packages/app/src/settings/general/general.tsx",
-      "reason": "Mount the Boc checkout default setting"
-    },
-    {
-      "path": "packages/app/src/settings/workspaces/project-dialog.tsx",
-      "reason": "Mount Boc checkout and environment project settings and allow direct Scripts-tab entry"
-    },
-    {
       "path": "packages/app/src/settings/workspaces/workspaces.tsx",
-      "reason": "Display Rift ownership and cleanup in workspace management"
+      "reason": "Display truthful Rift ownership and deletion details in workspace management"
     },
     {
       "path": "packages/app/src/workspaces/create.ts",
@@ -104,6 +96,10 @@
     {
       "path": "packages/app/src/shell/routes/routes.tsx",
       "reason": "Mount the generic BOC route and command bridges"
+    },
+    {
+      "path": "packages/app/src/settings/shell.tsx",
+      "reason": "Register one Boc settings section for checkout and development environment preferences"
     },
     {
       "path": "packages/app/src/shell/state/layout.tsx",

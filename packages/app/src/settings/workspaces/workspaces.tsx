@@ -1,5 +1,4 @@
 import type { Component } from "solid-js"
-import { createBocTranslator } from "@boc/extensions/renderer"
 import { For, Show, createEffect, createMemo, createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { createResizeObserver } from "@solid-primitives/resize-observer"
@@ -41,7 +40,6 @@ import {
   workspaceInventory,
 } from "@/workspaces/paths"
 import { BocRiftBadge, BocRiftDeleteDetail } from "@/boc/worktrees/settings"
-import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"
 import { listAllSessions } from "@/session/list"
 import type { ServerScope } from "@/runtime/server/scope"
 import { normalizeProjectInfo } from "@/runtime/server/global-sync/utils"
@@ -57,7 +55,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
 ) => {
   const dialog = useDialog()
   const language = useLanguage()
-  const boc = createBocTranslator(language.locale)
   const serverSDK = useServerSDK()
   const data = useData()
   const tabs = useTabs()
@@ -85,12 +82,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
           return normalizeProjectInfo({ ...project, worktrees })
         }),
       ),
-    refetchOnMount: "always",
-  }))
-  const trashQuery = useQuery(() => ({
-    queryKey: [serverSDK.scope, "boc-rift-trash"] as const,
-    enabled: serverSDK.connection.status() === "connected" && ServerConnection.local(serverSDK.server),
-    queryFn: () => serverSDK.api.rpc(BocWorktreeRpc.Rpc).riftTrash({}),
     refetchOnMount: "always",
   }))
   const inventory = createMemo(() => (projectQuery.isPending ? [] : (projectQuery.data ?? [])))
@@ -337,39 +328,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
       releaseConfirmation,
     )
   }
-  const confirmCleanup = () => {
-    if (store.transaction || !trashQuery.data?.checkouts) return
-    const sdk = serverSDK
-    const count = trashQuery.data.checkouts
-    setStore("transaction", "confirm")
-    void dialog.push(
-      () => (
-        <DialogCleanupRiftTrash
-          count={count}
-          onCleanup={() =>
-            transact(async () => {
-              const result = await sdk.api.rpc(BocWorktreeRpc.Rpc).cleanupRiftTrash({})
-              if (!result.completed) {
-                showToast({
-                  variant: "error",
-                  title: boc("boc.worktrees.cleanup.title"),
-                  description: boc("boc.worktrees.cleanup.failed"),
-                })
-                return
-              }
-              await trashQuery.refetch()
-              showToast({
-                title: boc("boc.worktrees.cleanup.title"),
-                description: boc("boc.worktrees.cleanup.succeeded"),
-              })
-            })
-          }
-        />
-      ),
-      releaseConfirmation,
-    )
-  }
-
   return (
     <>
       <div class="settings-tab-header settings-workspaces-header">
@@ -434,13 +392,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
                     <Menu.Item onSelect={confirmDeleteAll}>
                       <span class="settings-workspaces-delete-all">{language.t("settings.workspaces.deleteAll")}</span>
                     </Menu.Item>
-                    <Show when={trashQuery.data?.checkouts}>
-                      <Menu.Separator />
-                      <Menu.Item onSelect={confirmCleanup}>
-                        <span>{boc("boc.worktrees.cleanup.title")}</span>
-                        <span class="ml-auto text-v2-text-text-muted">{trashQuery.data?.checkouts}</span>
-                      </Menu.Item>
-                    </Show>
                   </Menu.Content>
                 </Menu.Portal>
               </Menu>
@@ -539,42 +490,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
         </div>
       </div>
     </>
-  )
-}
-
-function DialogCleanupRiftTrash(props: { count: number; onCleanup: () => Promise<void> }) {
-  const dialog = useDialog()
-  const language = useLanguage()
-  const t = createBocTranslator(language.locale)
-  const cleanup = () => {
-    const cleaning = props.onCleanup()
-    dialog.close()
-    void cleaning
-  }
-
-  return (
-    <Dialog fit>
-      <DialogHeader>
-        <DialogTitleGroup
-          title={t("boc.worktrees.cleanup.title")}
-          description={
-            <>
-              {t("boc.worktrees.cleanup.summary", { count: props.count })}
-              <br />
-              {t("boc.worktrees.cleanup.description")}
-            </>
-          }
-        />
-      </DialogHeader>
-      <DialogFooter>
-        <Button type="button" variant="neutral" onClick={() => dialog.close()}>
-          {language.t("common.cancel")}
-        </Button>
-        <Button type="button" variant="danger" onClick={cleanup}>
-          {t("boc.worktrees.cleanup.action")}
-        </Button>
-      </DialogFooter>
-    </Dialog>
   )
 }
 

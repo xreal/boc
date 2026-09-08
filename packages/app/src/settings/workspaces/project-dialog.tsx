@@ -16,34 +16,24 @@ import { ProjectIcon } from "@/shell/layout/project-icon"
 import { createEditProjectModel } from "./project-model"
 import { ProjectSettingsExtensions } from "./project-extensions"
 import { SettingsServerDataScope } from "@/settings/server-scope"
-import { BocWorktreeProjectSetting } from "@/boc/worktrees/settings"
-import { BocEnvironmentProjectSetting } from "@/boc/environments/settings"
 import "@/settings/settings.css"
 import "./project-dialog.css"
 
-export function DialogEditProject(props: {
-  project: LocalProject
-  server: ServerConnection.Any
-  initialTab?: "general" | "scripts" | "extensions"
-}) {
+export function DialogEditProject(props: { project: LocalProject; server: ServerConnection.Any }) {
   return (
     <SettingsServerDataScope server={props.server}>
       <LocationProvider directory={props.project.worktree}>
-        <ProjectSettingsDialog project={props.project} server={props.server} initialTab={props.initialTab} />
+        <ProjectSettingsDialog project={props.project} server={props.server} />
       </LocationProvider>
     </SettingsServerDataScope>
   )
 }
 
-function ProjectSettingsDialog(props: {
-  project: LocalProject
-  server: ServerConnection.Any
-  initialTab?: "general" | "scripts" | "extensions"
-}) {
+function ProjectSettingsDialog(props: { project: LocalProject; server: ServerConnection.Any }) {
   const language = useLanguage()
   const model = createEditProjectModel(props)
   const projectName = () => displayName(props.project)
-  const [tab, setTab] = createSignal<"general" | "scripts" | "extensions">(props.initialTab ?? "general")
+  const [tab, setTab] = createSignal("general")
 
   const Footer = () => (
     <DialogFooter>
@@ -62,10 +52,7 @@ function ProjectSettingsDialog(props: {
         orientation="vertical"
         variant="settings"
         value={tab()}
-        onChange={(value) => {
-          if (value !== "general" && value !== "scripts" && value !== "extensions") return
-          void startTransition(() => setTab(value))
-        }}
+        onChange={(value) => void startTransition(() => setTab(value))}
         class="project-settings-v2"
       >
         <Tabs.List>
@@ -194,8 +181,6 @@ function ProjectSettingsDialog(props: {
                   </div>
                 </div>
               </Show>
-
-              <BocWorktreeProjectSetting project={props.project} server={props.server} />
             </div>
             <Footer />
           </form>
@@ -220,7 +205,6 @@ function ProjectSettingsDialog(props: {
                   onInput={(event) => model.setStore("startup", event.currentTarget.value)}
                 />
               </Field>
-              <BocEnvironmentProjectSetting project={props.project} server={props.server} />
             </div>
             <Footer />
           </form>

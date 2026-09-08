@@ -17,6 +17,7 @@ import type { ServerSDK } from "@/runtime/server/client"
 import { ServerConnection } from "@/runtime/server/registry"
 import type { LocalProject } from "@/shell/state/layout"
 import { showToast } from "@/shell/notifications/toast"
+import { useSettingsSurface } from "@/settings/surface"
 import { pathKey } from "@/workspaces/path-key"
 import { environmentPrimaryIntent, retryableEnvironmentAction, type EnvironmentPrimaryIntent } from "./model"
 import { useEnvironmentProjectSettings } from "./settings-store"
@@ -375,6 +376,7 @@ function createEnvironmentActions(input: {
   const t = createBocTranslator(language.locale)
   const platform = usePlatform()
   const dialog = useDialog()
+  const settingsSurface = useSettingsSurface()
   const copyPath = () =>
     (
       platform.writeClipboardText?.(input.target.session.location.directory) ??
@@ -422,12 +424,9 @@ function createEnvironmentActions(input: {
     const { EnvironmentRemoveDialog } = await import("./dialog")
     dialog.show(() => <EnvironmentRemoveDialog target={input.target} resource={input.resource} />, input.returnFocus)
   }
-  const settings = async () => {
-    const { DialogEditProject } = await import("@/settings/workspaces/project-dialog")
-    dialog.show(
-      () => <DialogEditProject project={input.target.project} server={input.target.server} initialTab="scripts" />,
-      input.returnFocus,
-    )
+  const settings = () => {
+    dialog.close()
+    settingsSurface.open("boc")
   }
   const retry = async (action: NonNullable<ReturnType<typeof retryableEnvironmentAction>>) => {
     if (action === "remove") return remove()
