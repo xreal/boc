@@ -10,11 +10,9 @@ import { LayerNode } from "@opencode-ai/util/effect/layer-node"
 import { Bus } from "@opencode-ai/core/bus"
 import { FileSystem } from "@opencode-ai/core/filesystem"
 import { FSUtil } from "@opencode-ai/util/fs-util"
-import { Global } from "@opencode-ai/util/global"
 import { Form } from "@opencode-ai/core/form"
 import { Generate } from "@opencode-ai/core/generate"
 import { Integration } from "@opencode-ai/core/integration"
-import { InstructionDiscovery } from "@opencode-ai/core/instruction-discovery"
 import { KV } from "@opencode-ai/core/kv"
 import { Location } from "@opencode-ai/core/location"
 import { Mcp } from "@opencode-ai/core/mcp/index"
@@ -69,7 +67,6 @@ export const PluginTestLayer = AppNodeBuilder.build(
     AppProcess.node,
     FileSystem.node,
     FSUtil.node,
-    Global.node,
     Location.node,
     Npm.node,
     Credential.node,
@@ -83,7 +80,6 @@ export const PluginTestLayer = AppNodeBuilder.build(
     Catalog.node,
     Command.node,
     Integration.node,
-    InstructionDiscovery.node,
     KV.node,
     Mcp.node,
     Session.node,

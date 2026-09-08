@@ -13,6 +13,8 @@ import { Tool } from "../tool.js"
 import { McpTool } from "../tool/mcp.js"
 import { BocControlPolicy } from "./control-policy.js"
 import { BocControlSource } from "./control-source.js"
+import { BocSelection } from "./selection.js"
+import { InstructionDiscovery } from "../instruction-discovery.js"
 
 type Capability = {
   id: string
@@ -33,6 +35,8 @@ export const Definition = define({
     const config = yield* Config.Service
     const global = yield* Global.Service
     const tools = yield* Tool.Service
+    const selection = yield* BocSelection.Service
+    const discovery = yield* InstructionDiscovery.Service
     const project = yield* policies.project(ctx.location.project.id)
     const inventory: Record<BocControls.Kind, Capability[]> = {
       agent: [],
@@ -84,22 +88,19 @@ export const Definition = define({
           })
       })
     })
-    if (ctx.selection)
-      yield* ctx.selection.hook("instructions", (event) =>
-        Effect.sync(() => {
-          inventory.instruction = event.candidates.map((item) => ({
-            id: item.id,
-            name: path.basename(item.path),
-            description: "",
-            source: item.path,
-            defaultEnabled: true,
-            mutable: item.source === "project",
-          }))
-          inventory.instruction
-            .filter((item) => item.mutable && disabled("instruction", item.id))
-            .forEach((item) => event.exclude(item.id))
-        }),
-      )
+    yield* selection.register((event) => {
+      inventory.instruction = event.candidates.map((item) => ({
+        id: item.id,
+        name: path.basename(item.path),
+        description: "",
+        source: item.path,
+        defaultEnabled: true,
+        mutable: item.source === "project",
+      }))
+      inventory.instruction
+        .filter((item) => item.mutable && disabled("instruction", item.id))
+        .forEach((item) => event.exclude(item.id))
+    })
     yield* ctx.permission.hook("evaluate", (event) =>
       Effect.sync(() => {
         if (event.action === "skill" && event.resources.some((id) => disabled("skill", id))) event.effect = "deny"
@@ -149,11 +150,11 @@ export const Definition = define({
       yield* ctx.skill.list({})
       yield* tools.snapshot()
       const mcp = yield* ctx.mcp.list({})
-      const instructions = ctx.selection ? yield* ctx.selection.listInstructions() : undefined
+      const instructions = yield* discovery.list()
       const plugins = yield* ctx.plugin.list({})
       const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
       const statuses = new Map(mcp.data.map((item) => [item.name, item.status.status]))
-      const incomplete: BocControls.Kind[] = instructions?.available ? [] : ["instruction"]
+      const incomplete: BocControls.Kind[] = Array.isArray(instructions) ? [] : ["instruction"]
       const items = BocControls.kinds.flatMap((kind) => {
         const known = new Set(inventory[kind].map((item) => item.id))
         const missing = Object.keys(project.policy.settings[kind])
@@ -321,9 +322,7 @@ function originOf(
   if (server) return originOf(server, ctx)
 
   const plugin =
-    recorded && "plugin" in recorded
-      ? ctx.plugins.find((registered) => registered.id === recorded.plugin)
-      : undefined
+    recorded && "plugin" in recorded ? ctx.plugins.find((registered) => registered.id === recorded.plugin) : undefined
   const declaration = plugin?.source.type === "package" ? plugin.source.target : undefined
   const document = declaration
     ? ctx.documents.findLast((document) =>

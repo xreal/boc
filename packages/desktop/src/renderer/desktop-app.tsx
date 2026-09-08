@@ -31,6 +31,7 @@ import { getLastActiveUrl } from "./window/route-storage"
 import { DesktopMemoryRouter } from "./window/router"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import BocDesktopProvider from "../boc/provider"
+import { bocNotifications } from "../boc/notifications"
 
 const MigrationStatus = lazy(() => import("./migration-status").then((module) => ({ default: module.MigrationStatus })))
 
@@ -75,7 +76,10 @@ function DesktopWindow(props: {
   onReady: () => void
   onRoute: (route: LayoutRoute) => void
 }) {
-  const platform = createDesktopPlatform(props.api, props.windowState, props.updater)
+  const platform = {
+    ...createDesktopPlatform(props.api, props.windowState, props.updater),
+    ...bocNotifications(props.api),
+  }
   const [sidecar, { mutate: setSidecar }] = createResource(() => props.api.awaitInitialization())
   const [defaultServer] = createResource(() => platform.getDefaultServer?.())
   const [locale] = createResource(() => preloadStoredLocale(platform))

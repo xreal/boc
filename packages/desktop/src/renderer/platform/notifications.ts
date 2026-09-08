@@ -1,6 +1,5 @@
 import type { Platform } from "@opencode-ai/app/desktop"
 import type { ElectronAPI } from "../api-types"
-import { notificationIcon } from "../../boc/branding"
 
 export function createDesktopNotify(api: ElectronAPI): Platform["notify"] {
   return async (title, description, onClick) => {
@@ -9,7 +8,7 @@ export function createDesktopNotify(api: ElectronAPI): Platform["notify"] {
 
     const notification = new Notification(title, {
       body: description ?? "",
-      icon: notificationIcon(),
+      icon: "https://opencode.ai/favicon-96x96-v3.png",
     })
     notification.onclick = () => {
       void api.showWindow()

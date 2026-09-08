@@ -194,10 +194,6 @@
       "reason": "Mount the generic BOC desktop provider"
     },
     {
-      "path": "packages/desktop/src/renderer/platform/notifications.ts",
-      "reason": "Use the packaged Boc icon for Boc desktop notifications"
-    },
-    {
       "path": "packages/desktop/src/shared/ipc-rpc.ts",
       "reason": "Compose generic BOC desktop RPC schemas"
     },
@@ -243,31 +239,11 @@
     },
     {
       "path": "packages/core/src/instruction-discovery.ts",
-      "reason": "Apply Boc's optional structured selection hook to ambient instruction files before rendering"
-    },
-    {
-      "path": "packages/core/src/plugin/hooks.ts",
-      "reason": "Register the Boc ambient instruction selection event in the existing Location-scoped hook lifecycle"
+      "reason": "Apply native Controls selection to the structured ambient instruction list before rendering"
     },
     {
       "path": "packages/core/src/plugin/host.ts",
-      "reason": "Expose the Boc instruction-selection facade and observe producer identity through Boc-only plugin-context decoration"
-    },
-    {
-      "path": "packages/core/test/plugin/fixture.ts",
-      "reason": "Provide instruction discovery and global path services now consumed by the plugin host fixture"
-    },
-    {
-      "path": "packages/plugin/src/effect/plugin.ts",
-      "reason": "Expose the optional Boc selection facade to Effect plugins"
-    },
-    {
-      "path": "packages/plugin/src/promise/plugin.ts",
-      "reason": "Expose the optional Boc selection facade to portable Promise plugins"
-    },
-    {
-      "path": "packages/plugin/src/promise/adapter.ts",
-      "reason": "Adapt the optional Boc selection facade and its scoped hooks for Promise plugins"
+      "reason": "Observe producer identity through Boc-only plugin-context decoration"
     },
     {
       "path": "packages/desktop/scripts/dev.ts",

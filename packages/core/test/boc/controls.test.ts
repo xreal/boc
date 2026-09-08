@@ -3,8 +3,10 @@ import { BocControls } from "@opencode-ai/schema/boc/controls"
 import { BocProjectControls } from "@opencode-ai/core/boc/controls"
 import { BocControlPolicy } from "@opencode-ai/core/boc/control-policy"
 import { BocControlSource } from "@opencode-ai/core/boc/control-source"
+import { BocSelection } from "@opencode-ai/core/boc/selection"
 import { Config } from "@opencode-ai/core/config"
 import { Global } from "@opencode-ai/util/global"
+import { FSUtil } from "@opencode-ai/util/fs-util"
 import { Plugin } from "@opencode-ai/core/plugin"
 import { KV } from "@opencode-ai/core/kv"
 import { Location } from "@opencode-ai/core/location"
@@ -25,6 +27,8 @@ const it = testEffect(
       Plugin.node,
       Config.node,
       BocControlPolicy.node,
+      BocSelection.node,
+      FSUtil.node,
       Tool.node,
       Skill.node,
       Rpc.node,
@@ -60,7 +64,16 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
         }),
       )
     })
-    const services = yield* Effect.context<Config.Service | Global.Service | Tool.Service | BocControlPolicy.Service>()
+    const services = yield* Effect.context<
+      | Config.Service
+      | Global.Service
+      | Tool.Service
+      | BocControlPolicy.Service
+      | BocSelection.Service
+      | InstructionDiscovery.Service
+      | FSUtil.Service
+      | Location.Service
+    >()
     yield* plugins.activate([
       {
         id: "native-fixture",

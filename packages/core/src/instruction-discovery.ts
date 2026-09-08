@@ -7,7 +7,6 @@ import { Bus } from "./bus.js"
 import { Instructions } from "./instructions/index.js"
 import { AbsolutePath } from "./schema.js"
 import { State } from "./state.js"
-import { PluginHooks } from "./plugin/hooks.js"
 import { BocSelection } from "./boc/selection.js"
 
 export class File extends Schema.Class<File>("InstructionDiscovery.File")({
@@ -59,7 +58,7 @@ export const layer = (options?: Options) =>
     Service,
     Effect.gen(function* () {
       const bus = yield* Bus.Service
-      const hooks = yield* PluginHooks.Service
+      const selection = yield* BocSelection.Service
       const state = State.create<Data, Editor>({
         name: "instruction-discovery",
         initial: () => ({ files: new Map(), available: true }),
@@ -95,7 +94,7 @@ export const layer = (options?: Options) =>
       const list = Effect.fn("InstructionDiscovery.list")(function* () {
         const current = state.get()
         if (!current.available) return Instructions.unavailable
-        return yield* BocSelection.instructions(hooks, Array.from(current.files.values()))
+        return yield* selection.select(Array.from(current.files.values()))
       })
 
       return Service.of({
@@ -117,7 +116,7 @@ export function configured(options?: Options) {
   return makeLocationNode({
     service: Service,
     layer: layer(options),
-    deps: [Bus.node, PluginHooks.node],
+    deps: [Bus.node, BocSelection.node],
   })
 }
 

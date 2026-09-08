@@ -94,9 +94,11 @@ import { WarmingPlugin } from "./warming.js"
 import { WellKnownPlugin } from "../wellknown/plugin.js"
 import { BocProjectControls } from "../boc/controls.js"
 import { BocControlPolicy } from "../boc/control-policy.js"
+import { BocSelection } from "../boc/selection.js"
 
 const services = [
   BocControlPolicy.Service,
+  BocSelection.Service,
   Agent.Service,
   AppProcess.Service,
   Catalog.Service,
@@ -147,6 +149,7 @@ export type Requirements = Context.Service.Identifier<(typeof services)[number]>
 
 export const requirements = LayerNode.group([
   BocControlPolicy.node,
+  BocSelection.node,
   Agent.node,
   AppProcess.node,
   Catalog.node,
