@@ -2,6 +2,7 @@ import { Schema } from "effect"
 import { Session } from "../session.js"
 import { AbsolutePath, optional } from "../schema.js"
 import { Worktree } from "../worktree.js"
+import { Location } from "../location.js"
 
 export const Phase = Schema.Literals([
   "queued",
@@ -20,6 +21,7 @@ export type Status = typeof Status.Type
 export interface State extends Schema.Schema.Type<typeof State> {}
 export const State = Schema.Struct({
   operationID: Session.ID,
+  origin: optional(Location.Ref),
   status: Status,
   phase: Phase,
   startedAt: Schema.Number,

@@ -41,6 +41,7 @@ import {
   workspaceInventory,
 } from "@/workspaces/paths"
 import { BocRiftBadge, BocRiftDeleteDetail } from "@/boc/worktrees/settings"
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
 import { listAllSessions } from "@/session/list"
 import type { ServerScope } from "@/runtime/server/scope"
 import { normalizeProjectInfo } from "@/runtime/server/global-sync/utils"
@@ -89,7 +90,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
   const trashQuery = useQuery(() => ({
     queryKey: [serverSDK.scope, "boc-rift-trash"] as const,
     enabled: serverSDK.connection.status() === "connected" && ServerConnection.local(serverSDK.server),
-    queryFn: () => serverSDK.api["server.boc.worktree"].riftTrash(),
+    queryFn: () => serverSDK.api.rpc(BocWorktreeRpc.Rpc).riftTrash({}),
     refetchOnMount: "always",
   }))
   const inventory = createMemo(() => (projectQuery.isPending ? [] : (projectQuery.data ?? [])))
@@ -347,7 +348,7 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
           count={count}
           onCleanup={() =>
             transact(async () => {
-              const result = await sdk.api["server.boc.worktree"].cleanupRiftTrash()
+              const result = await sdk.api.rpc(BocWorktreeRpc.Rpc).cleanupRiftTrash({})
               if (!result.completed) {
                 showToast({
                   variant: "error",

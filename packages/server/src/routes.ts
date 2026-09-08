@@ -1,6 +1,5 @@
 import { Database } from "@opencode-ai/core/database/database"
-import { BocWorktrees } from "@boc/extensions/worktrees/server"
-import { BocEnvironments } from "@boc/extensions/environments/server"
+import { BocBackend } from "@boc/extensions/backend"
 import { V1Migration } from "@opencode-ai/core/database/v1-migration"
 import { App } from "@opencode-ai/core/app"
 import { LayerNode } from "@opencode-ai/util/effect/layer-node"
@@ -50,8 +49,7 @@ import { ServerInfo } from "./server-info"
 import type { ServerOptions } from "./options"
 
 const applicationServiceNodes = [
-  BocEnvironments.node,
-  BocWorktrees.node,
+  BocBackend.node,
   Global.node,
   Database.node,
   Bus.node,

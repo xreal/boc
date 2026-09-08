@@ -8,6 +8,8 @@ import type { PendingSession } from "@/shell/tabs/tabs"
 import { environmentDuration } from "./model"
 import { environmentOutput } from "./output"
 import { useParams } from "@solidjs/router"
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
+import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
 
 export function BocPreparingCheckout(props: { pending: PendingSession }) {
   const language = useLanguage()
@@ -16,12 +18,13 @@ export function BocPreparingCheckout(props: { pending: PendingSession }) {
   const params = useParams<{ id: string }>()
   const [clock, setClock] = createStore({ now: Date.now() })
   const [preparation, setPreparation] = createStore<{
-    state?: Awaited<ReturnType<(typeof server.ctx.sdk.api)["server.boc.worktree"]["preparation"]>>
+    state?: State | null
   }>({})
   const timer = setInterval(() => setClock("now", Date.now()), 1000)
   const inspect = () =>
-    server.ctx.sdk.api["server.boc.worktree"]
-      .preparation({ operationID: params.id })
+    server.ctx.sdk.api
+      .rpc(BocWorktreeRpc.Rpc)
+      .preparation({ operationID: params.id }, { location: { directory: props.pending.draft.directory } })
       .then((state) => setPreparation("state", state))
       .catch(() => undefined)
   const progressTimer = server.isLocal

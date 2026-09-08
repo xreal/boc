@@ -120,9 +120,8 @@ describe("Boc background service", () => {
   test("recognizes only an enabled Boc backend", async () => {
     const responses = [
       new Response(JSON.stringify({ healthy: true, version: "1.2.3", pid: 1 })),
-      new Response(
-        JSON.stringify({ available: false, backend: "boc/rift", reason: "project-mismatch", message: "missing" }),
-      ),
+      Response.json({ output: { protocol: 1 } }),
+      Response.json({ output: { protocol: 1 } }),
       new Response(
         JSON.stringify({
           output: {
@@ -149,7 +148,8 @@ describe("Boc background service", () => {
     const requests: { url: URL; init?: RequestInit }[] = []
     const responses = [
       Response.json({ version: "1.2.3" }),
-      Response.json({ available: true }),
+      Response.json({ output: { protocol: 1 } }),
+      Response.json({ output: { protocol: 1 } }),
       new Response("missing", { status: 404 }),
     ]
     expect(
@@ -158,9 +158,15 @@ describe("Boc background service", () => {
         return responseFrom(responses)
       }),
     ).toEqual({ version: "1.2.3", boc: false })
-    expect(requests[2]?.url.pathname).toBe("/api/rpc/boc.controls.v1/info")
-    expect(requests[2]?.url.searchParams.get("location[directory]")).toBe("/project")
-    expect(new Headers(requests[2]?.init?.headers).get("Authorization")).toBe("Basic fixture")
+    expect(requests.slice(1).map((request) => request.url.pathname)).toEqual([
+      "/api/rpc/boc.worktrees.v1/info",
+      "/api/rpc/boc.environments.v1/info",
+      "/api/rpc/boc.controls.v1/info",
+    ])
+    for (const request of requests.slice(1)) {
+      expect(request.url.searchParams.get("location[directory]")).toBe("/project")
+      expect(new Headers(request.init?.headers).get("Authorization")).toBe("Basic fixture")
+    }
   })
 
   test("updates an isolated backend missing controls even at the same version", async () => {

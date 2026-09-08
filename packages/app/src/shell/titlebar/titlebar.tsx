@@ -16,6 +16,7 @@ import { WindowsAppMenu } from "./windows-menu"
 import { applyPath, backPath, forwardPath, type HistoryLocation } from "./history"
 import { TitlebarTabStrip } from "@/shell/titlebar/tab-strip"
 import { BocNavigationBridge } from "@/boc/navigation"
+import { bocProductPresentation } from "@/boc/product"
 import { makeEventListener } from "@solid-primitives/event-listener"
 import { createMediaQuery } from "@solid-primitives/media"
 import { readSessionTabsRemovedDetail, SESSION_TABS_REMOVED_EVENT } from "@/shell/titlebar/session-events"
@@ -772,7 +773,8 @@ function ChannelIndicator(props: {
   const channel = import.meta.env.VITE_OPENCODE_CHANNEL
   if (!channel || channel === "prod") return null
 
-  const label = () => language.t(`titlebar.channel.${channel}`)
+  const product = bocProductPresentation(language.locale)
+  const label = () => product?.label() ?? language.t(`titlebar.channel.${channel}`)
   const debug = () => (channel === "dev" ? props.debugTools : undefined)
   return (
     <Tooltip
@@ -796,7 +798,7 @@ function ChannelIndicator(props: {
         aria-pressed={debug()?.visible}
       >
         <img
-          src={channel === "beta" ? betaIcon : devIcon}
+          src={product?.icon ?? (channel === "beta" ? betaIcon : devIcon)}
           alt={debug() ? "" : label()}
           class="shrink-0 rounded-[4px] shadow-[var(--v2-elevation-raised)]"
           classList={{ "size-6": props.sidebar, "size-5": !props.sidebar }}

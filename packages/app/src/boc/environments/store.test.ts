@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { BocEnvironmentState } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
 import { environmentFixtures } from "./fixtures"
 import { createEnvironmentRegistry, createEnvironmentResource } from "./store"
 
@@ -76,7 +76,7 @@ describe("shared environment store", () => {
 
   test("refreshes only while an observed operation is active", async () => {
     const refreshed = Promise.withResolvers<void>()
-    const states: BocEnvironmentState[] = [environmentFixtures.setupRunning, environmentFixtures.running]
+    const states: BocEnvironment.State[] = [environmentFixtures.setupRunning, environmentFixtures.running]
     const calls = { inspect: 0 }
     const resource = createEnvironmentResource({
       server: "sidecar",

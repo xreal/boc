@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "exports": {
+    "./backend": "./src/backend.ts",
     "./renderer": "./src/renderer/index.ts",
     "./desktop/shared": "./src/desktop/shared/rpcs.ts",
     "./desktop/main": "./src/desktop/main/index.ts",

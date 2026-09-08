@@ -3,7 +3,7 @@ import type { Data } from "@opencode-ai/client/solid"
 import { prepareWorktree } from "@/boc/worktrees/preparation"
 
 type WorktreeCreation = {
-  api: Pick<OpenCodeClient, "location" | "server.boc.worktree" | "worktree">
+  api: Pick<OpenCodeClient, "location" | "rpc" | "worktree">
   project: LocationGetOutput["project"]
   branch?: string
   directory: string
@@ -14,7 +14,7 @@ export type WorktreeStrategyResolver = (
 ) => Promise<Pick<WorktreeCreateInput, "strategy" | "directory"> | undefined>
 
 export async function createWorktree(input: {
-  api: Pick<OpenCodeClient, "location" | "server.boc.worktree" | "worktree">
+  api: Pick<OpenCodeClient, "location" | "rpc" | "worktree">
   data: Pick<Data, "location">
   directory: string
   project?: LocationGetOutput["project"]

@@ -234,20 +234,6 @@ import type {
   ShellRemoveOutput,
   ReferenceListInput,
   ReferenceListOutput,
-  ServerBocWorktreePrepareInput,
-  ServerBocWorktreePrepareOutput,
-  ServerBocWorktreePreparationInput,
-  ServerBocWorktreePreparationOutput,
-  ServerBocWorktreeRiftCapabilityInput,
-  ServerBocWorktreeRiftCapabilityOutput,
-  ServerBocWorktreeRiftTrashOutput,
-  ServerBocWorktreeCleanupRiftTrashOutput,
-  ServerBocEnvironmentInspectInput,
-  ServerBocEnvironmentInspectOutput,
-  ServerBocEnvironmentRunInput,
-  ServerBocEnvironmentRunOutput,
-  ServerBocEnvironmentCancelInput,
-  ServerBocEnvironmentCancelOutput,
   WorktreeListInput,
   WorktreeListOutput,
   WorktreeCreateInput,
@@ -1982,110 +1968,6 @@ export function make(options: ClientOptions) {
             method: "GET",
             path: `/api/reference`,
             query: { location: input?.["location"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-    },
-    "server.boc.worktree": {
-      prepare: (input: ServerBocWorktreePrepareInput, requestOptions?: RequestOptions) =>
-        request<ServerBocWorktreePrepareOutput>(
-          {
-            method: "POST",
-            path: `/api/boc/worktree/prepare`,
-            query: { location: input["location"] },
-            body: { operationID: input["operationID"], worktree: input["worktree"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      preparation: (input: ServerBocWorktreePreparationInput, requestOptions?: RequestOptions) =>
-        request<ServerBocWorktreePreparationOutput>(
-          {
-            method: "GET",
-            path: `/api/boc/worktree/preparation/${encodeURIComponent(input.operationID)}`,
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      riftCapability: (input: ServerBocWorktreeRiftCapabilityInput, requestOptions?: RequestOptions) =>
-        request<ServerBocWorktreeRiftCapabilityOutput>(
-          {
-            method: "GET",
-            path: `/api/boc/worktree/${encodeURIComponent(input.projectID)}/rift-capability`,
-            query: { source: input["source"], directory: input["directory"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      riftTrash: (requestOptions?: RequestOptions) =>
-        request<ServerBocWorktreeRiftTrashOutput>(
-          {
-            method: "GET",
-            path: `/api/boc/worktree/rift-trash`,
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      cleanupRiftTrash: (requestOptions?: RequestOptions) =>
-        request<ServerBocWorktreeCleanupRiftTrashOutput>(
-          {
-            method: "POST",
-            path: `/api/boc/worktree/rift-trash/cleanup`,
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-    },
-    "server.boc.environment": {
-      inspect: (input: ServerBocEnvironmentInspectInput, requestOptions?: RequestOptions) =>
-        request<ServerBocEnvironmentInspectOutput>(
-          {
-            method: "GET",
-            path: `/api/boc/environment/${encodeURIComponent(input.projectID)}`,
-            query: { directory: input["directory"] },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      run: (input: ServerBocEnvironmentRunInput, requestOptions?: RequestOptions) =>
-        request<ServerBocEnvironmentRunOutput>(
-          {
-            method: "POST",
-            path: `/api/boc/environment/${encodeURIComponent(input.projectID)}/run`,
-            body: {
-              directory: input["directory"],
-              sessionID: input["sessionID"],
-              action: input["action"],
-              domain: input["domain"],
-              confirmation: input["confirmation"],
-            },
-            successStatus: 200,
-            declaredStatuses: [400, 401],
-            empty: false,
-          },
-          requestOptions,
-        ),
-      cancel: (input: ServerBocEnvironmentCancelInput, requestOptions?: RequestOptions) =>
-        request<ServerBocEnvironmentCancelOutput>(
-          {
-            method: "POST",
-            path: `/api/boc/environment/${encodeURIComponent(input.projectID)}/cancel`,
-            body: { directory: input["directory"] },
             successStatus: 200,
             declaredStatuses: [400, 401],
             empty: false,

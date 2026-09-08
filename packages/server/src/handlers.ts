@@ -32,8 +32,6 @@ import { EventFeed } from "./event-feed"
 import { MigrationHandler } from "./handlers/migration"
 import { ConfigHandler } from "./handlers/config"
 import { WorkspaceHandler } from "./handlers/workspace"
-import { BocWorktreeHandler } from "./boc/worktree"
-import { BocEnvironmentHandler } from "./boc/environment"
 
 export const handlers = Layer.mergeAll(
   HealthHandler,
@@ -68,6 +66,4 @@ export const handlers = Layer.mergeAll(
   WorkspaceHandler,
   VcsHandler,
   ConfigHandler,
-  BocWorktreeHandler,
-  BocEnvironmentHandler,
 )

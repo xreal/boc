@@ -1,5 +1,7 @@
 import { createBocTranslator, type BocTranslator } from "@boc/extensions/renderer"
-import type { BocEnvironmentState, SessionInfo } from "@opencode-ai/client/promise"
+import type { SessionInfo } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import { environmentApi } from "./api"
 import { Icon } from "@opencode-ai/ui/icon"
 import { Menu } from "@opencode-ai/ui/menu"
 import { Spinner } from "@opencode-ai/ui/spinner"
@@ -55,7 +57,7 @@ export function useEnvironmentView(target: EnvironmentTarget) {
     server: ServerConnection.key(target.server),
     projectID: target.session.projectID,
     directory: target.session.location.directory,
-    api: () => target.sdk.api["server.boc.environment"],
+    api: () => environmentApi(target.sdk.api),
   })
 
   createEffect(() => {
@@ -455,7 +457,7 @@ export function actionLabel(t: BocTranslator, action: "setup" | "start" | "stop"
 
 export function resourceAnnouncement(
   t: BocTranslator,
-  environment: BocEnvironmentState | undefined,
+  environment: BocEnvironment.State | undefined,
   failed: boolean,
   rejection?: "operation-running" | "not-available" | "not-configured" | "confirmation-required",
 ) {

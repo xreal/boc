@@ -1,6 +1,7 @@
 import { defineConfig } from "electron-vite"
 import { pickerPlugin } from "./scripts/picker"
 import { bocBranding } from "./src/boc/branding-vite"
+import { bocProductConfig } from "../app/src/boc/product-vite"
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
@@ -95,7 +96,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
       "import.meta.env.OPENCODE_VERSION": JSON.stringify(process.env.OPENCODE_VERSION),
       "import.meta.env.VITE_OPENCODE_CHANNEL": JSON.stringify(channel),
     },
-    plugins: [pickerPlugin(), bocBranding(channel), appPlugin, sentry],
+    plugins: [pickerPlugin(), bocBranding(channel), appPlugin, bocProductConfig(channel), sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
     build: {

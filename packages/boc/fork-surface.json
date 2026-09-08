@@ -54,14 +54,6 @@
       "reason": "Register the BOC workspace dependency"
     },
     {
-      "path": "packages/app/src/env.d.ts",
-      "reason": "Recognize the Boc release channel"
-    },
-    {
-      "path": "packages/app/src/runtime/i18n/en.ts",
-      "reason": "Keep only the Boc channel identity string in upstream i18n"
-    },
-    {
       "path": "packages/app/src/new-session/composer-adapter.ts",
       "reason": "Apply the Boc checkout strategy, correlate local checkout preparation with the pending session, and notify the Boc bridge after successful session creation"
     },
@@ -130,20 +122,16 @@
       "reason": "Delegate vertical tab grouping, collapse filtering, and navigation order to Boc; retain group priority during upstream session dragging"
     },
     {
-      "path": "packages/app/vite.js",
-      "reason": "Recognize the Boc release channel"
-    },
-    {
       "path": "packages/ui/src/styles/tailwind/index.css",
       "reason": "Scan BOC renderer sources for Tailwind utilities"
     },
     {
       "path": "packages/desktop/package.json",
-      "reason": "Register the Boc workspace dependency and explicit Boc development, preparation, build and packaging commands"
+      "reason": "Register Boc workspace and schema dependencies plus explicit Boc development, preparation, build and packaging commands"
     },
     {
       "path": "packages/desktop/electron.vite.config.ts",
-      "reason": "Configure the Boc renderer build channel and channel-aware desktop favicons"
+      "reason": "Compose Boc product presentation and beta-equivalent renderer behavior while retaining Boc-aware Electron main identity"
     },
     {
       "path": "packages/desktop/src/main/constants.ts",
@@ -175,35 +163,7 @@
     },
     {
       "path": "packages/server/src/routes.ts",
-      "reason": "Register the Boc host services for managed worktrees and development environments"
-    },
-    {
-      "path": "packages/server/src/handlers.ts",
-      "reason": "Compose the generic Boc backend capability handlers"
-    },
-    {
-      "path": "packages/protocol/src/api.ts",
-      "reason": "Compose the authenticated Boc backend capability groups and apply location scope to tracked checkout preparation"
-    },
-    {
-      "path": "packages/client/test/promise.test.ts",
-      "reason": "Include the Boc worktree group in the exact public client API inventory assertion"
-    },
-    {
-      "path": "packages/client/src/effect/api/api.ts",
-      "reason": "Generate the typed Boc Rift, checkout preparation and environment capability client"
-    },
-    {
-      "path": "packages/client/src/effect/generated/client.ts",
-      "reason": "Generate the Effect Boc Rift, checkout preparation and environment capability client"
-    },
-    {
-      "path": "packages/client/src/promise/generated/client.ts",
-      "reason": "Generate the Promise Boc Rift, checkout preparation and environment capability client"
-    },
-    {
-      "path": "packages/client/src/promise/generated/types.ts",
-      "reason": "Generate the Promise Boc Rift, checkout preparation and environment capability types"
+      "reason": "Compose the Boc process-global backend and its Location-scoped typed plugin RPC registrations"
     },
     {
       "path": "packages/core/src/worktree.ts",

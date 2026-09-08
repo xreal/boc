@@ -1,5 +1,5 @@
 import { createBocTranslator, type BocTranslator } from "@boc/extensions/renderer"
-import type { BocEnvironmentState } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
 import { Button } from "@opencode-ai/ui/button"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode-ai/ui/dialog"
@@ -279,19 +279,19 @@ function StatusCard(props: { label: string; value: string; tone: "neutral" | "su
   )
 }
 
-function availabilityLabel(t: BocTranslator, environment?: BocEnvironmentState) {
+function availabilityLabel(t: BocTranslator, environment?: BocEnvironment.State) {
   if (!environment) return t("boc.environments.checking")
   if (environment.availability.available)
     return t(`boc.environments.details.available.${environment.availability.strategy}`)
   return t(`boc.environments.details.unavailable.${environment.availability.reason}`)
 }
 
-function stackLabel(t: BocTranslator, environment?: BocEnvironmentState) {
+function stackLabel(t: BocTranslator, environment?: BocEnvironment.State) {
   if (!environment) return t("boc.environments.checking")
   return t(`boc.environments.status.${environment.stack.status}`)
 }
 
-function containerLabel(t: BocTranslator, environment?: BocEnvironmentState) {
+function containerLabel(t: BocTranslator, environment?: BocEnvironment.State) {
   if (!environment) return t("boc.environments.checking")
   if (environment.containers.total > 0)
     return t("boc.environments.details.containerCount", {
@@ -301,7 +301,7 @@ function containerLabel(t: BocTranslator, environment?: BocEnvironmentState) {
   return t(`boc.environments.status.${environment.containers.status}`)
 }
 
-function httpLabel(t: BocTranslator, environment?: BocEnvironmentState) {
+function httpLabel(t: BocTranslator, environment?: BocEnvironment.State) {
   if (!environment) return t("boc.environments.checking")
   return t(`boc.environments.status.${environment.http.status}`)
 }

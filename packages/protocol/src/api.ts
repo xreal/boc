@@ -1,7 +1,5 @@
 import { Context } from "effect"
 import { HttpApi, HttpApiGroup, HttpApiMiddleware, OpenApi } from "effect/unstable/httpapi"
-import { makeBocWorktreeGroup } from "./boc/worktree.js"
-import { BocEnvironmentGroup } from "./boc/environment.js"
 import { SchemaErrorMiddleware } from "./middleware/schema-error.js"
 import { GenerateGroup } from "./groups/generate.js"
 import { MessageGroup } from "./groups/message.js"
@@ -78,10 +76,6 @@ type MixedMiddlewareGroups<
   SessionLocationService,
 > = ReturnType<typeof makePermissionGroup<LocationId, LocationService, SessionLocationId, SessionLocationService>>
 
-type BocWorktreeGroups<LocationId extends HttpApiMiddleware.AnyId, LocationService> = ReturnType<
-  typeof makeBocWorktreeGroup<LocationId, LocationService>
->
-
 type ApiGroups<
   LocationId extends HttpApiMiddleware.AnyId,
   LocationService,
@@ -95,8 +89,6 @@ type ApiGroups<
   | typeof ServerGroup
   | typeof DebugGroup
   | typeof MigrationGroup
-  | typeof BocEnvironmentGroup
-  | BocWorktreeGroups<LocationId, LocationService>
   | typeof WorkspaceGroup
   | typeof GenerateGroup
   | typeof PersistentPtyGroup
@@ -184,8 +176,6 @@ const makeApiFromGroup = <
     .add(PersistentPtyGroup)
     .add(ShellGroup.middleware(locationMiddleware))
     .add(ReferenceGroup.middleware(locationMiddleware))
-    .add(makeBocWorktreeGroup(locationMiddleware))
-    .add(BocEnvironmentGroup)
     .add(WorktreeGroup.middleware(locationMiddleware))
     .add(WorkspaceGroup)
     .add(VcsGroup.middleware(locationMiddleware))

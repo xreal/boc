@@ -1,5 +1,7 @@
 import type { Endpoint } from "@opencode-ai/client/service"
 import { BocControls } from "@boc/extensions/controls"
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
+import { BocEnvironmentRpc } from "@opencode-ai/schema/boc/environment-rpc"
 import { Option, Schema } from "effect"
 
 const decodeControls = Schema.decodeUnknownOption(Schema.Struct({ output: BocControls.Info }))
@@ -57,26 +59,27 @@ export async function inspectBocService(
   if (!hasString(healthBody, "version")) throw new Error("Background service health response has no version")
 
   const boc =
-    (await hasRiftBackend(endpoint, directory, headers, request)) &&
+    (await hasBackendRpc(BocWorktreeRpc.Rpc.id, BocWorktreeRpc.Info, endpoint, directory, headers, request)) &&
+    (await hasBackendRpc(BocEnvironmentRpc.Rpc.id, BocEnvironmentRpc.Info, endpoint, directory, headers, request)) &&
     (await hasProjectControls(endpoint, directory, headers, request))
   return { version: healthBody.version, boc }
 }
 
-async function hasRiftBackend(
+async function hasBackendRpc(
+  id: string,
+  info: typeof BocWorktreeRpc.Info,
   endpoint: Endpoint,
   directory: string,
   headers: HeadersInit | undefined,
   request: typeof fetch,
 ) {
-  const url = new URL("/api/boc/worktree/boc-desktop/rift-capability", endpoint.url)
-  url.searchParams.set("source", directory)
-  url.searchParams.set("directory", directory)
-  const response = await request(url, { headers })
+  const url = new URL(`/api/rpc/${id}/info`, endpoint.url)
+  url.searchParams.set("location[directory]", directory)
+  const requestHeaders = new Headers(headers)
+  requestHeaders.set("Content-Type", "application/json")
+  const response = await request(url, { method: "POST", headers: requestHeaders, body: JSON.stringify({ input: {} }) })
   if (!response.ok) return false
-  const body: unknown = await response.json()
-  if (!hasBoolean(body, "available")) return false
-  if (body.available) return true
-  return hasString(body, "reason") && body.reason !== "backend-unavailable"
+  return Option.isSome(Schema.decodeUnknownOption(Schema.Struct({ output: info }))(await response.json()))
 }
 
 async function hasProjectControls(
@@ -118,8 +121,4 @@ async function availableIsolated(lifecycle: BocServiceLifecycle) {
 
 function hasString<T extends string>(value: unknown, key: T): value is Record<T, string> {
   return typeof value === "object" && value !== null && typeof Reflect.get(value, key) === "string"
-}
-
-function hasBoolean<T extends string>(value: unknown, key: T): value is Record<T, boolean> {
-  return typeof value === "object" && value !== null && typeof Reflect.get(value, key) === "boolean"
 }

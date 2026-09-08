@@ -1,5 +1,7 @@
 import { createBocTranslator, useBocDesktop, type BocTranslator } from "@boc/extensions/renderer"
-import type { ServerBocWorktreeRiftCapabilityOutput } from "@opencode-ai/client/promise"
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
+export type { RiftCapability } from "@opencode-ai/schema/boc/rift"
+import type { RiftCapability } from "@opencode-ai/schema/boc/rift"
 import { Project } from "@opencode-ai/schema/project"
 import { getDirectory } from "@opencode-ai/util/path"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -9,7 +11,6 @@ import type { WorktreeStrategyResolver } from "@/workspaces/create"
 
 export type WorktreeBackend = "git" | "rift"
 export type WorktreeProjectBackend = WorktreeBackend | "inherit"
-export type RiftCapability = ServerBocWorktreeRiftCapabilityOutput
 
 export function useBocWorktreeStrategy(): WorktreeStrategyResolver {
   const desktop = useBocDesktop()
@@ -34,12 +35,16 @@ export function useBocWorktreeStrategy(): WorktreeStrategyResolver {
     }
 
     const directory = getDirectory(input.project.canonical)
-    const capability = await input.api["server.boc.worktree"]
-      .riftCapability({
-        projectID: input.project.id,
-        source: input.project.canonical,
-        directory,
-      })
+    const capability = await input.api
+      .rpc(BocWorktreeRpc.Rpc)
+      .riftCapability(
+        {
+          projectID: input.project.id,
+          source: input.project.canonical,
+          directory,
+        },
+        { location: { directory: input.project.canonical } },
+      )
       .catch(() => undefined)
 
     if (capability?.available) return { strategy: "boc/rift", directory }

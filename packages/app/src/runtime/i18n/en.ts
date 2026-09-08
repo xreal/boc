@@ -828,7 +828,6 @@ export const dict = {
   "titlebar.channel.local": "Local",
   "titlebar.channel.dev": "Dev",
   "titlebar.channel.beta": "Beta",
-  "titlebar.channel.boc": "Boc",
   "titlebar.toggleDebugTools": "Toggle debug tools",
   "titlebar.updateVersion": "Update {{version}}",
 

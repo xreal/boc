@@ -1,12 +1,12 @@
 import { Mark } from "@opencode-ai/ui/logo"
+import { bocProduct } from "./product"
 
 export function BocBrandMark(props: { class?: string }) {
-  const channel = import.meta.env.VITE_OPENCODE_CHANNEL
-  if (channel !== "boc" && channel !== "local") return <Mark class={props.class} />
+  if (!bocProduct) return <Mark class={props.class} />
 
   return (
     <svg class={props.class} viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <path d="M1024 1024H0V0H1024V1024Z" fill={channel === "local" ? "#0036B3" : "#B30000"} />
+      <path d="M1024 1024H0V0H1024V1024Z" fill={bocProduct === "boc-dev" ? "#0036B3" : "#B30000"} />
       <path
         d="M915.732 826.473C915.732 838.87 905.814 848.787 893.417 848.787H133.889C122.318 848.787 112.4 838.87 112.4 827.299C112.4 820.687 115.706 814.902 120.665 810.769L308.274 622.334C319.019 611.59 337.201 611.59 347.945 622.334L415.716 690.931L582.663 522.331C593.407 511.587 611.59 511.587 622.334 522.331L906.64 808.29C907.468 809.118 908.293 810.77 909.121 811.596C914.08 815.728 915.732 820.687 915.732 826.473Z"
         fill="white"

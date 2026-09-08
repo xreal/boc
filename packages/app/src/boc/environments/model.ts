@@ -1,4 +1,4 @@
-import type { BocEnvironmentState } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
 
 export type EnvironmentPrimaryIntent =
   | "configure"
@@ -14,7 +14,7 @@ export function environmentPrimaryIntent(input: {
   enabled: boolean
   loading: boolean
   failed: boolean
-  environment?: BocEnvironmentState
+  environment?: BocEnvironment.State
 }): EnvironmentPrimaryIntent {
   if (!input.settingsReady || (input.loading && !input.environment)) return "checking"
   if (!input.enabled) return "configure"
@@ -35,7 +35,7 @@ export function environmentPrimaryIntent(input: {
   return "open"
 }
 
-export function retryableEnvironmentAction(environment?: BocEnvironmentState) {
+export function retryableEnvironmentAction(environment?: BocEnvironment.State) {
   const run = environment?.latestRun
   if (!run || (run.status !== "failed" && run.status !== "cancelled" && run.status !== "unknown")) return
   return run.action

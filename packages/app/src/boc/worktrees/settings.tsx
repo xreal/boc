@@ -121,12 +121,16 @@ export function BocWorktreeProjectSetting(props: { project: LocalProject; server
       async ([defaults, preference]) => {
         const capability: RiftCapability = hostReason()
           ? unavailableCapability("unsupported-platform")
-          : await serverSDK.api["server.boc.worktree"]
-              .riftCapability({
-                projectID,
-                source: props.project.worktree,
-                directory: getDirectory(props.project.worktree),
-              })
+          : await serverSDK.api
+              .rpc(BocWorktreeRpc.Rpc)
+              .riftCapability(
+                {
+                  projectID,
+                  source: props.project.worktree,
+                  directory: getDirectory(props.project.worktree),
+                },
+                { location: { directory: props.project.worktree } },
+              )
               .catch(() => unavailableCapability("backend-unavailable"))
         if (!active) return
         const selected = preference.backend ?? "inherit"
@@ -196,7 +200,11 @@ export function BocWorktreeProjectSetting(props: { project: LocalProject; server
           </p>
         </div>
 
-        <div class="grid grid-cols-1 gap-2 sm:grid-cols-3" role="radiogroup" aria-label={t("boc.worktrees.method.title")}>
+        <div
+          class="grid grid-cols-1 gap-2 sm:grid-cols-3"
+          role="radiogroup"
+          aria-label={t("boc.worktrees.method.title")}
+        >
           <For each={options()}>
             {(option) => (
               <button
@@ -353,3 +361,4 @@ function BackendChoices(props: {
     </div>
   )
 }
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"

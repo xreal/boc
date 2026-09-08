@@ -2,6 +2,7 @@ import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
 import type { Session } from "@opencode-ai/schema/session"
 import type { WorktreeProgress } from "@opencode-ai/core/boc/worktree-progress"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
+import type { Location } from "@opencode-ai/schema/location"
 
 const LOG_LIMIT = 64 * 1024
 const HISTORY_LIMIT = 100
@@ -14,13 +15,14 @@ export function createWorktreePreparations() {
   const operations = new Map<Session.ID, MutableState>()
 
   const read = (operationID: Session.ID) => operations.get(operationID)
-  const begin = (operationID: Session.ID) => {
+  const begin = (operationID: Session.ID, origin?: Location.Ref) => {
     const existing = read(operationID)
     if (existing) return { started: false as const, state: existing }
 
     const now = Date.now()
     const state: MutableState = {
       operationID,
+      ...(origin ? { origin } : {}),
       status: "running",
       phase: "queued",
       startedAt: now,

@@ -1,10 +1,11 @@
-import type { BocEnvironmentState, OpenCodeClient } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { environmentApi } from "./api"
 import { onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"
 import { pathKey } from "@/workspaces/path-key"
 
-type EnvironmentApi = OpenCodeClient["server.boc.environment"]
-type EnvironmentAction = NonNullable<BocEnvironmentState["latestRun"]>["action"]
+type EnvironmentApi = ReturnType<typeof environmentApi>
+type EnvironmentAction = NonNullable<BocEnvironment.State["latestRun"]>["action"]
 type OperationRejection = "operation-running" | "not-available" | "not-configured" | "confirmation-required"
 
 export type EnvironmentResource = ReturnType<typeof createEnvironmentResource>
@@ -24,7 +25,7 @@ export type EnvironmentRegistry = {
 
 export function createEnvironmentResource(input: EnvironmentResourceInput) {
   const [state, setState] = createStore<{
-    environment?: BocEnvironmentState
+    environment?: BocEnvironment.State
     loading: boolean
     refreshing: boolean
     failed: boolean
@@ -50,7 +51,7 @@ export function createEnvironmentResource(input: EnvironmentResourceInput) {
     }, input.refreshDelayMs ?? 1_200)
   }
 
-  const apply = (environment: BocEnvironmentState) => {
+  const apply = (environment: BocEnvironment.State) => {
     setState({ environment, loading: false, refreshing: false, failed: false, stale: false, rejection: undefined })
     scheduleRefresh()
   }

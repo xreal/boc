@@ -407,76 +407,6 @@ export type ReferenceGitSource = {
   hidden?: boolean
 }
 
-export type BocWorktreePreparationState = {
-  operationID: string
-  status: "running" | "succeeded" | "failed"
-  phase:
-    | "queued"
-    | "creating-checkout"
-    | "preparing-template"
-    | "initializing-rift"
-    | "creating-rift-checkout"
-    | "verifying-checkout"
-    | "starting-environment"
-  startedAt: number | "Infinity" | "-Infinity" | "NaN"
-  updatedAt: number | "Infinity" | "-Infinity" | "NaN"
-  endedAt?: number | "Infinity" | "-Infinity" | "NaN"
-  log: string
-  truncated: boolean
-  directory?: string
-  error?: string
-}
-
-export type BocEnvironmentAvailability =
-  | { available: true; strategy: "git" | "boc/rift" }
-  | {
-      available: false
-      reason:
-        | "backend-unavailable"
-        | "unsupported-platform"
-        | "checkout-unavailable"
-        | "checkout-not-registered"
-        | "checkout-not-isolated"
-        | "checkout-ownership-mismatch"
-        | "devenv-unavailable"
-        | "devenv-preflight-failed"
-    }
-
-export type BocEnvironmentStack =
-  | { status: "unconfigured" }
-  | { status: "invalid" }
-  | {
-      status: "configured"
-      stackID: string
-      composeProject: string
-      infrastructureProject: string
-      host: string
-      url: string
-      sourceDirectory: string
-    }
-
-export type BocEnvironmentContainers = {
-  status: "unknown" | "absent" | "stopped" | "running" | "partial"
-  total: number
-  running: number
-}
-
-export type BocEnvironmentHttpReadiness =
-  | { status: "unknown" }
-  | { status: "ready"; checkedAt: number | "Infinity" | "-Infinity" | "NaN"; statusCode: number }
-  | { status: "unreachable"; checkedAt: number | "Infinity" | "-Infinity" | "NaN" }
-
-export type BocEnvironmentRun = {
-  id: string
-  action: "setup" | "start" | "stop" | "remove"
-  status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
-  startedAt: number | "Infinity" | "-Infinity" | "NaN"
-  endedAt?: number | "Infinity" | "-Infinity" | "NaN"
-  exitCode?: number | "Infinity" | "-Infinity" | "NaN"
-  log: string
-  truncated: boolean
-}
-
 export type WorktreeDirectory = { directory: string; strategy?: string }
 
 export type WorktreeInfo = { directory: string }
@@ -1712,17 +1642,6 @@ export type SessionStatusUpdated = {
 
 export type ReferenceSource = ReferenceLocalSource | ReferenceGitSource
 
-export type BocEnvironmentState = {
-  backend: "local"
-  projectID: string
-  directory: string
-  availability: BocEnvironmentAvailability
-  stack: BocEnvironmentStack
-  containers: BocEnvironmentContainers
-  http: BocEnvironmentHttpReadiness
-  latestRun?: BocEnvironmentRun
-}
-
 export type WorktreeList = Array<WorktreeDirectory>
 
 export type VcsInfo = { branch: VcsBranch }
@@ -1951,16 +1870,6 @@ export type ReferenceInfo = {
   hidden?: boolean
   source: ReferenceSource
 }
-
-export type BocEnvironmentOperationResult =
-  | { accepted: true; environment: BocEnvironmentState }
-  | {
-      accepted: false
-      reason: "operation-running" | "not-available" | "not-configured" | "confirmation-required"
-      environment: BocEnvironmentState
-    }
-
-export type BocEnvironmentCancelResult = { cancelled: boolean; environment: BocEnvironmentState }
 
 export type AgentInfo = {
   id: string
@@ -6179,125 +6088,6 @@ export type ReferenceListOutput = {
   location: { directory: string; workspaceID?: string; project: { id: string; directory: string; canonical: string } }
   data: Array<ReferenceInfo>
 }
-
-export type ServerBocWorktreePrepareInput = {
-  readonly location?: {
-    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
-  }["location"]
-  readonly operationID: {
-    readonly operationID: string
-    readonly worktree: {
-      readonly strategy?: string
-      readonly from?: string
-      readonly branch?: string
-      readonly directory?: string
-      readonly name?: string
-    }
-  }["operationID"]
-  readonly worktree: {
-    readonly operationID: string
-    readonly worktree: {
-      readonly strategy?: string
-      readonly from?: string
-      readonly branch?: string
-      readonly directory?: string
-      readonly name?: string
-    }
-  }["worktree"]
-}
-
-export type ServerBocWorktreePrepareOutput = BocWorktreePreparationState
-
-export type ServerBocWorktreePreparationInput = {
-  readonly operationID: { readonly operationID: string }["operationID"]
-}
-
-export type ServerBocWorktreePreparationOutput = BocWorktreePreparationState | null
-
-export type ServerBocWorktreeRiftCapabilityInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly source: { readonly source: string; readonly directory: string }["source"]
-  readonly directory: { readonly source: string; readonly directory: string }["directory"]
-}
-
-export type ServerBocWorktreeRiftCapabilityOutput =
-  | { available: true; backend: "boc/rift"; version: "0.0.10"; filesystem: string }
-  | {
-      available: false
-      backend: "boc/rift"
-      version: "0.0.10"
-      reason:
-        | "backend-unavailable"
-        | "binary-missing"
-        | "binary-unhealthy"
-        | "project-mismatch"
-        | "storage-inaccessible"
-        | "unsupported-architecture"
-        | "unsupported-filesystem"
-        | "unsupported-platform"
-      message: string
-    }
-
-export type ServerBocWorktreeRiftTrashOutput = { checkouts: number }
-
-export type ServerBocWorktreeCleanupRiftTrashOutput =
-  | { completed: true; checkouts: number }
-  | { completed: false; checkouts: number }
-
-export type ServerBocEnvironmentInspectInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly directory: { readonly directory: string }["directory"]
-}
-
-export type ServerBocEnvironmentInspectOutput = BocEnvironmentState
-
-export type ServerBocEnvironmentRunInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly directory: {
-    readonly directory: string
-    readonly sessionID: string
-    readonly action: "setup" | "start" | "stop" | "remove"
-    readonly domain?: string
-    readonly confirmation?: "remove-environment"
-  }["directory"]
-  readonly sessionID: {
-    readonly directory: string
-    readonly sessionID: string
-    readonly action: "setup" | "start" | "stop" | "remove"
-    readonly domain?: string
-    readonly confirmation?: "remove-environment"
-  }["sessionID"]
-  readonly action: {
-    readonly directory: string
-    readonly sessionID: string
-    readonly action: "setup" | "start" | "stop" | "remove"
-    readonly domain?: string
-    readonly confirmation?: "remove-environment"
-  }["action"]
-  readonly domain?: {
-    readonly directory: string
-    readonly sessionID: string
-    readonly action: "setup" | "start" | "stop" | "remove"
-    readonly domain?: string
-    readonly confirmation?: "remove-environment"
-  }["domain"]
-  readonly confirmation?: {
-    readonly directory: string
-    readonly sessionID: string
-    readonly action: "setup" | "start" | "stop" | "remove"
-    readonly domain?: string
-    readonly confirmation?: "remove-environment"
-  }["confirmation"]
-}
-
-export type ServerBocEnvironmentRunOutput = BocEnvironmentOperationResult
-
-export type ServerBocEnvironmentCancelInput = {
-  readonly projectID: { readonly projectID: string }["projectID"]
-  readonly directory: { readonly directory: string }["directory"]
-}
-
-export type ServerBocEnvironmentCancelOutput = BocEnvironmentCancelResult
 
 export type WorktreeListInput = {
   readonly location?: {

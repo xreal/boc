@@ -1,11 +1,13 @@
-import type { BocEnvironmentState } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import { Project } from "@opencode-ai/schema/project"
+import { AbsolutePath } from "@opencode-ai/schema/schema"
 
 const now = Date.UTC(2026, 8, 6, 9, 30)
 
-const base: BocEnvironmentState = {
+const base: BocEnvironment.State = {
   backend: "local",
-  projectID: "project_fixture",
-  directory: "/workspace/checkouts/BOC-204-environments",
+  projectID: Project.ID.make("project_fixture"),
+  directory: AbsolutePath.make("/workspace/checkouts/BOC-204-environments"),
   availability: { available: true, strategy: "git" },
   stack: { status: "unconfigured" },
   containers: { status: "absent", total: 0, running: 0 },
@@ -116,6 +118,6 @@ export const environmentFixtures = {
     availability: { available: false, reason: "backend-unavailable" },
     containers: { status: "unknown", total: 0, running: 0 },
   },
-} satisfies Record<string, BocEnvironmentState>
+} satisfies Record<string, BocEnvironment.State>
 
 export type EnvironmentFixtureName = keyof typeof environmentFixtures

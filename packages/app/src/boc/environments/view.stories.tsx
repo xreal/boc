@@ -1,4 +1,4 @@
-import type { BocEnvironmentState } from "@opencode-ai/client/promise"
+import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
 import { onCleanup, Show } from "solid-js"
 import { Menu } from "@opencode-ai/ui/menu"
 import { environmentFixtures, type EnvironmentFixtureName } from "./fixtures"
@@ -18,7 +18,7 @@ const target = {
   },
 } satisfies EnvironmentActionTarget
 
-function activeRun(environment: BocEnvironmentState, action: "setup" | "start" | "stop" | "remove") {
+function activeRun(environment: BocEnvironment.State, action: "setup" | "start" | "stop" | "remove") {
   return {
     ...environment,
     latestRun: {

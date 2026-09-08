@@ -1,30 +1,35 @@
 import type { OpenCodeClient, WorktreeCreateInput } from "@opencode-ai/client/promise"
+import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
+import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
 
 export async function prepareWorktree(input: {
-  api: Pick<OpenCodeClient, "server.boc.worktree">
+  api: Pick<OpenCodeClient, "rpc">
   location: string
   operationID: string
   worktree: Pick<WorktreeCreateInput, "strategy" | "from" | "branch" | "directory">
 }) {
-  const preparations = input.api["server.boc.worktree"]
-  const started = await preparations.prepare({
-    location: { directory: input.location },
-    operationID: input.operationID,
-    worktree: input.worktree,
-  })
-  const completed = await waitForPreparation(preparations, started)
+  const preparations = input.api.rpc(BocWorktreeRpc.Rpc)
+  const options = { location: { directory: input.location } }
+  const started = await preparations.prepare(
+    {
+      operationID: input.operationID,
+      worktree: input.worktree,
+    },
+    options,
+  )
+  const completed = await waitForPreparation(
+    () => preparations.preparation({ operationID: input.operationID }, options),
+    started,
+  )
   if (completed.status === "succeeded" && completed.directory) return { directory: completed.directory }
   if (completed.error) throw new Error(completed.error)
   throw completed
 }
 
-async function waitForPreparation(
-  preparations: OpenCodeClient["server.boc.worktree"],
-  started: Awaited<ReturnType<OpenCodeClient["server.boc.worktree"]["prepare"]>>,
-) {
+async function waitForPreparation(inspect: () => Promise<State | null>, started: State) {
   if (started.status !== "running") return started
-  await Bun.sleep(300)
-  const current = await preparations.preparation({ operationID: started.operationID })
+  await new Promise((resolve) => setTimeout(resolve, 300))
+  const current = await inspect()
   if (!current) throw started
-  return waitForPreparation(preparations, current)
+  return waitForPreparation(inspect, current)
 }

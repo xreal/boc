@@ -10,14 +10,39 @@ export function bocBranding(channel: string): Plugin {
     { name: "favicon.svg", source: "brand.svg", type: "image/svg+xml" },
     { name: "favicon.ico", source: "icon.ico", type: "image/x-icon" },
     { name: "apple-touch-icon.png", source: "ios/AppIcon-60x60@3x.png", type: "image/png" },
+    { name: "manifest-192.png", source: "android/mipmap-xxxhdpi/ic_launcher.png", type: "image/png" },
+    { name: "manifest-512.png", source: "icon.png", type: "image/png" },
   ].map((file) => ({
     ...file,
     fileName: `boc/${file.name}`,
     contents: readFileSync(new URL(`../../icons/${iconSet}/${file.source}`, import.meta.url)),
   }))
+  files.push({
+    name: "site.webmanifest",
+    source: "",
+    fileName: "boc/site.webmanifest",
+    type: "application/manifest+json",
+    contents: Buffer.from(
+      JSON.stringify({
+        name: "Boc",
+        short_name: "Boc",
+        id: "/",
+        start_url: "/",
+        scope: "/",
+        display: "standalone",
+        icons: [192, 512].map((size) => ({
+          src: `/boc/manifest-${size}.png`,
+          sizes: `${size}x${size}`,
+          type: "image/png",
+          purpose: "maskable",
+        })),
+      }),
+    ),
+  })
 
   return {
     name: "boc:branding",
+    enforce: "pre",
     generateBundle() {
       files.forEach((file) => this.emitFile({ type: "asset", fileName: file.fileName, source: file.contents }))
     },
@@ -33,6 +58,10 @@ export function bocBranding(channel: string): Plugin {
       order: "pre",
       handler(html) {
         return html
+          .replace("<title>OpenCode</title>", "<title>Boc</title>")
+          .replace("%OPENCODE_FAVICON%", "/boc/favicon.ico")
+          .replace("%OPENCODE_APPLE_TOUCH_ICON%", "/boc/apple-touch-icon.png")
+          .replace('href="/site.webmanifest"', 'href="/boc/site.webmanifest"')
           .replace("./favicon-96x96-v3.png", "./boc/favicon.png")
           .replace("./favicon-v3.svg", "./boc/favicon.svg")
           .replace("./favicon-v3.ico", "./boc/favicon.ico")
