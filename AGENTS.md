@@ -24,6 +24,9 @@
 - Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
 - Boc releases accept only the Boc application version. Keep `BOC_SERVER_VERSION` in `.github/workflows/boc-release.yml` pinned to the exact compatible official server version and update that pin during upstream syncs, not during routine Boc releases.
 
+## Maintained implementation references
+- The earlier requirement to read `BOC_HANDOVER.md` and `BOC_EXTENSIONS_JIRA_PLAN.md` is obsolete; those documents are retired and are no longer prerequisites for Boc-owned changes. Read `BOC_FORK.md` for maintained integration facts and follow the current task's approved plan. For the surface-reduction work, that plan is `tmp/BOC_SURFACE_REDUCTION_REVIEW.md`; local `tmp/` documents remain uncommitted.
+
 ---
 <!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->
 ---
