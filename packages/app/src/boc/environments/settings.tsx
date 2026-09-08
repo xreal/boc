@@ -45,6 +45,12 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
     setDraft("domain", draft.domain.trim())
     setDraft("saved", true)
   }
+  const toggleEnabled = (enabled: boolean) => {
+    setDraft({ enabled, saved: false })
+    if (!valid()) return
+    settings.update({ enabled, domain: draft.domain.trim() })
+    setDraft({ domain: draft.domain.trim(), saved: true })
+  }
   const supported = () => ServerConnection.local(props.server) && platform.os !== "windows"
 
   return (
@@ -64,7 +70,7 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
           checked={draft.enabled}
           disabled={!draft.loaded}
           description={t("boc.environments.settings.enabled.description")}
-          onChange={(enabled) => setDraft({ enabled, saved: false })}
+          onChange={toggleEnabled}
         >
           {t("boc.environments.settings.enabled")}
         </Switch>
