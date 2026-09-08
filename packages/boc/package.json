@@ -22,11 +22,11 @@
     "test": "bun test --conditions=browser --conditions=solid --preload ./happydom.ts ./src ./scripts"
   },
   "dependencies": {
-    "@opencode-ai/core": "workspace:*",
-    "@opencode-ai/plugin": "workspace:*",
-    "@opencode-ai/schema": "workspace:*",
-    "@opencode-ai/ui": "workspace:*",
-    "@opencode-ai/util": "workspace:*",
+    "@opencode/core": "workspace:*",
+    "@opencode/plugin": "workspace:*",
+    "@opencode/schema": "workspace:*",
+    "@opencode/ui": "workspace:*",
+    "@opencode/util": "workspace:*",
     "@solid-primitives/i18n": "2.2.1",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
@@ -34,7 +34,7 @@
     "marked": "catalog:",
     "solid-js": "catalog:",
     "yaml": "2.9.0",
-    "@opencode-ai/client": "workspace:*"
+    "@opencode/client": "workspace:*"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",

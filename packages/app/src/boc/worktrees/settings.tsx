@@ -1,11 +1,11 @@
 import { createBocTranslator, useBocDesktop, type BocTranslator } from "@boc/extensions/renderer"
-import { Badge } from "@opencode-ai/ui/badge"
-import { Button } from "@opencode-ai/ui/button"
-import { Icon } from "@opencode-ai/ui/icon"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
-import { Project } from "@opencode-ai/schema/project"
-import { RIFT_BACKEND_VERSION } from "@opencode-ai/schema/boc/rift"
-import { getDirectory } from "@opencode-ai/util/path"
+import { Badge } from "@opencode/ui/badge"
+import { Button } from "@opencode/ui/button"
+import { Icon } from "@opencode/ui/icon"
+import { Tooltip } from "@opencode/ui/tooltip"
+import { Project } from "@opencode/schema/project"
+import { RIFT_BACKEND_VERSION } from "@opencode/schema/boc/rift"
+import { getDirectory } from "@opencode/util/path"
 import { createMemo, For, onCleanup, onMount, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -361,4 +361,4 @@ function BackendChoices(props: {
     </div>
   )
 }
-import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
+import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"

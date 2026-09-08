@@ -1,8 +1,8 @@
 export * as BocWorktrees from "./runtime"
 
-import { App } from "@opencode-ai/core/app"
-import { SdkPlugins } from "@opencode-ai/core/plugin/sdk"
-import { makeGlobalNode } from "@opencode-ai/util/effect/app-node"
+import { App } from "@opencode/core/app"
+import { SdkPlugins } from "@opencode/core/plugin/sdk"
+import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Effect, Layer } from "effect"
 import { createRiftBackend, RiftBackendService } from "./backend"
 import { riftPlugin } from "./registration"

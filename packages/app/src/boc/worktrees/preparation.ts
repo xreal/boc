@@ -1,6 +1,6 @@
-import type { OpenCodeClient, WorktreeCreateInput } from "@opencode-ai/client/promise"
-import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
-import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
+import type { OpenCodeClient, WorktreeCreateInput } from "@opencode/client/promise"
+import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"
+import type { State } from "@opencode/schema/boc/worktree-preparation"
 
 export async function prepareWorktree(input: {
   api: Pick<OpenCodeClient, "rpc">

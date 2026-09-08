@@ -1,7 +1,7 @@
-import type { Endpoint } from "@opencode-ai/client/service"
+import type { Endpoint } from "@opencode/client/service"
 import { BocControls } from "@boc/extensions/controls"
-import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
-import { BocEnvironmentRpc } from "@opencode-ai/schema/boc/environment-rpc"
+import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"
+import { BocEnvironmentRpc } from "@opencode/schema/boc/environment-rpc"
 import { Option, Schema } from "effect"
 
 const decodeControls = Schema.decodeUnknownOption(Schema.Struct({ output: BocControls.Info }))

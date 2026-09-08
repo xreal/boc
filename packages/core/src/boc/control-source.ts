@@ -1,6 +1,6 @@
 export * as BocControlSource from "./control-source.js"
 
-import type { Context } from "@opencode-ai/plugin/effect/plugin"
+import type { Context } from "@opencode/plugin/effect/plugin"
 
 const sources = new WeakMap<object, { file: string } | { plugin: string }>()
 export const get = (value: object) => sources.get(value)

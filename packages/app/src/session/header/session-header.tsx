@@ -5,7 +5,7 @@ import { useSettings } from "@/settings/model"
 import { useSessionLayout } from "@/session/session-layout"
 import { StatusPopover } from "@/shell/status/status-popover"
 import { TitlebarRight } from "@/shell/titlebar/right-slot"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Tooltip } from "@opencode/ui/tooltip"
 import { BocEnvironmentSessionControl } from "@/boc/environments/session"
 
 export function SessionHeader() {

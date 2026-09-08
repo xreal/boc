@@ -1,7 +1,7 @@
 export * as BocControlPolicy from "./control-policy.js"
 
-import { BocControls } from "@opencode-ai/schema/boc/controls"
-import { makeGlobalNode } from "@opencode-ai/util/effect/app-node"
+import { BocControls } from "@opencode/schema/boc/controls"
+import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Context, Effect, Layer, Schema, Semaphore } from "effect"
 import { KV } from "../kv.js"
 

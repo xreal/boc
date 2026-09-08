@@ -1,5 +1,5 @@
-import { Avatar } from "@opencode-ai/ui/avatar"
-import { Badge } from "@opencode-ai/ui/badge"
+import { Avatar } from "@opencode/ui/avatar"
+import { Badge } from "@opencode/ui/badge"
 import { Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import { jiraIssueIsSubtask, type JiraBoardIssue } from "../domain/board"

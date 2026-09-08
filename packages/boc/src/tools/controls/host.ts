@@ -1,6 +1,6 @@
-import type { RpcClient } from "@opencode-ai/client/promise/api"
-import { BocControls } from "@opencode-ai/schema/boc/controls"
-export { BocControls } from "@opencode-ai/schema/boc/controls"
+import type { RpcClient } from "@opencode/client/promise/api"
+import { BocControls } from "@opencode/schema/boc/controls"
+export { BocControls } from "@opencode/schema/boc/controls"
 
 export const controls = BocControls.Rpc
 export type ControlState = BocControls.State

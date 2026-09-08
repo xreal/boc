@@ -8,7 +8,7 @@ import type {
   Stack,
   State,
   Strategy,
-} from "@opencode-ai/schema/boc/environment"
+} from "@opencode/schema/boc/environment"
 import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"

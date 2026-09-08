@@ -42,7 +42,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const rift = yield* resolveRiftEnvironment
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
-  const client = yield* Effect.promise(() => import("@opencode-ai/client/service"))
+  const client = yield* Effect.promise(() => import("@opencode/client/service"))
   const options = (isolatedService: boolean) => ({
     file: serviceFile(path, isolatedService),
     version,

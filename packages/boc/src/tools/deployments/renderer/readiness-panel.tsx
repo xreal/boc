@@ -1,5 +1,5 @@
-import { Button } from "@opencode-ai/ui/button"
-import { Icon } from "@opencode-ai/ui/icon"
+import { Button } from "@opencode/ui/button"
+import { Icon } from "@opencode/ui/icon"
 import { For, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { DeploymentCapabilityStatus, DeploymentReadiness } from "../rpcs"

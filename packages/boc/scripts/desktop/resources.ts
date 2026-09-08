@@ -21,7 +21,7 @@ export async function stageBocCli(root: string) {
   const filename = cli.os === "win32" ? "opencode2.exe" : "opencode2"
   const destination = path.join(desktopDirectory, "resources", cli.os === "win32" ? "opencode-cli.exe" : "opencode-cli")
   await mkdir(path.dirname(destination), { recursive: true })
-  await copyFile(path.join(root, cli.package.replace("@opencode-ai/", ""), "bin", filename), destination)
+  await copyFile(path.join(root, cli.package.replace("@opencode/", ""), "bin", filename), destination)
   if (cli.os !== "win32") await chmod(destination, 0o755)
   if (
     cli.os === "win32" &&

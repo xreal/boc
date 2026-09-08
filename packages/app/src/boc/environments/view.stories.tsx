@@ -1,6 +1,6 @@
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
 import { onCleanup, Show } from "solid-js"
-import { Menu } from "@opencode-ai/ui/menu"
+import { Menu } from "@opencode/ui/menu"
 import { environmentFixtures, type EnvironmentFixtureName } from "./fixtures"
 import { createEnvironmentResource } from "./store"
 import { EnvironmentControl, EnvironmentContextMenu, type EnvironmentActionTarget } from "./view"

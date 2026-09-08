@@ -1,4 +1,4 @@
-import type { IconProps } from "@opencode-ai/ui/icon"
+import type { IconProps } from "@opencode/ui/icon"
 import type { Component } from "solid-js"
 import type { BocI18nKey } from "./renderer/i18n"
 import type { BocHost } from "./renderer/host"

@@ -1,11 +1,10 @@
 export * as PluginHost from "./host.js"
 
-import { Plugin } from "@opencode-ai/plugin/effect"
-import type { IntegrationMethodRegistration } from "@opencode-ai/plugin/effect/integration"
-import { EventManifest } from "@opencode-ai/schema/event-manifest"
-import type { Event } from "@opencode-ai/schema/event"
-import { ServerConfig } from "@opencode-ai/schema/mcp"
-import { LayerNode } from "@opencode-ai/util/effect/layer-node"
+import { Plugin } from "@opencode/plugin/effect"
+import type { IntegrationMethodRegistration } from "@opencode/plugin/effect/integration"
+import { EventManifest } from "@opencode/schema/event-manifest"
+import type { Event } from "@opencode/schema/event"
+import { ServerConfig } from "@opencode/schema/mcp"
 import { Effect, Schema, Stream } from "effect"
 import { App } from "../app.js"
 import { Agent } from "../agent.js"
@@ -37,6 +36,7 @@ import { Generate } from "../generate.js"
 import { Permission } from "../permission.js"
 import { PluginHooks } from "./hooks.js"
 import type { Interface } from "../plugin.js"
+import { LayerNode } from "@opencode/util/effect/layer-node"
 
 const mutable = <T>(value: T) => value as DeepMutable<T>
 type RpcEvent = Event.Payload & {

@@ -1,4 +1,4 @@
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
 
 export type EnvironmentPrimaryIntent =
   | "configure"

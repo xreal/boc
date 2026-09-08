@@ -1,8 +1,8 @@
-import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
-import type { Session } from "@opencode-ai/schema/session"
-import type { WorktreeProgress } from "@opencode-ai/core/boc/worktree-progress"
-import { AbsolutePath } from "@opencode-ai/schema/schema"
-import type { Location } from "@opencode-ai/schema/location"
+import type { State } from "@opencode/schema/boc/worktree-preparation"
+import type { Session } from "@opencode/schema/session"
+import type { WorktreeProgress } from "@opencode/core/boc/worktree-progress"
+import { AbsolutePath } from "@opencode/schema/schema"
+import type { Location } from "@opencode/schema/location"
 
 const LOG_LIMIT = 64 * 1024
 const HISTORY_LIMIT = 100

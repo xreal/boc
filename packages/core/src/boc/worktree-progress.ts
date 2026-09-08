@@ -2,7 +2,7 @@ export * as WorktreeProgress from "./worktree-progress.js"
 
 import { Effect, Stream } from "effect"
 import { ChildProcess } from "effect/unstable/process"
-import { AppProcess } from "@opencode-ai/util/process"
+import { AppProcess } from "@opencode/util/process"
 
 export type Phase =
   | "creating-checkout"

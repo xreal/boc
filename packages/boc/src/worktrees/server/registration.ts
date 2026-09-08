@@ -1,6 +1,6 @@
-import { Worktree } from "@opencode-ai/core/worktree"
-import { AbsolutePath } from "@opencode-ai/schema/schema"
-import { define } from "@opencode-ai/plugin/effect/plugin"
+import { Worktree } from "@opencode/core/worktree"
+import { AbsolutePath } from "@opencode/schema/schema"
+import { define } from "@opencode/plugin/effect/plugin"
 import { Effect } from "effect"
 
 export const RIFT_STRATEGY = Worktree.StrategyID.make("boc/rift")

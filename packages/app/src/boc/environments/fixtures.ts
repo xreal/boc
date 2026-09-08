@@ -1,6 +1,6 @@
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
-import { Project } from "@opencode-ai/schema/project"
-import { AbsolutePath } from "@opencode-ai/schema/schema"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
+import { Project } from "@opencode/schema/project"
+import { AbsolutePath } from "@opencode/schema/schema"
 
 const now = Date.UTC(2026, 8, 6, 9, 30)
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
 import { environmentFixtures } from "./fixtures"
 import { createEnvironmentRegistry, createEnvironmentResource } from "./store"
 

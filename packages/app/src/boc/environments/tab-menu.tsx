@@ -1,4 +1,4 @@
-import type { SessionInfo } from "@opencode-ai/client/promise"
+import type { SessionInfo } from "@opencode/client/promise"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useGlobal } from "@/runtime/server/runtime"
 import type { ServerConnection } from "@/runtime/server/registry"

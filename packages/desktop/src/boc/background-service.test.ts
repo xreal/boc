@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import type { Endpoint } from "@opencode-ai/client/service"
+import type { Endpoint } from "@opencode/client/service"
 import { connectBocService, inspectBocService, type BocServiceLifecycle } from "./background-service"
 
 const official = endpoint("official")

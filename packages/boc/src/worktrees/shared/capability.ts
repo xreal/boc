@@ -4,4 +4,4 @@ export {
   RiftCapabilityReason,
   RiftCleanupResult,
   RiftTrashSummary,
-} from "@opencode-ai/schema/boc/rift"
+} from "@opencode/schema/boc/rift"

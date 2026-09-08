@@ -1,4 +1,4 @@
-import { Button } from "@opencode-ai/ui/button"
+import { Button } from "@opencode/ui/button"
 import { For, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import {

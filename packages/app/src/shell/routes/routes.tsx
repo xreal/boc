@@ -4,6 +4,7 @@ import { Home } from "@/home/route"
 import { ServerProvider } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection } from "@/runtime/server/registry"
+import { BrowserAttachmentsProvider } from "@/session/browser/attachments"
 import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import { LayoutProvider } from "@/shell/state/layout"
 import { SettingsSurfaceProvider } from "@/settings/surface"
@@ -12,7 +13,7 @@ import { BocCommandBridge } from "@/boc/commands"
 import { BocRouteBridge, preloadBocRoute } from "@/boc/route"
 import { requireServerKey } from "./session"
 
-export const File = lazy(() => import("@opencode-ai/session-ui/file").then((module) => ({ default: module.File })))
+export const File = lazy(() => import("@opencode/session-ui/file").then((module) => ({ default: module.File })))
 const loadSessionRoute = () => Promise.all([import("@/session/route"), File.preload()]).then(([module]) => module)
 const DraftRoute = lazy(() => import("@/new-session/route").then((module) => ({ default: module.DraftRoute })))
 const SettingsScreen = lazy(() => import("@/settings/shell").then((module) => ({ default: module.SettingsScreen })))
@@ -77,8 +78,10 @@ function AppLayout(props: ParentProps) {
   return (
     <LayoutProvider>
       <SettingsSurfaceProvider>
-        <BocCommandBridge />
-        <Shell>{props.children}</Shell>
+        <BrowserAttachmentsProvider>
+          <BocCommandBridge />
+          <Shell>{props.children}</Shell>
+        </BrowserAttachmentsProvider>
       </SettingsSurfaceProvider>
     </LayoutProvider>
   )

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
-import { OpenCode } from "@opencode-ai/client/promise"
-import { createData } from "@opencode-ai/client/solid"
+import { OpenCode } from "@opencode/client/promise"
+import { createData } from "@opencode/client/solid"
 import { createRoot } from "solid-js"
 import { createWorktree } from "../../workspaces/create"
 

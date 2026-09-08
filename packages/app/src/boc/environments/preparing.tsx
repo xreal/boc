@@ -1,5 +1,5 @@
 import { createBocTranslator } from "@boc/extensions/renderer"
-import { Icon } from "@opencode-ai/ui/icon"
+import { Icon } from "@opencode/ui/icon"
 import { createEffect, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
@@ -8,8 +8,8 @@ import type { PendingSession } from "@/shell/tabs/tabs"
 import { environmentDuration } from "./model"
 import { environmentOutput } from "./output"
 import { useParams } from "@solidjs/router"
-import { BocWorktreeRpc } from "@opencode-ai/schema/boc/worktree-rpc"
-import type { State } from "@opencode-ai/schema/boc/worktree-preparation"
+import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"
+import type { State } from "@opencode/schema/boc/worktree-preparation"
 
 export function BocPreparingCheckout(props: { pending: PendingSession }) {
   const language = useLanguage()

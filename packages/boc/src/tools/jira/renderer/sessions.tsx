@@ -1,4 +1,4 @@
-import { Button } from "@opencode-ai/ui/button"
+import { Button } from "@opencode/ui/button"
 import { createEffect, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useBocDesktop } from "../../../renderer/desktop"

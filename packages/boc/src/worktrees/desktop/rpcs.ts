@@ -1,4 +1,4 @@
-import { Project } from "@opencode-ai/schema/project"
+import { Project } from "@opencode/schema/project"
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
 

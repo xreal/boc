@@ -1,8 +1,8 @@
-import { Icon } from "@opencode-ai/ui/icon"
-import { IconButton } from "@opencode-ai/ui/icon-button"
-import { SegmentedControl, SegmentedControlItem } from "@opencode-ai/ui/segmented-control"
-import { TextInput } from "@opencode-ai/ui/text-input"
-import { Tooltip } from "@opencode-ai/ui/tooltip"
+import { Icon } from "@opencode/ui/icon"
+import { IconButton } from "@opencode/ui/icon-button"
+import { SegmentedControl, SegmentedControlItem } from "@opencode/ui/segmented-control"
+import { TextInput } from "@opencode/ui/text-input"
+import { Tooltip } from "@opencode/ui/tooltip"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { DeploymentAvailabilityFilter } from "./surface"
 

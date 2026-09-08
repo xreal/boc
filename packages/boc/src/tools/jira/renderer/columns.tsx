@@ -1,4 +1,4 @@
-import { Badge } from "@opencode-ai/ui/badge"
+import { Badge } from "@opencode/ui/badge"
 import { For, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraBoardIssue } from "../domain/board"

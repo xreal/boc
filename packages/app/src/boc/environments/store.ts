@@ -1,4 +1,4 @@
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
 import type { environmentApi } from "./api"
 import { onCleanup } from "solid-js"
 import { createStore } from "solid-js/store"

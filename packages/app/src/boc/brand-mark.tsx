@@ -1,4 +1,4 @@
-import { Mark } from "@opencode-ai/ui/logo"
+import { Mark } from "@opencode/ui/logo"
 import { bocProduct } from "./product"
 
 export function BocBrandMark(props: { class?: string }) {

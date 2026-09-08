@@ -1,5 +1,5 @@
 import type { ElectronAPI } from "./api-types"
-import type { UpdaterState } from "@opencode-ai/app/updater"
+import type { UpdaterState } from "@opencode/app/updater"
 import { invoke, listen, send } from "./ipc-client"
 
 type Mutable<Value> =
@@ -25,6 +25,11 @@ const updaterHandler = (state: UpdaterState) => {
 export const api: ElectronAPI = {
   awaitInitialization: () => invoke("AppAwaitInitialization"),
   reconnectService: () => invoke("AppReconnectService"),
+  browserPane: {
+    request: (request) => invoke("BrowserPane", { request }),
+    send: (request) => send("BrowserPane", { request }),
+    onEvent: (callback) => listen("BrowserPaneEvent", (value) => callback(value)),
+  },
   wslServers: {
     getState: () => invoke("WslGetState").then(mutable),
     subscribe: (cb) => {

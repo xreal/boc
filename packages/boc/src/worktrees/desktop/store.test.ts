@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test"
-import { Project } from "@opencode-ai/schema/project"
+import { Project } from "@opencode/schema/project"
 import {
   getDefaultBackend,
   getProjectBackend,

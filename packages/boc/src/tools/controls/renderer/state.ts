@@ -1,4 +1,4 @@
-import { BocControls } from "@opencode-ai/schema/boc/controls"
+import { BocControls } from "@opencode/schema/boc/controls"
 import { Schema, Option } from "effect"
 import type { ControlItem, ControlState } from "../host"
 import { createEffect, createMemo, onCleanup, onMount, untrack } from "solid-js"

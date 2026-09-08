@@ -1,4 +1,4 @@
-import type { Platform } from "@opencode-ai/app/desktop"
+import type { Platform } from "@opencode/app/desktop"
 import type { ElectronAPI } from "../renderer/api-types"
 import { notificationIcon } from "./branding"
 

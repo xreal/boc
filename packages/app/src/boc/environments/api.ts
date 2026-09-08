@@ -1,6 +1,6 @@
-import type { OpenCodeClient } from "@opencode-ai/client/promise"
-import { BocEnvironmentRpc } from "@opencode-ai/schema/boc/environment-rpc"
-import type { BocEnvironment } from "@opencode-ai/schema/boc/environment"
+import type { OpenCodeClient } from "@opencode/client/promise"
+import { BocEnvironmentRpc } from "@opencode/schema/boc/environment-rpc"
+import type { BocEnvironment } from "@opencode/schema/boc/environment"
 
 export function environmentApi(api: Pick<OpenCodeClient, "rpc">) {
   const rpc = api.rpc(BocEnvironmentRpc.Rpc)
