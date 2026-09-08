@@ -3,10 +3,11 @@ import { app } from "electron"
 import { Effect } from "effect"
 import { CHANNEL } from "../main/constants"
 import { DesktopPaths } from "../main/paths"
+import { usesRiftRuntime } from "./development"
 import { stageRift } from "./rift-stage"
 
 export const resolveRiftEnvironment = Effect.gen(function* () {
-  if (CHANNEL !== "boc") return undefined
+  if (!usesRiftRuntime(CHANNEL)) return undefined
   const paths = yield* DesktopPaths.resolve
   const root = path.join(app.getPath("userData"), "rift")
   const source = app.isPackaged

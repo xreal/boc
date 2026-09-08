@@ -3,7 +3,14 @@ import { existsSync } from "node:fs"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
+import { usesRiftRuntime } from "./development"
 import { stageRift } from "./rift-stage"
+
+test("enables Rift for the Boc source backend", () => {
+  expect(usesRiftRuntime("dev", { OPENCODE_CHANNEL: "local", OPENCODE_DESKTOP_CLI_DEV: "packages/cli" })).toBe(true)
+  expect(usesRiftRuntime("dev", { OPENCODE_CHANNEL: "local" })).toBe(false)
+  expect(usesRiftRuntime("boc", {})).toBe(true)
+})
 
 test("stages and reuses a healthy versioned Rift executable", async () => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "boc-rift-stage-"))

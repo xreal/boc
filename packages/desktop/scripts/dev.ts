@@ -1,6 +1,7 @@
 import { $ } from "bun"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { resolveRiftTarget } from "../../boc/scripts/rift/target"
 import { downloadCliToResources, windowsify } from "./utils"
 
 type ServerSource = { type: "build" } | { type: "download"; version: string }
@@ -22,7 +23,14 @@ async function prepareDesktop() {
   await Promise.all([
     $`bun run install-electron`,
     $`bun ./scripts/copy-icons.ts ${process.env.OPENCODE_CHANNEL ?? "dev"}`,
+    prepareRift(),
   ])
+}
+
+async function prepareRift() {
+  const target = resolveRiftTarget(process.platform, process.arch)
+  if (!target) return
+  await $`bun ../boc/scripts/rift/fetch.ts ${target} ${"resources/rift/rift"}`
 }
 
 function selectOptions(): DevOptions {
