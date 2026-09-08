@@ -8,7 +8,6 @@
   - Prefer existing extension seams: Effect `Layer` overrides, additive RPC groups, `command.register`, channel-keyed build config.
   - New app identity is channel-keyed (`boc`: `ai.boc.desktop.beta` / `Boc Beta` / updates from `BergDevOrg/boc`) so Boc Beta installs side-by-side with upstream OpenCode Beta.
 - AGENTS.md convention: fork notes are added ABOVE the boundary line below, newest last. NEVER edit or delete anything below the boundary line — that content mirrors upstream verbatim so merges stay clean. NEVER rewrite the notes above; only append.
-- BOC extension work (Jira board, future tools): the specification is `BOC_EXTENSIONS_JIRA_PLAN.md`, the living status/handover log is `BOC_HANDOVER.md`. Read the handover first, then the plan, before touching `packages/boc/`, `packages/app/src/boc/` or `packages/desktop/src/boc/`.
 
 ## Importand Rules:
 - Write code for expression, not just correctness: make variable names, method names, conditions, abstractions, and composition communicate intent clearly and naturally. Prefer simple, deliberate, Taylor Otwell or DHH style code that reads almost like prose, keeps control flow shallow, gives important concepts good names, removes unnecessary ceremony, and feels thoughtfully designed rather than merely working—without introducing speculative abstractions or architecture.
@@ -24,8 +23,6 @@
 - Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
 - Boc releases accept only the Boc application version. Keep `BOC_SERVER_VERSION` in `.github/workflows/boc-release.yml` pinned to the exact compatible official server version and update that pin during upstream syncs, not during routine Boc releases.
 
-## Maintained implementation references
-- The earlier requirement to read `BOC_HANDOVER.md` and `BOC_EXTENSIONS_JIRA_PLAN.md` is obsolete; those documents are retired and are no longer prerequisites for Boc-owned changes. Read `BOC_FORK.md` for maintained integration facts and follow the current task's approved plan. For the surface-reduction work, that plan is `tmp/BOC_SURFACE_REDUCTION_REVIEW.md`; local `tmp/` documents remain uncommitted.
 
 ---
 <!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->
