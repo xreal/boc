@@ -1,5 +1,7 @@
 import { RiftBackendService } from "@boc/extensions/worktrees/server"
 import { Database } from "@opencode-ai/core/database/database"
+import { Plugin } from "@opencode-ai/core/plugin"
+import { Worktree } from "@opencode-ai/core/worktree"
 import { WorktreeTable } from "@opencode-ai/core/worktree/sql"
 import { RIFT_BACKEND_VERSION, type RiftCapability as RiftCapabilityResult } from "@opencode-ai/schema/boc/rift"
 import { Effect } from "effect"
@@ -14,6 +16,32 @@ export const BocWorktreeHandler = HttpApiBuilder.group(Api, "server.boc.worktree
     const database = yield* Database.Service
 
     return handlers
+      .handle("boc.worktree.prepare", (context) =>
+        Effect.gen(function* () {
+          const operationID = context.payload.operationID
+          const plugins = yield* Plugin.Service
+          const worktrees = yield* Worktree.Service
+          yield* plugins.awaitActivation
+          const preparation = rift.preparations.begin(operationID)
+          if (!preparation.started) return { ...preparation.state }
+          yield* worktrees.create(context.payload.worktree, rift.preparations.progress(operationID)).pipe(
+            Effect.tap((created) => Effect.sync(() => rift.preparations.succeed(operationID, created.directory))),
+            Effect.catch((error) =>
+              Effect.sync(() =>
+                rift.preparations.fail(
+                  operationID,
+                  error instanceof Error ? error.message : "Checkout preparation failed.",
+                ),
+              ),
+            ),
+            Effect.forkDetach,
+          )
+          return { ...preparation.state }
+        }),
+      )
+      .handle("boc.worktree.preparation", (context) =>
+        Effect.succeed(rift.preparations.read(context.params.operationID) ?? null),
+      )
       .handle("boc.worktree.riftCapability", (context) =>
         Effect.gen(function* () {
           if (!rift.enabled) {

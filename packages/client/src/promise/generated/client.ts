@@ -234,6 +234,10 @@ import type {
   ShellRemoveOutput,
   ReferenceListInput,
   ReferenceListOutput,
+  ServerBocWorktreePrepareInput,
+  ServerBocWorktreePrepareOutput,
+  ServerBocWorktreePreparationInput,
+  ServerBocWorktreePreparationOutput,
   ServerBocWorktreeRiftCapabilityInput,
   ServerBocWorktreeRiftCapabilityOutput,
   ServerBocWorktreeRiftTrashOutput,
@@ -1986,6 +1990,30 @@ export function make(options: ClientOptions) {
         ),
     },
     "server.boc.worktree": {
+      prepare: (input: ServerBocWorktreePrepareInput, requestOptions?: RequestOptions) =>
+        request<ServerBocWorktreePrepareOutput>(
+          {
+            method: "POST",
+            path: `/api/boc/worktree/prepare`,
+            query: { location: input["location"] },
+            body: { operationID: input["operationID"], worktree: input["worktree"] },
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
+      preparation: (input: ServerBocWorktreePreparationInput, requestOptions?: RequestOptions) =>
+        request<ServerBocWorktreePreparationOutput>(
+          {
+            method: "GET",
+            path: `/api/boc/worktree/preparation/${encodeURIComponent(input.operationID)}`,
+            successStatus: 200,
+            declaredStatuses: [400, 401],
+            empty: false,
+          },
+          requestOptions,
+        ),
       riftCapability: (input: ServerBocWorktreeRiftCapabilityInput, requestOptions?: RequestOptions) =>
         request<ServerBocWorktreeRiftCapabilityOutput>(
           {

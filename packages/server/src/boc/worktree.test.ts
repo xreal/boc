@@ -3,9 +3,12 @@ import { $ } from "bun"
 import { SdkPlugins } from "@opencode-ai/core/plugin/sdk"
 import { Project } from "@opencode-ai/core/project"
 import { AbsolutePath } from "@opencode-ai/schema/schema"
+import { State as WorktreePreparationState } from "@opencode-ai/schema/boc/worktree-preparation"
+import { Session } from "@opencode-ai/schema/session"
 import { BocEnvironments } from "@boc/extensions/environments/server"
 import path from "node:path"
-import { Context, Effect, Layer } from "effect"
+import fs from "node:fs/promises"
+import { Context, Effect, Layer, Schedule, Schema } from "effect"
 import { HttpEffect, HttpRouter, HttpServer } from "effect/unstable/http"
 import { tmpdirScoped } from "../../../core/test/fixture/tmpdir"
 import { initRepo } from "../../../core/test/fixture/git"
@@ -40,6 +43,29 @@ it.live("exposes Rift capability only from a Boc backend and registered project"
     const capability = yield* boc.request(url)
     expect(capability).toMatchObject({ backend: "boc/rift" })
     expect(capability).not.toMatchObject({ reason: "project-mismatch" })
+
+    const operationID = Session.ID.create()
+    const preparationRoot = path.join(path.dirname(tmp.path), `${path.basename(tmp.path)}-preparations`)
+    yield* Effect.addFinalizer(() => Effect.promise(() => fs.rm(preparationRoot, { recursive: true, force: true })))
+    const prepareUrl = new URL("/api/boc/worktree/prepare", "http://opencode.local")
+    prepareUrl.searchParams.set("location[directory]", tmp.path)
+    expect(
+      yield* boc
+        .request(prepareUrl, "POST", {
+          operationID,
+          worktree: { strategy: "git", from: tmp.path, directory: preparationRoot, name: "tracked" },
+        })
+        .pipe(Effect.flatMap(Schema.decodeUnknownEffect(WorktreePreparationState))),
+    ).toMatchObject({ operationID })
+    const completed = yield* boc.request(`/api/boc/worktree/preparation/${operationID}`).pipe(
+      Effect.flatMap(Schema.decodeUnknownEffect(Schema.NullOr(WorktreePreparationState))),
+      Effect.filterOrFail(
+        (state) => state?.status === "succeeded",
+        () => new Error("Preparation is still running"),
+      ),
+      Effect.retry({ schedule: Schedule.spaced("10 millis"), times: 50 }),
+    )
+    expect(completed).toMatchObject({ phase: "creating-checkout", directory: path.join(preparationRoot, "tracked") })
 
     expect(yield* boc.request(environmentUrl(tmp.path, project.id))).toMatchObject({
       availability: { available: false, reason: "checkout-not-isolated" },
@@ -110,12 +136,13 @@ const backend = Effect.fnUntraced(function* (directory: string, channel?: string
       .all()
       .some((plugin) => plugin.id === "boc.worktrees"),
   ).toBe(channel === "boc")
-  const request = Effect.fnUntraced(function* (target: string | URL, method = "GET") {
+  const request = Effect.fnUntraced(function* (target: string | URL, method = "GET", body?: unknown) {
     const response = yield* Effect.promise((signal) =>
       handler(
         new Request(new URL(target, "http://opencode.local"), {
           method,
-          headers: { authorization: `Basic ${btoa("opencode:secret")}` },
+          headers: { authorization: `Basic ${btoa("opencode:secret")}`, "content-type": "application/json" },
+          body: body === undefined ? undefined : JSON.stringify(body),
           signal,
         }),
       ),

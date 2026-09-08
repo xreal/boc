@@ -23,6 +23,21 @@ describe("Rift command boundary", () => {
     expect(result).toMatchObject({ ok: false, reason: "output-limit" })
   })
 
+  test("reports stdout and stderr while retaining the command result", async () => {
+    const output: string[] = []
+    const result = await runCommand({
+      executable: process.execPath,
+      args: ["-e", 'console.log("checkout"); console.error("stack")'],
+      onOutput: (value) => output.push(value),
+    })
+
+    expect(result.ok).toBe(true)
+    expect(output.join("")).toContain("checkout")
+    expect(output.join("")).toContain("stack")
+    expect(result.stdout).toContain("checkout")
+    expect(result.stderr).toContain("stack")
+  })
+
   test("bounds command duration", async () => {
     const result = await runCommand({
       executable: process.execPath,

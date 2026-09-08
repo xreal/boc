@@ -1935,6 +1935,58 @@ export interface ReferenceApi<E = never> {
   readonly list: ReferenceListOperation<E>
 }
 
+export type ServerBocWorktreePrepareInput = {
+  readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  readonly operationID: Session.ID
+  readonly worktree: Worktree.CreateInput
+}
+export type ServerBocWorktreePrepareOutput = {
+  readonly operationID: Session.ID
+  readonly status: "running" | "succeeded" | "failed"
+  readonly phase:
+    | "queued"
+    | "creating-checkout"
+    | "preparing-template"
+    | "initializing-rift"
+    | "creating-rift-checkout"
+    | "verifying-checkout"
+    | "starting-environment"
+  readonly startedAt: number
+  readonly updatedAt: number
+  readonly endedAt?: number | undefined
+  readonly log: string
+  readonly truncated: boolean
+  readonly directory?: AbsolutePath | undefined
+  readonly error?: string | undefined
+}
+export type ServerBocWorktreePrepareOperation<E = never> = (
+  input: ServerBocWorktreePrepareInput,
+) => Effect.Effect<ServerBocWorktreePrepareOutput, E>
+
+export type ServerBocWorktreePreparationInput = { readonly operationID: Session.ID }
+export type ServerBocWorktreePreparationOutput = {
+  readonly operationID: Session.ID
+  readonly status: "running" | "succeeded" | "failed"
+  readonly phase:
+    | "queued"
+    | "creating-checkout"
+    | "preparing-template"
+    | "initializing-rift"
+    | "creating-rift-checkout"
+    | "verifying-checkout"
+    | "starting-environment"
+  readonly startedAt: number
+  readonly updatedAt: number
+  readonly endedAt?: number | undefined
+  readonly log: string
+  readonly truncated: boolean
+  readonly directory?: AbsolutePath | undefined
+  readonly error?: string | undefined
+} | null
+export type ServerBocWorktreePreparationOperation<E = never> = (
+  input: ServerBocWorktreePreparationInput,
+) => Effect.Effect<ServerBocWorktreePreparationOutput, E>
+
 export type ServerBocWorktreeRiftCapabilityInput = {
   readonly projectID: Project.ID
   readonly source: AbsolutePath
@@ -1973,6 +2025,8 @@ export type ServerBocWorktreeCleanupRiftTrashOperation<E = never> = () => Effect
 >
 
 export interface ServerBocWorktreeApi<E = never> {
+  readonly prepare: ServerBocWorktreePrepareOperation<E>
+  readonly preparation: ServerBocWorktreePreparationOperation<E>
   readonly riftCapability: ServerBocWorktreeRiftCapabilityOperation<E>
   readonly riftTrash: ServerBocWorktreeRiftTrashOperation<E>
   readonly cleanupRiftTrash: ServerBocWorktreeCleanupRiftTrashOperation<E>

@@ -238,6 +238,10 @@ import type {
   ShellRemoveOutput,
   ReferenceListInput,
   ReferenceListOutput,
+  ServerBocWorktreePrepareInput,
+  ServerBocWorktreePrepareOutput,
+  ServerBocWorktreePreparationInput,
+  ServerBocWorktreePreparationOutput,
   ServerBocWorktreeRiftCapabilityInput,
   ServerBocWorktreeRiftCapabilityOutput,
   ServerBocWorktreeRiftTrashOutput,
@@ -1461,6 +1465,23 @@ const EndpointReferenceList = (raw: RawClient["server.reference"]) => (input?: R
 
 const adaptGroupReference = (raw: RawClient["server.reference"]) => ({ list: EndpointReferenceList(raw) })
 
+const EndpointServerBocWorktreePrepare =
+  (raw: RawClient["server.boc.worktree"]) => (input: ServerBocWorktreePrepareInput) =>
+    preserveEffect<ServerBocWorktreePrepareOutput>()(
+      raw["boc.worktree.prepare"]({
+        query: { location: input["location"] },
+        payload: { operationID: input["operationID"], worktree: input["worktree"] },
+      }).pipe(Effect.mapError(mapClientError)),
+    )
+
+const EndpointServerBocWorktreePreparation =
+  (raw: RawClient["server.boc.worktree"]) => (input: ServerBocWorktreePreparationInput) =>
+    preserveEffect<ServerBocWorktreePreparationOutput>()(
+      raw["boc.worktree.preparation"]({ params: { operationID: input["operationID"] } }).pipe(
+        Effect.mapError(mapClientError),
+      ),
+    )
+
 const EndpointServerBocWorktreeRiftCapability =
   (raw: RawClient["server.boc.worktree"]) => (input: ServerBocWorktreeRiftCapabilityInput) =>
     preserveEffect<ServerBocWorktreeRiftCapabilityOutput>()(
@@ -1481,6 +1502,8 @@ const EndpointServerBocWorktreeCleanupRiftTrash = (raw: RawClient["server.boc.wo
   )
 
 const adaptGroupServerBocWorktree = (raw: RawClient["server.boc.worktree"]) => ({
+  prepare: EndpointServerBocWorktreePrepare(raw),
+  preparation: EndpointServerBocWorktreePreparation(raw),
   riftCapability: EndpointServerBocWorktreeRiftCapability(raw),
   riftTrash: EndpointServerBocWorktreeRiftTrash(raw),
   cleanupRiftTrash: EndpointServerBocWorktreeCleanupRiftTrash(raw),

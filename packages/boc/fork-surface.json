@@ -79,7 +79,7 @@
     },
     {
       "path": "packages/app/src/new-session/composer-adapter.ts",
-      "reason": "Apply the Boc checkout strategy and notify the Boc bridge after successful session creation"
+      "reason": "Apply the Boc checkout strategy, correlate local checkout preparation with the pending session, and notify the Boc bridge after successful session creation"
     },
     {
       "path": "packages/app/src/new-session/view.tsx",
@@ -95,7 +95,7 @@
     },
     {
       "path": "packages/app/src/session/route.tsx",
-      "reason": "Mount Boc checkout preparation context, elapsed time and connection feedback beside the existing loading indicator"
+      "reason": "Mount Boc checkout preparation context, elapsed time, live output and connection feedback beside the existing loading indicator"
     },
     {
       "path": "packages/app/src/session/header/session-header.tsx",
@@ -123,7 +123,7 @@
     },
     {
       "path": "packages/app/src/workspaces/create.ts",
-      "reason": "Resolve an optional Boc checkout strategy before unchanged worktree creation"
+      "reason": "Resolve an optional Boc checkout strategy and use the Boc tracked preparation route for local pending sessions"
     },
     {
       "path": "packages/app/src/workspaces/create.test.ts",
@@ -235,7 +235,7 @@
     },
     {
       "path": "packages/protocol/src/api.ts",
-      "reason": "Compose the authenticated Boc backend capability groups"
+      "reason": "Compose the authenticated Boc backend capability groups and apply location scope to tracked checkout preparation"
     },
     {
       "path": "packages/client/test/promise.test.ts",
@@ -243,19 +243,23 @@
     },
     {
       "path": "packages/client/src/effect/api/api.ts",
-      "reason": "Generate the typed Boc Rift and environment capability client"
+      "reason": "Generate the typed Boc Rift, checkout preparation and environment capability client"
     },
     {
       "path": "packages/client/src/effect/generated/client.ts",
-      "reason": "Generate the Effect Boc Rift and environment capability client"
+      "reason": "Generate the Effect Boc Rift, checkout preparation and environment capability client"
     },
     {
       "path": "packages/client/src/promise/generated/client.ts",
-      "reason": "Generate the Promise Boc Rift and environment capability client"
+      "reason": "Generate the Promise Boc Rift, checkout preparation and environment capability client"
     },
     {
       "path": "packages/client/src/promise/generated/types.ts",
-      "reason": "Generate the Promise Boc Rift and environment capability types"
+      "reason": "Generate the Promise Boc Rift, checkout preparation and environment capability types"
+    },
+    {
+      "path": "packages/core/src/worktree.ts",
+      "reason": "Pass one optional checkout progress observer into fork-owned reporting without changing ordinary worktree creation"
     },
     {
       "path": "packages/client/test/promise.test.ts",

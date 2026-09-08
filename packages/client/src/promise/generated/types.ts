@@ -407,6 +407,26 @@ export type ReferenceGitSource = {
   hidden?: boolean
 }
 
+export type BocWorktreePreparationState = {
+  operationID: string
+  status: "running" | "succeeded" | "failed"
+  phase:
+    | "queued"
+    | "creating-checkout"
+    | "preparing-template"
+    | "initializing-rift"
+    | "creating-rift-checkout"
+    | "verifying-checkout"
+    | "starting-environment"
+  startedAt: number | "Infinity" | "-Infinity" | "NaN"
+  updatedAt: number | "Infinity" | "-Infinity" | "NaN"
+  endedAt?: number | "Infinity" | "-Infinity" | "NaN"
+  log: string
+  truncated: boolean
+  directory?: string
+  error?: string
+}
+
 export type BocEnvironmentAvailability =
   | { available: true; strategy: "git" | "boc/rift" }
   | {
@@ -6159,6 +6179,40 @@ export type ReferenceListOutput = {
   location: { directory: string; workspaceID?: string; project: { id: string; directory: string; canonical: string } }
   data: Array<ReferenceInfo>
 }
+
+export type ServerBocWorktreePrepareInput = {
+  readonly location?: {
+    readonly location?: { readonly directory?: string | undefined; readonly workspace?: string | undefined } | undefined
+  }["location"]
+  readonly operationID: {
+    readonly operationID: string
+    readonly worktree: {
+      readonly strategy?: string
+      readonly from?: string
+      readonly branch?: string
+      readonly directory?: string
+      readonly name?: string
+    }
+  }["operationID"]
+  readonly worktree: {
+    readonly operationID: string
+    readonly worktree: {
+      readonly strategy?: string
+      readonly from?: string
+      readonly branch?: string
+      readonly directory?: string
+      readonly name?: string
+    }
+  }["worktree"]
+}
+
+export type ServerBocWorktreePrepareOutput = BocWorktreePreparationState
+
+export type ServerBocWorktreePreparationInput = {
+  readonly operationID: { readonly operationID: string }["operationID"]
+}
+
+export type ServerBocWorktreePreparationOutput = BocWorktreePreparationState | null
 
 export type ServerBocWorktreeRiftCapabilityInput = {
   readonly projectID: { readonly projectID: string }["projectID"]

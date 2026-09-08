@@ -67,6 +67,7 @@ export function createNewSessionComposerAdapter(props: {
         serverSDK,
         language,
         worktreeStrategy,
+        operationID: server.isLocal ? id : undefined,
       })
       if (!sessionDirectory) {
         await pending?.rollback()
@@ -199,6 +200,7 @@ async function resolveSessionDirectory(input: {
   serverSDK: ReturnType<typeof useServerSDK>
   language: ReturnType<typeof useLanguage>
   worktreeStrategy: ReturnType<typeof useBocWorktreeStrategy>
+  operationID?: string
 }) {
   if (input.worktree === "main") return input.projectDirectory
   if (input.worktree !== "create") return input.worktree
@@ -210,6 +212,7 @@ async function resolveSessionDirectory(input: {
     project: input.data.location.info({ directory: input.projectDirectory })?.project,
     branch: input.branch,
     strategy: input.worktreeStrategy,
+    operationID: input.operationID,
   }).catch((error) => {
     showToast({
       title: input.language.t("prompt.toast.worktreeCreateFailed.title"),

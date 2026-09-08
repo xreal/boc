@@ -1,19 +1,42 @@
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Icon } from "@opencode-ai/ui/icon"
-import { onCleanup, Show } from "solid-js"
+import { createEffect, onCleanup, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useServer } from "@/runtime/server/current"
 import type { PendingSession } from "@/shell/tabs/tabs"
 import { environmentDuration } from "./model"
+import { environmentOutput } from "./output"
+import { useParams } from "@solidjs/router"
 
 export function BocPreparingCheckout(props: { pending: PendingSession }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const server = useServer()
+  const params = useParams<{ id: string }>()
   const [clock, setClock] = createStore({ now: Date.now() })
+  const [preparation, setPreparation] = createStore<{
+    state?: Awaited<ReturnType<(typeof server.ctx.sdk.api)["server.boc.worktree"]["preparation"]>>
+  }>({})
   const timer = setInterval(() => setClock("now", Date.now()), 1000)
-  onCleanup(() => clearInterval(timer))
+  const inspect = () =>
+    server.ctx.sdk.api["server.boc.worktree"]
+      .preparation({ operationID: params.id })
+      .then((state) => setPreparation("state", state))
+      .catch(() => undefined)
+  const progressTimer = server.isLocal
+    ? setInterval(() => {
+        void inspect()
+      }, 300)
+    : undefined
+  onCleanup(() => {
+    clearInterval(timer)
+    if (progressTimer) clearInterval(progressTimer)
+  })
+
+  createEffect(() => {
+    if (server.isLocal) void inspect()
+  })
 
   return (
     <div
@@ -50,6 +73,28 @@ export function BocPreparingCheckout(props: { pending: PendingSession }) {
           )}
         </Show>
       </dl>
+      <Show when={preparation.state} keyed>
+        {(state) => (
+          <div class="flex min-w-0 flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+              <span>{t("boc.environments.preparing.phase")}</span>
+              <span class="text-v2-text-text-base">{t(`boc.environments.preparing.phase.${state.phase}`)}</span>
+            </div>
+            <Show when={state.log}>
+              <pre
+                aria-label={t("boc.environments.details.output")}
+                dir="ltr"
+                class="m-0 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-v2-background-bg-stronger p-3 font-mono text-12-regular text-v2-text-text-base"
+              >
+                {environmentOutput(state.log)}
+              </pre>
+            </Show>
+            <Show when={state.truncated}>
+              <span>{t("boc.environments.details.outputTruncated")}</span>
+            </Show>
+          </div>
+        )}
+      </Show>
       <p
         class="m-0 flex items-start gap-2"
         role="status"
@@ -57,7 +102,7 @@ export function BocPreparingCheckout(props: { pending: PendingSession }) {
       >
         <Icon name="info" size="small" class="mt-0.5 shrink-0" />
         {server.ctx.sdk.connection.status() === "connected"
-          ? t("boc.environments.preparing.waiting")
+          ? t(preparation.state ? "boc.environments.preparing.streaming" : "boc.environments.preparing.waiting")
           : t("boc.environments.preparing.disconnected")}
       </p>
     </div>

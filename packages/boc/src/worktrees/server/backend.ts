@@ -11,6 +11,7 @@ import { inspectRiftCapability } from "./capability"
 import { runCommand, type CommandResult, type CommandRunner } from "./command"
 import { claimTemplateRoot, createMetadataStore, metadataKey, type RiftCheckout } from "./metadata"
 import { RIFT_STRATEGY } from "./registration"
+import { createWorktreePreparations, type WorktreePreparations } from "./preparation"
 
 export type RiftBackendOptions = {
   binary?: string
@@ -27,6 +28,7 @@ export interface RiftBackend {
   readonly trash: () => Promise<{ checkouts: number }>
   readonly cleanup: () => Promise<{ completed: boolean; checkouts: number }>
   readonly ownership: (directory: string) => Promise<{ sourceDirectory: string } | undefined>
+  readonly preparations: WorktreePreparations
 }
 
 export class RiftBackendService extends Context.Service<RiftBackendService, RiftBackend>()("@boc/RiftBackend") {}
@@ -51,6 +53,7 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
   const run = options.run ?? runCommand
   const registry = path.join(options.stateDirectory, "registry.sqlite")
   const metadata = createMetadataStore(options.stateDirectory)
+  const preparations = createWorktreePreparations()
   let mutations = Promise.resolve()
 
   const serialize = <A>(operation: () => Promise<A>) => {
@@ -63,9 +66,9 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
   }
 
   const capability = (directory: string) => inspectRiftCapability({ ...options, directory, run })
-  const rift = (args: readonly string[], cwd?: string) => {
+  const rift = (args: readonly string[], cwd?: string, onOutput?: (value: string) => void) => {
     if (!options.binary) return Promise.resolve(missingBinary())
-    return run({ executable: options.binary, args: ["--database", registry, ...args], cwd })
+    return run({ executable: options.binary, args: ["--database", registry, ...args], cwd, onOutput })
   }
 
   const strategy: Worktree.Strategy = {
@@ -118,13 +121,14 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
     return { sourceDirectory: record.sourceDirectory }
   }
 
-  return { strategy, capability, trash, cleanup, ownership }
+  return { strategy, capability, trash, cleanup, ownership, preparations }
 
   async function removedRecords() {
     return (await metadata.list()).filter((record) => record.state === "removed")
   }
 
   async function createCheckout(input: Parameters<Worktree.Strategy["create"]>[0]) {
+    input.progress?.phase("preparing-template")
     const availability = await capability(input.directory)
     if (!availability.available) throw new RiftOperationError(availability.message)
     const destination = await safeDestination(input.directory)
@@ -137,7 +141,11 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
 
     await prepareTemplate(input.sourceDirectory, sourceDirectory, templateDirectory, commit)
     await fs.mkdir(options.stateDirectory, { recursive: true })
-    requireSuccess(await rift(["init", "--here", templateDirectory]), "Rift template initialization failed")
+    input.progress?.phase("initializing-rift")
+    requireSuccess(
+      await rift(["init", "--here", templateDirectory], undefined, input.progress?.output),
+      "Rift template initialization failed",
+    )
 
     const pending: RiftCheckout = {
       version: 1,
@@ -150,21 +158,27 @@ export function createRiftBackend(options: RiftBackendOptions = defaultRiftOptio
       artifactVersion: RIFT_BACKEND_VERSION,
     }
     await metadata.write(pending)
+    input.progress?.phase("creating-rift-checkout")
     const created = requireSuccess(
-      await rift([
-        "create",
-        "--copy-all",
-        "--no-hooks",
-        "--name",
-        destination.name,
-        "--into",
-        destination.parent,
-        templateDirectory,
-      ]),
+      await rift(
+        [
+          "create",
+          "--copy-all",
+          "--no-hooks",
+          "--name",
+          destination.name,
+          "--into",
+          destination.parent,
+          templateDirectory,
+        ],
+        undefined,
+        input.progress?.output,
+      ),
       "Rift checkout creation failed",
     )
     const directory = AbsolutePath.make(await fs.realpath(created.stdout.trim()))
     if (directory !== destination.directory) throw new RiftOperationError("Rift created an unexpected checkout path.")
+    input.progress?.phase("verifying-checkout")
     await verifyCreatedCheckout(templateDirectory, directory, commit)
     await metadata.write({ ...pending, state: "active", marker: await readMarker(directory) })
     return { directory }

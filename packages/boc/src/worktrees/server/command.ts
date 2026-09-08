@@ -11,6 +11,7 @@ export type Command = {
   signal?: AbortSignal
   timeoutMs?: number
   maxBytes?: number
+  onOutput?: (value: string) => void
 }
 
 export type CommandResult =
@@ -61,6 +62,7 @@ export const runCommand: CommandRunner = (command) =>
       bytes += chunk.byteLength
       if (bytes > maxBytes) return stop("output-limit")
       chunks.push(chunk)
+      command.onOutput?.(chunk.toString("utf8"))
     }
     const cancel = () => stop("cancelled")
     const timeout = setTimeout(() => stop("timeout"), command.timeoutMs ?? RIFT_COMMAND_TIMEOUT_MS)

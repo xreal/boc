@@ -58,7 +58,13 @@ test("exposes every standard HTTP API group", () => {
   expect(Object.keys(client.shell)).toEqual(["list", "create", "get", "timeout", "output", "remove"])
   expect(Object.keys(client.project)).toEqual(["list", "update", "current"])
   expect(Object.keys(client.worktree)).toEqual(["list", "create", "remove", "refresh"])
-  expect(Object.keys(client["server.boc.worktree"])).toEqual(["riftCapability", "riftTrash", "cleanupRiftTrash"])
+  expect(Object.keys(client["server.boc.worktree"])).toEqual([
+    "prepare",
+    "preparation",
+    "riftCapability",
+    "riftTrash",
+    "cleanupRiftTrash",
+  ])
   expect(Object.keys(client["server.boc.environment"])).toEqual(["inspect", "run", "cancel"])
 })
 
