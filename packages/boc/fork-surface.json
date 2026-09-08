@@ -262,10 +262,6 @@
       "reason": "Pass one optional checkout progress observer into fork-owned reporting without changing ordinary worktree creation"
     },
     {
-      "path": "packages/client/test/promise.test.ts",
-      "reason": "Verify the generated Promise client exposes the Boc capability groups"
-    },
-    {
       "path": "packages/core/src/instruction-discovery.ts",
       "reason": "Apply Boc's optional structured selection hook to ambient instruction files before rendering"
     },
@@ -294,24 +290,8 @@
       "reason": "Adapt the optional Boc selection facade and its scoped hooks for Promise plugins"
     },
     {
-      "path": "packages/core/src/plugin/sdk.ts",
-      "reason": "Opt-in host fallback registration for bundled plugins; regular host registrations retain their precedence"
-    },
-    {
-      "path": "packages/core/src/plugin/supervisor.ts",
-      "reason": "Select host fallbacks only after external plugin identity and configuration are resolved; preserve external options and disable operations"
-    },
-    {
-      "path": "packages/core/src/config/plugin/source.ts",
-      "reason": "Preserve unresolved local plugin intent so an invalid external source cannot silently activate a host fallback"
-    },
-    {
-      "path": "packages/core/test/plugin/supervisor-reload.test.ts",
-      "reason": "Verify host fallback selection, external failures and options, disable operations, package installation, and storage continuity through the real Location loader"
-    },
-    {
-      "path": "packages/core/src/plugin/module.ts",
-      "reason": "Export the existing module schema for adapting the portable bundled Bergflow plugin through the normal Promise plugin adapter"
+      "path": "packages/desktop/scripts/dev.ts",
+      "reason": "Prepare the Boc source backend and bundled Rift for isolated local desktop development"
     },
     {
       "path": "packages/app/component-tests/controls.spec.ts",

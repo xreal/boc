@@ -24,11 +24,6 @@ export type Operation =
       readonly type: "remove"
       readonly target: string
     }
-  | {
-      readonly type: "unresolved"
-      readonly target: string
-      readonly error: string
-    }
 
 export interface Interface {
   readonly operations: () => Effect.Effect<readonly Operation[], never, Scope.Scope>
@@ -115,7 +110,7 @@ export const empty = makeLocationNode({
   deps: [],
 })
 
-function parse(input: ConfigPlugin.Plugin): Exclude<Operation, { type: "unresolved" }> {
+function parse(input: ConfigPlugin.Plugin): Operation {
   if (typeof input !== "string") {
     return { type: "add", target: input.package, options: input.options ?? {} }
   }
@@ -155,11 +150,7 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
       if (operation.type === "remove" || !path.isAbsolute(operation.target)) return Option.some(operation)
       if (yield* fs.isFile(operation.target)) {
         yield* Effect.logWarning("configured plugin path must be a directory", { target: operation.target })
-        return Option.some<Operation>({
-          type: "unresolved",
-          target: operation.target,
-          error: "Configured plugin path must be a directory.",
-        })
+        return Option.none<Operation>()
       }
       return Option.some<Operation>(operation)
     }),
@@ -167,34 +158,17 @@ const scan = Effect.fn("ConfigPluginSource.scan")(function* (
   // Explicit config is applied last so it can remove auto-discovered packages.
   return yield* Effect.forEach([...discovered, ...resolved], (operation) =>
     Effect.gen(function* () {
-      if (operation.type !== "add" || !path.isAbsolute(operation.target)) return [operation]
+      if (operation.type === "remove" || !path.isAbsolute(operation.target)) return [operation]
       if (!(yield* fs.existsSafe(operation.target))) return [operation]
       const directory = yield* fs.isDir(operation.target)
-      const entrypoints = directory
-        ? yield* Effect.sync(() => Host.resolve({ directory: operation.target })).pipe(
-            Effect.catchCause(() => Effect.undefined),
-          )
+      const entrypoints: Host.Entrypoints = directory
+        ? yield* Effect.sync(() => Host.resolve({ directory: operation.target }))
         : { server: pathToFileURL(operation.target).href }
-      if (!entrypoints || (!entrypoints.server && !entrypoints.tui))
-        return [
-          {
-            type: "unresolved" as const,
-            target: operation.target,
-            error: "Configured plugin entrypoints could not be resolved.",
-          },
-        ]
       if (!entrypoints.server) return []
       if (directory) {
         const root = yield* fs.resolve(operation.target)
         const server = yield* fs.resolve(fileURLToPath(entrypoints.server))
-        if (!FSUtil.contains(root, server))
-          return [
-            {
-              type: "unresolved" as const,
-              target: operation.target,
-              error: "Configured plugin server entrypoint must be inside its directory.",
-            },
-          ]
+        if (!FSUtil.contains(root, server)) return []
       }
       const times = yield* Effect.forEach(
         [

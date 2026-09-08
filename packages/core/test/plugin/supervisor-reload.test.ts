@@ -32,8 +32,6 @@ setDefaultTimeout(15_000)
 // Package resolution can be held open so overlapping activations become observable.
 const npm = {
   directory: "",
-  cached: true,
-  installs: 0,
   gate: undefined as Deferred.Deferred<void> | undefined,
   inflight: 0,
   peak: 0,
@@ -42,18 +40,14 @@ const npm = {
 const npmLayer = Layer.succeed(
   Npm.Service,
   Npm.Service.of({
-    add: (name) =>
-      Effect.sync(() => {
-        npm.installs++
-        return { directory: npm.directory, name }
-      }),
+    add: (name) => Effect.succeed({ directory: npm.directory, name }),
     resolve: (name) =>
       Effect.gen(function* () {
         npm.inflight++
         npm.peak = Math.max(npm.peak, npm.inflight)
         if (npm.gate) yield* Deferred.await(npm.gate)
         npm.inflight--
-        return { directory: npm.cached ? npm.directory : path.join(npm.directory, "..", "missing"), name }
+        return { directory: npm.directory, name }
       }),
     check: () => Effect.succeed(false),
     update: (name) => Effect.succeed({ directory: npm.directory, name }),
@@ -117,229 +111,6 @@ const failed = (plugins: Plugin.Interface) =>
   )
 
 describe("PluginSupervisor reload", () => {
-  ;(
-    [
-      "bundle",
-      "external",
-      "import-failure",
-      "setup-failure",
-      "file-path",
-      "missing-entrypoint",
-      "disabled",
-      "bundle-disabled",
-      "options",
-      "reenabled",
-    ] as const
-  ).forEach((scenario) => {
-    it.live(`selects host fallbacks before activation: ${scenario}`, () =>
-      Effect.gen(function* () {
-        const directory = yield* tmpdirScoped()
-        const external = path.join(directory.path, "external/bergflow")
-        yield* Effect.promise(async () => {
-          await Bun.write(
-            path.join(external, "index.ts"),
-            scenario === "import-failure"
-              ? 'throw new Error("broken external import"); export default {}'
-              : `export default { id: "bergflow", async setup(ctx) {
-                  ${scenario === "setup-failure" ? 'throw new Error("broken external setup");' : ""}
-                  await ctx.command.transform(editor => editor.add({ name: ctx.options.command, execute: async () => {} }))
-                } }`,
-          )
-          if (scenario === "missing-entrypoint") await fs.rm(path.join(external, "index.ts"))
-          await Bun.write(
-            path.join(directory.path, ".opencode/opencode.json"),
-            JSON.stringify({
-              plugins:
-                scenario === "bundle"
-                  ? []
-                  : scenario === "bundle-disabled"
-                    ? ["-bergflow"]
-                    : scenario === "reenabled"
-                      ? ["-*", "bergflow"]
-                      : scenario === "options"
-                        ? [{ package: "bergflow", options: { command: "configured-bundle" } }]
-                        : [
-                            {
-                              package: scenario === "file-path" ? path.join(external, "index.ts") : external,
-                              options: { command: "external-choice" },
-                            },
-                            ...(scenario === "disabled" ? ["-bergflow"] : []),
-                          ],
-            }),
-          )
-        })
-        const sdk = yield* SdkPlugins.Service
-        let activations = 0
-        yield* sdk.register(
-          define({
-            id: "bergflow",
-            effect: (ctx) =>
-              Effect.gen(function* () {
-                activations++
-                yield* ctx.command.transform((editor) =>
-                  editor.add({
-                    name: typeof ctx.options.command === "string" ? ctx.options.command : "bundle-choice",
-                    execute: () => Effect.void,
-                  }),
-                )
-              }),
-          }),
-          { fallback: true },
-        )
-        const locations = yield* LocationServiceMap.Service
-        yield* Effect.gen(function* () {
-          const plugins = yield* Plugin.Service
-          const commands = yield* Command.Service
-          yield* plugins.awaitActivation
-          const inventory = yield* plugins.list()
-          const active = inventory.filter((plugin) => plugin.id === "bergflow" && plugin.state.status === "active")
-          const bundled = ["bundle", "options", "reenabled"].includes(scenario)
-          expect(activations).toBe(bundled ? 1 : 0)
-          expect(active).toHaveLength(bundled || scenario === "external" ? 1 : 0)
-          expect(Boolean(yield* commands.get("external-choice"))).toBe(scenario === "external")
-          expect(Boolean(yield* commands.get(scenario === "options" ? "configured-bundle" : "bundle-choice"))).toBe(
-            bundled,
-          )
-          expect(
-            inventory.some(
-              (plugin) => plugin.state.status === "failed" && plugin.state.error.startsWith("Duplicate plugin ID"),
-            ),
-          ).toBe(false)
-          if (scenario === "external") expect(active[0].source).toMatchObject({ type: "local" })
-          if (bundled) expect(active[0].source).toEqual({ type: "sdk" })
-          if (["import-failure", "file-path", "missing-entrypoint"].includes(scenario))
-            expect(inventory).toContainEqual(
-              expect.objectContaining({
-                id: "bergflow",
-                source: { type: "sdk" },
-                state: expect.objectContaining({
-                  status: "failed",
-                  error: expect.stringContaining("could not be identified"),
-                }),
-              }),
-            )
-          if (scenario === "setup-failure")
-            expect(inventory).toContainEqual(
-              expect.objectContaining({
-                id: "bergflow",
-                source: expect.objectContaining({ type: "local" }),
-                state: expect.objectContaining({ status: "failed" }),
-              }),
-            )
-        }).pipe(
-          Effect.scoped,
-          Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory.path) }))),
-        )
-      }),
-    )
-  })
-
-  it.live("preserves plugin storage when switching between external and host fallback", () =>
-    Effect.gen(function* () {
-      const directory = yield* tmpdirScoped()
-      const external = path.join(directory.path, "external/bergflow")
-      const config = path.join(directory.path, ".opencode/opencode.json")
-      yield* Effect.promise(async () => {
-        await Bun.write(
-          path.join(external, "index.ts"),
-          `export default { id: "bergflow", async setup(ctx) {
-          await ctx.storage.set("policy", "external-policy")
-          await ctx.command.transform(editor => editor.add({ name: "external-choice", execute: async () => {} }))
-        } }`,
-        )
-        await Bun.write(config, JSON.stringify({ plugins: [external] }))
-      })
-      const sdk = yield* SdkPlugins.Service
-      yield* sdk.register(
-        define({
-          id: "bergflow",
-          effect: (ctx) =>
-            Effect.gen(function* () {
-              const policy = yield* ctx.storage.get("policy")
-              yield* ctx.command.transform((editor) =>
-                editor.add({ name: "bundle-choice", description: String(policy), execute: () => Effect.void }),
-              )
-            }),
-        }),
-        { fallback: true },
-      )
-      const bus = yield* Bus.Service
-      const locations = yield* LocationServiceMap.Service
-      yield* Effect.gen(function* () {
-        const plugins = yield* Plugin.Service
-        const commands = yield* Command.Service
-        yield* plugins.awaitActivation
-        expect(yield* commands.get("external-choice")).toBeDefined()
-        yield* Effect.promise(() => Bun.write(config, JSON.stringify({ plugins: [] })))
-        yield* bus.publish(Event.Updated, {})
-        yield* commands.get("bundle-choice").pipe(
-          Effect.flatMap((command) => (command ? Effect.succeed(command) : Effect.fail("activation pending"))),
-          Effect.retry({ times: 80, schedule: Schedule.spaced("25 millis") }),
-        )
-        expect(yield* commands.get("external-choice")).toBeUndefined()
-        expect(yield* commands.get("bundle-choice")).toMatchObject({ description: "external-policy" })
-      }).pipe(
-        Effect.scoped,
-        Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory.path) }))),
-      )
-    }),
-  )
-
-  it.live("does not activate a fallback while its external package is being installed", () =>
-    Effect.gen(function* () {
-      const directory = yield* tmpdirScoped()
-      npm.directory = path.join(directory.path, "cache")
-      npm.cached = false
-      npm.installs = 0
-      yield* Effect.addFinalizer(() =>
-        Effect.sync(() => {
-          npm.cached = true
-        }),
-      )
-      const external = path.join(npm.directory, "node_modules/fallback-fixture")
-      yield* Effect.promise(async () => {
-        await Bun.write(
-          path.join(external, "package.json"),
-          JSON.stringify({ name: "fallback-fixture", exports: { "./server": "./server.ts" } }),
-        )
-        await Bun.write(path.join(external, "server.ts"), greeter("external-choice"))
-        await Bun.write(
-          path.join(directory.path, ".opencode/opencode.json"),
-          JSON.stringify({ plugins: ["fallback-fixture"] }),
-        )
-      })
-      const sdk = yield* SdkPlugins.Service
-      let activations = 0
-      yield* sdk.register(
-        define({
-          id: "greeter",
-          effect: () =>
-            Effect.sync(() => {
-              activations++
-            }),
-        }),
-        { fallback: true },
-      )
-      const locations = yield* LocationServiceMap.Service
-      yield* Effect.gen(function* () {
-        const plugins = yield* Plugin.Service
-        const commands = yield* Command.Service
-        yield* plugins.awaitActivation
-        expect(npm.installs).toBe(1)
-        expect(activations).toBe(0)
-        expect(yield* commands.get("external-choice")).toBeDefined()
-        expect((yield* plugins.list()).filter((plugin) => plugin.id === "greeter")).toEqual([
-          expect.objectContaining({
-            source: { type: "package", target: "fallback-fixture" },
-            state: { status: "active" },
-          }),
-        ])
-      }).pipe(
-        Effect.scoped,
-        Effect.provide(locations.get(Location.Ref.make({ directory: AbsolutePath.make(directory.path) }))),
-      )
-    }),
-  )
   ;(
     [
       { name: "on a helper-only save", helper: "nested/helper.ts", touchEntry: false },
