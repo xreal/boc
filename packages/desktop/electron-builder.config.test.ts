@@ -6,7 +6,6 @@ import os from "node:os"
 import path from "node:path"
 import { fileURLToPath, pathToFileURL } from "node:url"
 import type { Configuration } from "electron-builder"
-import { packagedResources } from "./electron-builder.config"
 
 const legacyDesktopEntry = "resources/linux/opencode-desktop.desktop"
 // Use electron-builder's matcher so the tests also cover its glob and directory traversal semantics.
@@ -15,7 +14,6 @@ const { FileMatcher } = createRequire(import.meta.resolve("electron-builder"))("
 const channels = [
   { channel: "dev", appId: "ai.opencode.desktop.dev" },
   { channel: "beta", appId: "ai.opencode.desktop.beta" },
-  { channel: "boc", appId: "ai.boc.desktop.beta" },
   { channel: "prod", appId: "ai.opencode.desktop" },
 ] as const
 
@@ -197,67 +195,3 @@ for (const channel of ["dev", "beta"] as const) {
     ])
   })
 }
-
-test("packages Rift as an external Boc backend resource", () => {
-  expect(packagedResources(true)).toEqual([
-    {
-      from: "resources/",
-      to: "",
-      filter: ["opencode-cli", "opencode-cli.exe"],
-    },
-    { from: "resources/rift/rift", to: "rift/rift" },
-  ])
-  expect(packagedResources(false)).toHaveLength(1)
-})
-
-test("publishes Boc updates through versioned public R2 artifacts", async () => {
-  const previousChannel = process.env.OPENCODE_CHANNEL
-  const previousSigning = process.env.OPENCODE_WINDOWS_SIGNING
-  const previousPublisher = process.env.WINDOWS_PUBLISHER_NAME
-  process.env.OPENCODE_CHANNEL = "boc"
-  delete process.env.OPENCODE_WINDOWS_SIGNING
-  process.env.WINDOWS_PUBLISHER_NAME = "Boc Release Publisher"
-  try {
-    const module = await import("./electron-builder.config.ts?updates=boc")
-    const config = module.default as Configuration
-
-    expect(config.artifactName).toBe("boc-desktop-${version}-${os}-${arch}.${ext}")
-    expect(config.publish).toEqual({
-      provider: "generic",
-      url: "https://boc-updates.bergdev.de",
-      channel: "latest",
-    })
-    expect(config.win?.publisherName).toBe("Boc Release Publisher")
-    expect(config.win?.verifyUpdateCodeSignature).toBe(true)
-  } finally {
-    if (previousChannel === undefined) delete process.env.OPENCODE_CHANNEL
-    else process.env.OPENCODE_CHANNEL = previousChannel
-    if (previousSigning === undefined) delete process.env.OPENCODE_WINDOWS_SIGNING
-    else process.env.OPENCODE_WINDOWS_SIGNING = previousSigning
-    if (previousPublisher === undefined) delete process.env.WINDOWS_PUBLISHER_NAME
-    else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
-  }
-})
-
-test("supports unsigned Boc Windows releases", async () => {
-  const previousChannel = process.env.OPENCODE_CHANNEL
-  const previousSigning = process.env.OPENCODE_WINDOWS_SIGNING
-  const previousPublisher = process.env.WINDOWS_PUBLISHER_NAME
-  process.env.OPENCODE_CHANNEL = "boc"
-  process.env.OPENCODE_WINDOWS_SIGNING = "false"
-  process.env.WINDOWS_PUBLISHER_NAME = "Boc Release Publisher"
-  try {
-    const module = await import("./electron-builder.config.ts?updates=boc-unsigned")
-    const config = module.default as Configuration
-
-    expect(config.win?.publisherName).toBeUndefined()
-    expect(config.win?.verifyUpdateCodeSignature).toBe(false)
-  } finally {
-    if (previousChannel === undefined) delete process.env.OPENCODE_CHANNEL
-    else process.env.OPENCODE_CHANNEL = previousChannel
-    if (previousSigning === undefined) delete process.env.OPENCODE_WINDOWS_SIGNING
-    else process.env.OPENCODE_WINDOWS_SIGNING = previousSigning
-    if (previousPublisher === undefined) delete process.env.WINDOWS_PUBLISHER_NAME
-    else process.env.WINDOWS_PUBLISHER_NAME = previousPublisher
-  }
-})

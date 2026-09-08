@@ -3,7 +3,7 @@ import { existsSync } from "node:fs"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { usesRiftRuntime } from "./development"
+import { developmentRiftSource, usesRiftRuntime } from "./development"
 import { stageRift } from "./rift-stage"
 
 test("enables Rift for the Boc source backend", () => {
@@ -48,7 +48,7 @@ test("leaves Rift unavailable when the packaged resource is missing", async () =
   }
 })
 
-const prepared = path.resolve(import.meta.dirname, "../../resources/rift/rift")
+const prepared = developmentRiftSource(path.resolve(import.meta.dirname, "../../resources"))
 test.skipIf(!existsSync(prepared))("launches the prepared Rift artifact after staging", async () => {
   const temporary = await fs.mkdtemp(path.join(os.tmpdir(), "boc-rift-artifact-"))
   try {

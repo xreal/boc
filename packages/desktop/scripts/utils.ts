@@ -5,11 +5,11 @@ import { join } from "node:path"
 
 const CLI_VERSION = "dev"
 
-export type Channel = "dev" | "beta" | "boc" | "prod"
+export type Channel = "dev" | "beta" | "prod"
 
 export function resolveChannel(): Channel {
   const raw = Bun.env.OPENCODE_CHANNEL
-  if (raw === "dev" || raw === "beta" || raw === "boc" || raw === "prod") return raw
+  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   if (raw === "latest") return "prod"
   return "dev"
 }
@@ -99,11 +99,7 @@ async function copyCliToResources(source: string, dest: string) {
 
 async function prepareCli(dest: string) {
   if (process.platform !== "win32") await chmod(dest, 0o755)
-  if (
-    process.platform === "win32" &&
-    process.env.GITHUB_ACTIONS === "true" &&
-    process.env.OPENCODE_WINDOWS_SIGNING !== "false"
-  ) {
+  if (process.platform === "win32" && process.env.GITHUB_ACTIONS === "true") {
     await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../../script/sign-windows.ps1 ${dest}`
   }
   if (process.platform === "darwin") await $`codesign --force --sign - ${dest}`

@@ -3,7 +3,7 @@ import path from "node:path"
 
 test("requires a fork-built CLI for Boc desktop builds", async () => {
   const root = path.resolve(import.meta.dirname, "../..")
-  const prebuild = Bun.spawn([process.execPath, "./scripts/prebuild.ts"], {
+  const prebuild = Bun.spawn([process.execPath, "../boc/scripts/desktop/prebuild.ts"], {
     cwd: root,
     env: { ...process.env, OPENCODE_CHANNEL: "boc", OPENCODE_CLI_DIST: "" },
     stdout: "ignore",

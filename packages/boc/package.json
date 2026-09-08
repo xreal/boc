@@ -43,6 +43,7 @@
     "@types/node": "catalog:",
     "@typescript/native-preview": "catalog:",
     "electron": "42.10.1",
+    "electron-builder": "26.15.7",
     "happy-dom": "20.11.1"
   }
 }

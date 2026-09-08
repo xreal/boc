@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process"
-import { existsSync } from "node:fs"
 import { stat } from "node:fs/promises"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -17,8 +16,6 @@ const signScript = path.join(rootDir, "script", "sign-windows.ps1")
 // pins still resolve after the canonical app id changes back to ai.opencode.desktop.
 const legacyDesktopEntry = path.join(packageDir, "resources", "linux", "opencode-desktop.desktop")
 const legacyDesktopEntryFpm = `${legacyDesktopEntry}=/usr/share/applications/opencode-desktop.desktop`
-const riftResource = path.join(packageDir, "resources", "rift", "rift")
-const windowsSigning = process.env.OPENCODE_WINDOWS_SIGNING !== "false"
 
 const metainfoFpm = (appId: string) =>
   `${path.join(packageDir, "resources", `${appId}.metainfo.xml`)}=/usr/share/metainfo/${appId}.metainfo.xml`
@@ -26,7 +23,6 @@ const metainfoFpm = (appId: string) =>
 async function signWindows(configuration: { path: string }) {
   if (process.platform !== "win32") return
   if (process.env.GITHUB_ACTIONS !== "true") return
-  if (!windowsSigning) return
 
   await execFileAsync(
     "pwsh",
@@ -49,7 +45,7 @@ export function macSignOptions(options: CustomMacSignOptions): CustomMacSignOpti
 
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
-  if (raw === "dev" || raw === "beta" || raw === "prod" || raw === "boc") return raw
+  if (raw === "dev" || raw === "beta" || raw === "prod") return raw
   if (raw === "latest") return "prod"
   return "dev"
 })()
@@ -57,20 +53,10 @@ const channel = (() => {
 const APP_IDS = {
   dev: "ai.opencode.desktop.dev",
   beta: "ai.opencode.desktop.beta",
-  boc: "ai.boc.desktop.beta",
   prod: "ai.opencode.desktop",
 } as const
 
-export const packagedResources = (includeRift: boolean): Configuration["extraResources"] => [
-  {
-    from: "resources/",
-    to: "",
-    filter: ["opencode-cli", "opencode-cli.exe"],
-  },
-  ...(includeRift ? [{ from: "resources/rift/rift", to: "rift/rift" }] : []),
-]
-
-const getBase = (appId: string, includeRift: boolean): Configuration => ({
+const getBase = (appId: string): Configuration => ({
   artifactName: "opencode-desktop-${os}-${arch}.${ext}",
   directories: {
     output: "dist",
@@ -88,7 +74,6 @@ const getBase = (appId: string, includeRift: boolean): Configuration => ({
     "out/**/*",
     "resources/**/*",
     "!resources/opencode-cli*",
-    "!resources/rift{,/**/*}",
     // Log export imports Zip.js as ESM. Keep index.js and lib, including its inline worker.
     "!**/node_modules/@zip.js/zip.js/dist{,/**/*}",
     "!**/node_modules/@zip.js/zip.js/{index.cjs,index.min.js,index-fflate.js,deno.json,eslint.config.mjs}",
@@ -101,7 +86,13 @@ const getBase = (appId: string, includeRift: boolean): Configuration => ({
     "!**/node_modules/js-yaml/dist/{js-yaml.js,js-yaml.min.js,*.map}",
     "!**/node_modules/js-yaml/bin{,/**/*}",
   ],
-  extraResources: packagedResources(includeRift),
+  extraResources: [
+    {
+      from: "resources/",
+      to: "",
+      filter: ["opencode-cli", "opencode-cli.exe"],
+    },
+  ],
   afterPack: async (context) => {
     const cli = path.join(
       context.packager.getResourcesDir(context.appOutDir),
@@ -109,10 +100,6 @@ const getBase = (appId: string, includeRift: boolean): Configuration => ({
     )
     const file = await stat(cli)
     if (!file.isFile() || file.size === 0) throw new Error(`Bundled CLI must be a non-empty file: ${cli}`)
-    if (!includeRift) return
-    const rift = path.join(context.packager.getResourcesDir(context.appOutDir), "rift", "rift")
-    const riftFile = await stat(rift)
-    if (!riftFile.isFile() || riftFile.size === 0) throw new Error(`Bundled Rift must be a non-empty file: ${rift}`)
   },
   mac: {
     category: "public.app-category.developer-tools",
@@ -167,7 +154,7 @@ const getBase = (appId: string, includeRift: boolean): Configuration => ({
 
 function getConfig() {
   const appId = APP_IDS[channel]
-  const base = getBase(appId, channel === "boc" && existsSync(riftResource))
+  const base = getBase(appId)
 
   switch (channel) {
     case "dev": {
@@ -199,27 +186,6 @@ function getConfig() {
         publish: { provider: "github", owner: "anomalyco", repo: "opencode", channel: "latest" },
         deb: { fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
         rpm: { packageName: "opencode", fpm: [metainfoFpm(appId), legacyDesktopEntryFpm] },
-      }
-    }
-    // Boc fork: same shape as beta, own identity and update repo so it
-    // installs side-by-side with upstream OpenCode Beta.
-    case "boc": {
-      return {
-        ...base,
-        appId,
-        productName: "Boc Beta",
-        artifactName: "boc-desktop-${version}-${os}-${arch}.${ext}",
-        protocols: { name: "Boc Beta", schemes: ["opencode"] },
-        publish: { provider: "generic", url: "https://boc-updates.bergdev.de", channel: "latest" },
-        win: windowsSigning
-          ? {
-              ...base.win,
-              publisherName: process.env.WINDOWS_PUBLISHER_NAME,
-              verifyUpdateCodeSignature: true,
-            }
-          : base.win,
-        deb: { fpm: [metainfoFpm(appId)] },
-        rpm: { packageName: "boc-beta", fpm: [metainfoFpm(appId)] },
       }
     }
   }

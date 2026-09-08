@@ -25,6 +25,5 @@ dist-ssr
 out/
 
 resources/opencode-cli*
-resources/rift
 resources/icons
 resources/*.metainfo.xml

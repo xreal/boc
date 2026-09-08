@@ -174,17 +174,17 @@ jobs:
 
       - name: Prepare desktop resources
         working-directory: packages/desktop
-        run: bun ./scripts/prepare.ts
+        run: bun run prepare:boc
 
       - name: Build desktop application
         working-directory: packages/desktop
-        run: bun run build
+        run: bun run build:boc
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Package desktop application
         working-directory: packages/desktop
-        run: bunx electron-builder ${{ matrix.settings.platform_flags }} --publish never --config electron-builder.config.ts
+        run: bunx electron-builder ${{ matrix.settings.platform_flags }} --publish never --config ../boc/scripts/desktop/electron-builder.config.ts
         timeout-minutes: 60
         env:
           APPLE_API_ISSUER: ${{ secrets.APPLE_API_ISSUER_ID }}

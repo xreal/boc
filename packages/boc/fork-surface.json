@@ -23,7 +23,7 @@
     },
     {
       "path": "packages/core/src/plugin/internal.ts",
-      "reason": "Register the Boc-only Project Controls built-in after configuration producers and provide its shared policy service"
+      "reason": "Register native Project Controls after configuration producers and compose its shared policy and Location-scoped instruction selection services"
     },
     {
       "path": "packages/core/src/config/plugin/agent.ts",
@@ -139,39 +139,11 @@
     },
     {
       "path": "packages/desktop/package.json",
-      "reason": "Register the BOC workspace as a bundled devDependency"
-    },
-    {
-      "path": "packages/desktop/.gitignore",
-      "reason": "Exclude prepared Rift packaging artifacts"
-    },
-    {
-      "path": "packages/desktop/electron-builder.config.test.ts",
-      "reason": "Verify Boc channel packaging identity, unsigned Windows releases, and public R2 updater metadata"
-    },
-    {
-      "path": "packages/desktop/electron-builder.config.ts",
-      "reason": "Configure Boc channel packaging identity, optional Windows signing, versioned artifacts, and public R2 updates"
+      "reason": "Register the Boc workspace dependency and explicit Boc development, preparation, build and packaging commands"
     },
     {
       "path": "packages/desktop/electron.vite.config.ts",
       "reason": "Configure the Boc renderer build channel and channel-aware desktop favicons"
-    },
-    {
-      "path": "packages/desktop/scripts/copy-icons.ts",
-      "reason": "Select Boc channel icons"
-    },
-    {
-      "path": "packages/desktop/scripts/copy-metainfo.ts",
-      "reason": "Select Boc channel metadata"
-    },
-    {
-      "path": "packages/desktop/scripts/prebuild.ts",
-      "reason": "Prepare the Boc release channel and select blue branding for local builds"
-    },
-    {
-      "path": "packages/desktop/scripts/utils.ts",
-      "reason": "Describe the Boc release channel and skip CLI signing for unsigned Boc Windows releases"
     },
     {
       "path": "packages/desktop/src/main/constants.ts",
@@ -191,7 +163,7 @@
     },
     {
       "path": "packages/desktop/src/renderer/desktop-app.tsx",
-      "reason": "Mount the generic BOC desktop provider"
+      "reason": "Mount the Boc desktop provider and compose branded notifications through the existing platform contract"
     },
     {
       "path": "packages/desktop/src/shared/ipc-rpc.ts",
@@ -244,10 +216,6 @@
     {
       "path": "packages/core/src/plugin/host.ts",
       "reason": "Observe producer identity through Boc-only plugin-context decoration"
-    },
-    {
-      "path": "packages/desktop/scripts/dev.ts",
-      "reason": "Prepare the Boc source backend and bundled Rift for isolated local desktop development"
     }
   ]
 }

@@ -3,7 +3,7 @@ import { app } from "electron"
 import { Effect } from "effect"
 import { CHANNEL } from "../main/constants"
 import { DesktopPaths } from "../main/paths"
-import { usesRiftRuntime } from "./development"
+import { developmentRiftSource, usesRiftRuntime } from "./development"
 import { stageRift } from "./rift-stage"
 
 export const resolveRiftEnvironment = Effect.gen(function* () {
@@ -12,7 +12,7 @@ export const resolveRiftEnvironment = Effect.gen(function* () {
   const root = path.join(app.getPath("userData"), "rift")
   const source = app.isPackaged
     ? path.join(process.resourcesPath, "rift", "rift")
-    : path.join(paths.developmentResourcesRoot, "rift", "rift")
+    : developmentRiftSource(paths.developmentResourcesRoot)
   const binary = yield* Effect.tryPromise(() => stageRift({ source, root })).pipe(
     Effect.catch((error) => Effect.logError("Rift executable staging failed", { error }).pipe(Effect.as(undefined))),
   )
