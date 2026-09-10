@@ -13,6 +13,7 @@ import {
   useLanguage,
   useTabs,
   useWslServers,
+  useSsh,
   type LayoutRoute,
   type UpdaterPlatform,
 } from "@opencode/app/desktop"
@@ -32,6 +33,7 @@ import { DesktopMemoryRouter } from "./window/router"
 import { availableStartupServer, readyWslConnections } from "./wsl/connections"
 import BocDesktopProvider from "../boc/provider"
 import { bocNotifications } from "../boc/notifications"
+import { createSshConnections } from "./ssh/connections"
 
 const MigrationStatus = lazy(() => import("./migration-status").then((module) => ({ default: module.MigrationStatus })))
 
@@ -90,9 +92,11 @@ function DesktopWindow(props: {
 
   function ReadyApp() {
     const wslServers = useWslServers()
+    const ssh = useSsh()
+    const sshConnections = createSshConnections(props.api.sshServers)
     const language = useLanguage()
     const ready = createMemo(
-      () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading,
+      () => !defaultServer.loading && !sidecar.loading && !locale.loading && !wslServers.isLoading && !ssh.loading,
     )
     const servers = createMemo(() => {
       const data = initializationData(sidecar)
@@ -107,6 +111,7 @@ function DesktopWindow(props: {
         })
       }
       list.push(...readyWslConnections(wslServers.data, language.t("wsl.server.label")))
+      list.push(...sshConnections({ servers: ssh.servers }, language.t("ssh.label")))
       return list
     })
     const effectiveDefaultServer = createMemo(() =>
@@ -144,16 +149,16 @@ function DesktopWindow(props: {
   return (
     <PlatformProvider value={platform}>
       <BocDesktopProvider>
-      <AppBaseProviders
-        locale={locale.latest}
-        onNativeTranslations={(bundle) => void props.api.setNativeTranslations(bundle).catch(() => undefined)}
-        onThemeApplied={(mode, scheme) => {
-          void props.api.setTitlebar({ mode, scheme })
-          void props.api.themeReady()
-        }}
-      >
-        <Show when={true}>{(_) => <ReadyApp />}</Show>
-      </AppBaseProviders>
+        <AppBaseProviders
+          locale={locale.latest}
+          onNativeTranslations={(bundle) => void props.api.setNativeTranslations(bundle).catch(() => undefined)}
+          onThemeApplied={(mode, scheme) => {
+            void props.api.setTitlebar({ mode, scheme })
+            void props.api.themeReady()
+          }}
+        >
+          <Show when={true}>{(_) => <ReadyApp />}</Show>
+        </AppBaseProviders>
       </BocDesktopProvider>
     </PlatformProvider>
   )

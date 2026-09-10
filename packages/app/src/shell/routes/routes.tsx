@@ -3,7 +3,7 @@ import { createMemo, lazy, Show, Suspense, type ParentProps } from "solid-js"
 import { Home } from "@/home/route"
 import { ServerProvider } from "@/runtime/server/current"
 import { useGlobal } from "@/runtime/server/runtime"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { BrowserAttachmentsProvider } from "@/session/browser/attachments"
 import { SessionPanelFrame, SessionRouteFrame } from "@/session/session-frame"
 import { LayoutProvider } from "@/shell/state/layout"
@@ -17,6 +17,9 @@ export const File = lazy(() => import("@opencode/session-ui/file").then((module)
 const loadSessionRoute = () => Promise.all([import("@/session/route"), File.preload()]).then(([module]) => module)
 const DraftRoute = lazy(() => import("@/new-session/route").then((module) => ({ default: module.DraftRoute })))
 const SettingsScreen = lazy(() => import("@/settings/shell").then((module) => ({ default: module.SettingsScreen })))
+const ConnectServerScreen = lazy(() =>
+  import("@/servers/connect/screen").then((module) => ({ default: module.ConnectServerScreen })),
+)
 const TargetSessionRouteContent = lazy(() =>
   loadSessionRoute().then((module) => ({ default: module.TargetSessionRouteContent })),
 )
@@ -75,14 +78,17 @@ function TargetServerRoute(props: ParentProps) {
 }
 
 function AppLayout(props: ParentProps) {
+  const servers = useServers()
   return (
-    <LayoutProvider>
-      <SettingsSurfaceProvider>
-        <BrowserAttachmentsProvider>
-          <BocCommandBridge />
-          <Shell>{props.children}</Shell>
-        </BrowserAttachmentsProvider>
-      </SettingsSurfaceProvider>
-    </LayoutProvider>
+    <Show when={servers.list.length > 0} fallback={<ConnectServerScreen />}>
+      <LayoutProvider>
+        <SettingsSurfaceProvider>
+          <BrowserAttachmentsProvider>
+            <BocCommandBridge />
+            <Shell>{props.children}</Shell>
+          </BrowserAttachmentsProvider>
+        </SettingsSurfaceProvider>
+      </LayoutProvider>
+    </Show>
   )
 }

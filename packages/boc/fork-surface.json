@@ -46,6 +46,10 @@
       "reason": "Use the standard session database when the Boc superset server owns the shared service"
     },
     {
+      "path": "packages/cli/src/database-path.ts",
+      "reason": "Keep the Boc channel on the standard session database after upstream centralized database path selection"
+    },
+    {
       "path": "packages/cli/src/services/service-config.ts",
       "reason": "Map the Boc channel to the compatible standard service registration and port"
     },
