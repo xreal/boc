@@ -25,6 +25,17 @@ story("shows Project setup and focuses search with Ctrl/Cmd+F", async ({ mount, 
   await expect(input).toHaveCSS("outline-offset", "0px")
 })
 
+story("switches projects through the shared Select without page errors", async ({ mount, page }) => {
+  const errors: Error[] = []
+  page.on("pageerror", (error) => errors.push(error))
+  const component = await mount("boc-controls--default")
+  const project = component.locator('[data-component="select-v2"][aria-label="Project"]')
+  await project.click()
+  await page.getByText("Archive", { exact: true }).click()
+  await expect(project).toContainText("Archive")
+  expect(errors).toEqual([])
+})
+
 story("applies inline native agent and skill switches with the keyboard and preserves focus", async ({ mount, page }) => {
   const component = await mount("boc-controls--default")
   await expect(component.getByText("Enabled here", { exact: true })).toHaveCount(0)
@@ -102,8 +113,8 @@ story("edits native agent and MCP configuration", async ({ mount, page }) => {
   const mcp = page.getByRole("dialog")
   await mcp.getByLabel("Server URL").fill("https://docs.example.com/updated-mcp")
   await mcp.getByRole("button", { name: "JSONC editor", exact: true }).click()
-  await expect(mcp.getByLabel("Configuration content")).toHaveValue(/"X-Api-Key": "fixture-key"/)
-  await expect(mcp.getByLabel("Configuration content")).toHaveValue(/"client_id": "fixture-client"/)
+  await expect(mcp.getByLabel("Definition · JSONC")).toHaveValue(/"X-Api-Key": "fixture-key"/)
+  await expect(mcp.getByLabel("Definition · JSONC")).toHaveValue(/"client_id": "fixture-client"/)
 })
 
 story("retains a configuration draft when the file conflicts", async ({ mount, page }) => {

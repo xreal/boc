@@ -235,6 +235,9 @@ function ControlsPreview() {
         globalDirectories: ["/config/opencode"],
         projects: [
           { name: "Shop", directory: "/workspace/shop", locations: ["/workspace/shop", "/workspace/shop-review"] },
+          { name: "Archive", directory: "/workspace/archive", locations: ["/workspace/archive"] },
+          { name: "Billing", directory: "/workspace/billing", locations: ["/workspace/billing"] },
+          { name: "Console", directory: "/workspace/console", locations: ["/workspace/console"] },
         ],
       },
     ],
