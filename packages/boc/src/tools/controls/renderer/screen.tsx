@@ -10,9 +10,12 @@ import type { BocScreenProps } from "../../../registry"
 import { createBocTranslator, type BocTranslator } from "../../../renderer/i18n"
 import { createProjectControls, type ControlError } from "./state"
 import { controlOrigin } from "./origin"
+import { ConfigurationEditor } from "./configuration-editor"
+import { SourceEditor } from "./source-editor"
+import { Choice } from "./choice"
 import "./screen.css"
 
-const kinds = ["agent", "skill", "tool", "mcp", "instruction"] as const
+const kinds = ["agent", "skill", "mcp", "tool", "instruction"] as const
 const categoryIcons = {
   agent: "subagent",
   skill: "flask",
@@ -22,6 +25,8 @@ const categoryIcons = {
 } as const
 
 const originIcons = { system: "server", global: "settings-gear", project: "folder", plugin: "sliders" } as const
+const internalAgent = (item: ControlItem) =>
+  item.kind === "agent" && ["compaction", "title", "summary"].includes(item.id)
 
 export default function ProjectControlsScreen(props: BocScreenProps) {
   const t = createBocTranslator(props.host.locale)
@@ -45,7 +50,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
   onMount(() => {
     const find = (event: KeyboardEvent) => {
       if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "f") return
-      if (!searchInput?.isConnected || document.querySelector('[role="dialog"]')) return
+      if (!searchInput?.isConnected || document.querySelector('dialog[open], [role="dialog"]')) return
       event.preventDefault()
       event.stopPropagation()
       searchInput.focus()
@@ -54,8 +59,15 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
     window.addEventListener("keydown", find, { capture: true })
     onCleanup(() => window.removeEventListener("keydown", find, { capture: true }))
   })
-  const [filters, setFilters] = createStore({ search: "", category: "all", server: "" })
-  const selectedServer = () => view.selection?.server ?? filters.server
+  const [filters, setFilters] = createStore({ search: "", category: "all" })
+  const [editor, setEditor] = createStore({
+    open: false,
+    scope: "project" as "project" | "global",
+    item: undefined as ControlItem | undefined,
+    add: false,
+    source: undefined as "skill" | "instruction" | undefined,
+  })
+  const selectedServer = () => view.selection?.server
   const serverInfo = () => host.servers().find((server) => server.key === selectedServer())
   const projectInfo = () => serverInfo()?.projects.find((project) => project.directory === view.selection?.project)
   const locations = () => [
@@ -77,14 +89,24 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       ) ?? []
     )
   })
-  const selectServer = (key: string) => {
-    if (view.pending) return
-    control.clear()
-    setFilters("server", key)
-    const server = host.servers().find((server) => server.key === key)
-    const project = server?.projects.length === 1 ? server.projects[0] : undefined
-    if (project) control.select({ server: key, project: project.directory, directory: project.directory })
-  }
+  const projects = createMemo(() =>
+    host.servers().flatMap((server) =>
+      server.projects.map((project) => ({
+        ...project,
+        server: server.key,
+        serverName: server.name,
+        key: JSON.stringify([server.key, project.directory]),
+      })),
+    ),
+  )
+  const edit = (scope: "project" | "global", item?: ControlItem, add = false) =>
+    setEditor({
+      open: true,
+      scope,
+      item,
+      add,
+      source: item?.kind === "skill" || item?.kind === "instruction" ? item.kind : undefined,
+    })
   const disabled = () => view.stale || !!view.pending
   const clearFilters = () => {
     setFilters({ search: "", category: "all" })
@@ -95,89 +117,82 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       data-boc-screen="controls"
       class="mx-2 mb-[var(--shell-bottom-inset,8px)] mt-[var(--shell-top-inset,8px)] flex min-h-0 min-w-0 flex-1 flex-col self-stretch overflow-hidden rounded-[10px] bg-v2-background-bg-base text-v2-text-text-base shadow-[var(--v2-elevation-raised)]"
     >
-      <header class="flex h-11 shrink-0 items-center justify-between gap-3 border-b border-v2-border-border-muted px-4">
+      <header class="controls-header">
         <h1 class="min-w-0 truncate text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
           {t("boc.bergflow.title")}
         </h1>
-        <Button
-          variant="outline"
-          size="small"
-          onClick={() => void preserveFocus(control.refresh)}
-          disabled={!view.selection || view.loading || !!view.pending}
-        >
-          {t(view.loading && view.snapshot ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
-        </Button>
+        <div class="controls-header-actions">
+          <Show when={view.snapshot?.info.operations.includes("getConfiguration")}>
+            <Button variant="ghost" size="small" disabled={disabled()} onClick={() => edit("global")}>
+              {t("boc.controls.globalDefaults")}
+            </Button>
+            <Button variant="outline" size="small" disabled={disabled()} onClick={() => edit("project")}>
+              {t("boc.controls.configure")}
+            </Button>
+            <Button size="small" disabled={disabled()} onClick={() => edit("project", undefined, true)}>
+              {t("boc.controls.add")}
+            </Button>
+          </Show>
+          <Button
+            variant="outline"
+            size="small"
+            onClick={() => void preserveFocus(control.refresh)}
+            disabled={!view.selection || view.loading || !!view.pending}
+          >
+            {t(view.loading && view.snapshot ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
+          </Button>
+        </div>
       </header>
       <div class="min-h-0 flex-1 overflow-y-auto">
         <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-4 sm:p-6">
           <div class="controls-context">
-            <div class="flex flex-wrap gap-3" aria-busy={!!view.pending}>
-              <label class="flex min-w-[160px] flex-1 flex-col gap-1 text-12-medium">
-                {t("boc.bergflow.server")}
-                <select
-                  aria-label={t("boc.bergflow.server")}
-                  class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                  value={selectedServer()}
-                  disabled={!!view.pending}
-                  onChange={(event) => selectServer(event.currentTarget.value)}
-                >
-                  <option value="">{t("boc.bergflow.selectServer")}</option>
-                  <For each={host.servers()}>{(server) => <option value={server.key}>{server.name}</option>}</For>
-                  <Show when={view.selection && !serverInfo()}>
-                    <option value={view.selection?.server}>{t("boc.bergflow.error.unavailable")}</option>
-                  </Show>
-                </select>
-              </label>
-              <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
+            <div class="controls-project-line" aria-busy={!!view.pending}>
+              <div class="controls-project-select text-12-medium">
                 {t("boc.bergflow.project")}
-                <select
-                  aria-label={t("boc.bergflow.project")}
-                  class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                  value={view.selection?.project ?? ""}
-                  disabled={!!view.pending || !serverInfo()}
-                  onChange={(event) => {
-                    const root = event.currentTarget.value
-                    if (root) control.select({ server: selectedServer(), project: root, directory: root })
+                <Choice
+                  label={t("boc.bergflow.project")}
+                  value={view.selection ? JSON.stringify([view.selection.server, view.selection.project]) : ""}
+                  disabled={!!view.pending}
+                  options={projects().map((project) => ({
+                    value: project.key,
+                    label: host.servers().length > 1 ? `${project.name} · ${project.serverName}` : project.name,
+                  }))}
+                  onChange={(key) => {
+                    const project = projects().find((project) => project.key === key)
+                    if (project)
+                      control.select({
+                        server: project.server,
+                        project: project.directory,
+                        directory: project.directory,
+                      })
                   }}
-                >
-                  <option value="">{t("boc.bergflow.selectProject")}</option>
-                  <For each={serverInfo()?.projects}>
-                    {(project) => (
-                      <option value={project.directory} selected={view.selection?.project === project.directory}>
-                        {project.name}
-                      </option>
-                    )}
-                  </For>
-                  <Show when={view.selection && !projectInfo()}>
-                    <option value={view.selection?.project}>{view.selection?.project}</option>
-                  </Show>
-                </select>
-              </label>
+                />
+              </div>
               <Show when={locations().length > 1}>
-                <label class="flex min-w-[200px] flex-[2] flex-col gap-1 text-12-medium">
+                <div class="controls-project-select text-12-medium">
                   {t("boc.bergflow.worktree")}
-                  <select
-                    aria-label={t("boc.bergflow.worktree")}
-                    dir="ltr"
-                    class="h-9 min-w-0 rounded-md border border-v2-border-border-base bg-v2-background-bg-base px-2 text-13-regular"
-                    value={view.selection?.directory}
+                  <Choice
+                    label={t("boc.bergflow.worktree")}
+                    value={view.selection?.directory ?? ""}
                     disabled={!!view.pending}
-                    onChange={(event) => {
-                      const selection = view.selection
-                      if (selection) control.select({ ...selection, directory: event.currentTarget.value })
+                    options={locations().map((directory) => ({
+                      value: directory,
+                      label:
+                        directory === view.selection?.project
+                          ? t("boc.controls.mainCheckout")
+                          : (directory.split(/[\\/]/).filter(Boolean).at(-1) ?? directory),
+                    }))}
+                    onChange={(directory) => {
+                      const selected = view.selection
+                      if (selected) control.select({ ...selected, directory })
                     }}
-                  >
-                    <For each={locations()}>{(directory) => <option value={directory}>{directory}</option>}</For>
-                  </select>
-                </label>
+                  />
+                </div>
               </Show>
             </div>
             <Show when={view.selection}>
               <div class="flex flex-col gap-1 text-12-regular text-v2-text-text-muted">
-                <p class="break-words">
-                  <bdi dir="ltr">{view.snapshot?.info.location.directory ?? view.selection?.directory}</bdi>
-                </p>
-                <p>{t("boc.bergflow.scope")}</p>
+                <p>{serverInfo()?.name}</p>
                 <Show when={view.pending}>
                   <p role="status">{t("boc.bergflow.contextLocked")}</p>
                 </Show>
@@ -246,6 +261,20 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                 <For each={kinds}>
                   {(kind) => {
                     const items = () => filtered().filter((item) => item.kind === kind && item.present)
+                    const row = (item: ControlItem & { key: string }) => (
+                      <ControlRow
+                        item={item}
+                        origin={origin(item)}
+                        t={t}
+                        disabled={disabled()}
+                        pending={view.pending === item.key}
+                        error={view.rowError?.key === item.key ? view.rowError.error : undefined}
+                        operations={view.snapshot?.info.operations ?? []}
+                        canConnect={!!host.connectMcp}
+                        edit={() => edit("project", item)}
+                        change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
+                      />
+                    )
                     return (
                       <Show when={items().length}>
                         <section class="min-w-0">
@@ -256,40 +285,22 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                             {t(`boc.bergflow.${kind}`)}{" "}
                             <span class="controls-count text-12-regular text-v2-text-text-muted">{items().length}</span>
                           </h2>
-                          <Show
-                            when={
-                              (kind === "agent" || kind === "instruction") && items().every((item) => !item.mutable)
-                            }
-                          >
-                            <p class="controls-readonly-note text-12-regular text-v2-text-text-muted">
-                              {t(
-                                kind === "agent" ? "boc.bergflow.readOnly.agent" : "boc.bergflow.readOnly.instruction",
-                              )}
-                            </p>
+                          <Show when={items().some((item) => !internalAgent(item))}>
+                            <div class="controls-cards">
+                              <TableHeader kind={kind} t={t} />
+                              <For each={items().filter((item) => !internalAgent(item))}>{row}</For>
+                            </div>
                           </Show>
-                          <Show when={kind === "instruction"}>
-                            <p class="controls-readonly-note text-12-regular text-v2-text-text-muted">
-                              {t("boc.bergflow.scope.instruction")}
-                            </p>
+                          <Show when={items().some(internalAgent)}>
+                            <details class="controls-system" open={!!filters.search}>
+                              <summary>{t("boc.controls.systemAgents")}</summary>
+                              <p>{t("boc.controls.systemAgentsHint")}</p>
+                              <div class="controls-cards">
+                                <TableHeader kind={kind} t={t} />
+                                <For each={items().filter(internalAgent)}>{row}</For>
+                              </div>
+                            </details>
                           </Show>
-                          <div class="controls-cards">
-                            <For each={items()}>
-                              {(item) => (
-                                <ControlRow
-                                  item={item}
-                                  origin={origin(item)}
-                                  t={t}
-                                  disabled={disabled()}
-                                  pending={view.pending === item.key}
-                                  error={view.rowError?.key === item.key ? view.rowError.error : undefined}
-                                  operations={view.snapshot?.info.operations ?? []}
-                                  change={(action, enabled) =>
-                                    void preserveFocus(() => control.mutate(item, action, enabled))
-                                  }
-                                />
-                              )}
-                            </For>
-                          </div>
                         </section>
                       </Show>
                     )
@@ -308,6 +319,8 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                           pending={view.pending === item.key}
                           error={view.rowError?.key === item.key ? view.rowError.error : undefined}
                           operations={view.snapshot?.info.operations ?? []}
+                          canConnect={!!host.connectMcp}
+                          edit={() => edit("project", item)}
                           change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
                         />
                       )}
@@ -324,7 +337,10 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                     </Show>
                   </div>
                 </Show>
-                <footer class="flex flex-col gap-1 border-t border-v2-border-border-base pt-4 text-12-regular text-v2-text-text-muted">
+                <details class="controls-scope-details text-12-regular text-v2-text-text-muted">
+                  <summary>{t("boc.controls.scopeDetails")}</summary>
+                  <p>{t("boc.controls.scope")}</p>
+                  <p>{t("boc.bergflow.scope.instruction")}</p>
                   <p>{t("boc.bergflow.running")}</p>
                   <p>
                     {t("boc.bergflow.version", {
@@ -338,13 +354,68 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                         : `boc.bergflow.${view.snapshot?.info.source ?? "bundled"}`,
                     )}
                   </p>
-                </footer>
+                </details>
               </Show>
             </Show>
           </Show>
         </div>
       </div>
+      <Show when={editor.open && view.selection}>
+        <Show
+          when={editor.source}
+          keyed
+          fallback={
+            <ConfigurationEditor
+              host={host}
+              selection={view.selection!}
+              scope={editor.scope}
+              item={editor.item}
+              add={editor.add}
+              t={t}
+              close={() => setEditor("open", false)}
+              saved={() => void control.refresh()}
+              agents={view.snapshot?.items.filter((item) => item.kind === "agent") ?? []}
+              instructions={view.snapshot?.items.filter((item) => item.kind === "instruction") ?? []}
+              editSource={(item) => edit(editor.scope, item)}
+              createSource={
+                view.snapshot?.info.operations.includes("createSource")
+                  ? (kind, scope) => setEditor({ source: kind, scope, item: undefined })
+                  : undefined
+              }
+            />
+          }
+        >
+          {(kind) => (
+            <SourceEditor
+              host={host}
+              selection={view.selection!}
+              scope={editor.scope}
+              kind={kind}
+              item={editor.item}
+              t={t}
+              canDelete={view.snapshot?.info.operations.includes("deleteSource") ?? false}
+              skills={view.snapshot?.items.filter((item) => item.kind === "skill") ?? []}
+              close={() => setEditor("open", false)}
+              saved={() => void control.refresh()}
+            />
+          )}
+        </Show>
+      </Show>
     </main>
+  )
+}
+
+function TableHeader(props: { kind: ControlItem["kind"]; t: BocTranslator }) {
+  return (
+    <div class="controls-table-head" data-kind={props.kind}>
+      <span>{props.t("boc.controls.column.name")}</span>
+      <span>{props.t("boc.controls.column.source")}</span>
+      <Show when={props.kind === "agent"}>
+        <span class="controls-cell-model">{props.t("boc.controls.editor.model")}</span>
+      </Show>
+      <span class="controls-column-actions">{props.t("boc.controls.column.actions")}</span>
+      <span>{props.t("boc.controls.column.enabled")}</span>
+    </div>
   )
 }
 
@@ -356,16 +427,20 @@ function ControlRow(props: {
   pending: boolean
   error?: ControlError | undefined
   operations: readonly string[]
-  change: (action: "set" | "clear" | "retry", enabled?: boolean) => void
+  edit: () => void
+  canConnect: boolean
+  change: (action: "set" | "clear" | "retry" | "connect", enabled?: boolean) => void
 }) {
   const statusID = createUniqueId()
+  const [row, setRow] = createStore({ expanded: false })
   const desired = () => props.item.override ?? props.item.defaultEnabled ?? props.item.effective === "enabled"
-  const showStatus = () => props.pending || props.item.application === "failed" || props.item.effective === "disabled"
+  const applying = () => props.pending || props.item.application === "pending"
+  const showStatus = () => applying() || props.item.application === "failed" || props.item.effective === "unknown"
   return (
-    <article class="controls-card min-w-0 p-3 sm:p-4" aria-busy={props.pending}>
-      <div class="flex items-start justify-between gap-4">
-        <div class="min-w-0 flex-1">
-          <h3 class="flex items-start gap-2 break-words text-14-medium" aria-label={props.item.name}>
+    <article class="controls-card" aria-busy={applying()} data-kind={props.item.kind}>
+      <div class="controls-table-row">
+        <div class="controls-cell-name">
+          <h3 aria-label={props.item.name}>
             <Tooltip value={props.t(`boc.bergflow.origin.${props.origin}`)}>
               <span
                 class="controls-origin"
@@ -376,79 +451,150 @@ function ControlRow(props: {
                 <Icon name={originIcons[props.origin]} size="small" />
               </span>
             </Tooltip>
-            <bdi>{props.item.name}</bdi>
-          </h3>
-          <p class="mt-1 break-words text-12-regular text-v2-text-text-muted">
-            <bdi dir="auto">{props.item.source || props.t("boc.bergflow.sourceUnknown")}</bdi> ·{" "}
-            {props.t(props.item.override === null ? "boc.bergflow.default" : "boc.bergflow.override")}
-          </p>
-          <Show when={showStatus()}>
-            <p
-              id={statusID}
-              class="controls-status mt-2 text-12-regular"
-              data-state={
-                props.pending ? "pending" : props.item.application === "failed" ? "failed" : props.item.effective
-              }
+            <button
+              type="button"
+              aria-expanded={row.expanded}
+              aria-controls={`${statusID}-details`}
+              class="controls-name-button"
+              onClick={() => setRow("expanded", !row.expanded)}
             >
-              {props.pending
-                ? props.t("boc.bergflow.applying")
-                : props.item.application === "failed"
-                  ? props.t("boc.bergflow.savedPending")
-                  : props.t(`boc.bergflow.${props.item.effective}`)}
-            </p>
+              <bdi>{props.item.name}</bdi>
+              <Icon name="chevron-down" size="small" />
+            </button>
+            <Show when={props.item.defaultAgent}>
+              <span class="controls-default-mark" title={props.t("boc.controls.editor.defaultAgent")}>
+                {props.t("boc.controls.defaultBadge")}
+              </span>
+            </Show>
+          </h3>
+        </div>
+        <div class="controls-cell-origin">{props.t(`boc.controls.origin.${props.origin}`)}</div>
+        <Show when={props.item.kind === "agent"}>
+          <div class="controls-cell-model" title={props.item.model ?? props.t("boc.controls.model.default")}>
+            <bdi dir="ltr">
+              {props.item.model?.slice((props.item.model.indexOf("/") ?? -1) + 1) ??
+                props.t("boc.controls.model.default")}
+            </bdi>
+          </div>
+        </Show>
+        <div class="controls-row-actions">
+          <Show
+            when={
+              props.canConnect &&
+              props.item.kind === "mcp" &&
+              props.item.effective === "enabled" &&
+              (props.item.availability === "needs_auth" || props.item.availability === "failed")
+            }
+          >
+            <Button variant="outline" size="small" disabled={props.disabled} onClick={() => props.change("connect")}>
+              {props.t(props.item.availability === "needs_auth" ? "boc.controls.signIn" : "boc.controls.connect")}
+            </Button>
+          </Show>
+          <Show when={props.item.override !== null && props.operations.includes("clearOverride")}>
+            <Tooltip value={props.t("boc.bergflow.reset")}>
+              <Button
+                variant="ghost"
+                size="small"
+                aria-label={props.t("boc.bergflow.reset")}
+                disabled={props.disabled}
+                onClick={() => props.change("clear")}
+              >
+                <Icon name="reset" size="small" />
+              </Button>
+            </Tooltip>
           </Show>
           <Show
             when={
-              props.item.availability === "needs_auth" ||
-              props.item.availability === "pending" ||
-              props.item.availability === "failed"
+              props.operations.includes("getConfiguration") &&
+              (props.item.kind === "agent" ||
+                props.item.kind === "mcp" ||
+                ((props.item.kind === "skill" || props.item.kind === "instruction") &&
+                  props.origin !== "system" &&
+                  props.origin !== "plugin" &&
+                  props.operations.includes("getSource")))
             }
           >
-            <p class="text-12-regular text-v2-text-text-muted">
-              {props.t(`boc.bergflow.availability.${props.item.availability as "needs_auth" | "pending" | "failed"}`)}
-            </p>
-          </Show>
-          <Show when={props.item.override !== null && props.item.effective !== (desired() ? "enabled" : "disabled")}>
-            <p class="text-12-regular">{props.t(desired() ? "boc.bergflow.desiredOn" : "boc.bergflow.desiredOff")}</p>
+            <Button variant="ghost" size="small" disabled={props.disabled} onClick={props.edit}>
+              {props.t(
+                (props.item.kind === "agent" || props.item.kind === "mcp") &&
+                  (props.origin === "global" || props.origin === "system")
+                  ? "boc.controls.customize"
+                  : "boc.controls.edit",
+              )}
+            </Button>
           </Show>
         </div>
-        <Show
-          when={props.item.mutable && props.operations.includes("setEnabled")}
-          fallback={<span class="controls-readonly text-12-medium">{props.t("boc.bergflow.readOnly")}</span>}
-        >
-          <Switch
-            hideLabel
-            checked={desired()}
-            disabled={props.disabled}
-            onChange={(enabled) => props.change("set", enabled)}
-            aria-describedby={showStatus() ? statusID : undefined}
+        <div class="controls-cell-toggle">
+          <Show
+            when={props.item.mutable && props.operations.includes("setEnabled")}
+            fallback={
+              <Tooltip
+                value={props.t(
+                  props.item.kind === "instruction" && props.origin === "global"
+                    ? "boc.controls.alwaysIncluded"
+                    : "boc.bergflow.readOnly",
+                )}
+              >
+                <span class="controls-readonly" aria-label={props.t("boc.bergflow.readOnly")}>
+                  —
+                </span>
+              </Tooltip>
+            }
           >
-            {props.item.name}
-          </Switch>
-        </Show>
+            <Switch
+              hideLabel
+              checked={desired()}
+              disabled={props.disabled || applying()}
+              onChange={(enabled) => props.change("set", enabled)}
+              aria-describedby={showStatus() ? statusID : undefined}
+            >
+              {props.item.name}
+            </Switch>
+          </Show>
+        </div>
       </div>
+      <Show when={showStatus()}>
+        <p id={statusID} class="controls-row-feedback" role="status">
+          {props.t(
+            applying()
+              ? "boc.bergflow.applying"
+              : props.item.application === "failed"
+                ? "boc.bergflow.savedPending"
+                : "boc.bergflow.unknown",
+          )}
+        </p>
+      </Show>
+      <Show when={props.item.kind === "mcp" && ["needs_auth", "pending", "failed"].includes(props.item.availability)}>
+        <p class="controls-row-feedback">
+          {props.t(`boc.bergflow.availability.${props.item.availability as "needs_auth" | "pending" | "failed"}`)}
+        </p>
+      </Show>
       <Show when={props.error}>
         <p role="alert" class="mt-2 text-12-regular">
           {props.t(`boc.bergflow.error.${props.error ?? "unknown"}`)}
         </p>
       </Show>
-      <details class="mt-2 text-12-regular">
-        <summary class="w-fit cursor-pointer text-v2-text-text-muted">{props.t("boc.bergflow.details")}</summary>
-        <div class="mt-2 flex flex-col gap-2">
+      <Show when={row.expanded}>
+        <div id={`${statusID}-details`} class="controls-row-details">
           <Show when={props.item.description}>
             <p class="whitespace-pre-wrap break-words">{props.item.description}</p>
           </Show>
           <p class="break-all">
             {props.t("boc.bergflow.id")}: <bdi dir="ltr">{props.item.id}</bdi>
           </p>
+          <p class="break-all">
+            {props.t("boc.bergflow.source")}:{" "}
+            <bdi dir="ltr">{props.item.source || props.t("boc.bergflow.sourceUnknown")}</bdi>
+          </p>
+          <p>{props.t(props.item.override === null ? "boc.bergflow.default" : "boc.bergflow.override")}</p>
+          <Show when={props.item.model}>
+            <p>
+              {props.t("boc.controls.editor.model")}: <bdi dir="ltr">{props.item.model}</bdi>
+            </p>
+          </Show>
           <Show when={props.item.reason}>{(reason) => <p>{props.t(`boc.bergflow.reason.${reason()}`)}</p>}</Show>
           <p>{props.t(`boc.bergflow.effect.${props.item.effect}`)}</p>
           <div class="flex flex-wrap gap-2">
-            <Show when={props.item.override !== null && props.operations.includes("clearOverride")}>
-              <Button variant="outline" size="small" disabled={props.disabled} onClick={() => props.change("clear")}>
-                {props.t("boc.bergflow.reset")}
-              </Button>
-            </Show>
             <Show
               when={
                 props.item.mutable && props.item.application === "failed" && props.operations.includes("retryApply")
@@ -460,7 +606,7 @@ function ControlRow(props: {
             </Show>
           </div>
         </div>
-      </details>
+      </Show>
     </article>
   )
 }

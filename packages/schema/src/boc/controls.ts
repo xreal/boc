@@ -2,6 +2,7 @@ export * as BocControls from "./controls.js"
 
 import { Schema } from "effect"
 import { optional } from "../schema.js"
+import { ConfigMCP } from "../config/mcp.js"
 
 export const Kind = Schema.Literals(["agent", "skill", "tool", "mcp", "instruction"])
 export type Kind = typeof Kind.Type
@@ -39,6 +40,9 @@ export const Item = Schema.Struct({
   origin: optional(Origin),
   override: Schema.NullOr(Schema.Boolean),
   defaultEnabled: Schema.NullOr(Schema.Boolean),
+  defaultAgent: optional(Schema.Boolean),
+  agentMode: optional(Schema.Literals(["primary", "subagent", "all"])),
+  model: optional(Schema.String),
   effective: Schema.Literals(["enabled", "disabled", "unknown"]),
   application: Schema.Literals(["applied", "pending", "failed"]),
   mutable: Schema.Boolean,
@@ -70,6 +74,28 @@ export const State = Schema.Struct({
   incomplete: Schema.Array(Kind),
 })
 export interface State extends Schema.Schema.Type<typeof State> {}
+export const ConfigurationScope = Schema.Literals(["project", "global"])
+export type ConfigurationScope = typeof ConfigurationScope.Type
+export const Configuration = Schema.Struct({
+  scope: ConfigurationScope,
+  path: Schema.String,
+  content: Schema.String,
+  revision: Schema.String,
+  mcp: optional(Schema.Record(Schema.String, ConfigMCP.Server)),
+  instructionExists: optional(Schema.Boolean),
+})
+export interface Configuration extends Schema.Schema.Type<typeof Configuration> {}
+export const SourceKind = Schema.Literals(["skill", "instruction"])
+export type SourceKind = typeof SourceKind.Type
+export const Source = Schema.Struct({
+  kind: SourceKind,
+  scope: ConfigurationScope,
+  id: Schema.String,
+  path: Schema.String,
+  content: Schema.String,
+  revision: Schema.String,
+})
+export interface Source extends Schema.Schema.Type<typeof Source> {}
 const Target = Schema.Struct({
   kind: Kind,
   id: Schema.String.check(Schema.isMinLength(1)),
@@ -82,12 +108,66 @@ const errors = {
   not_supported: schema(Schema.Struct({})),
   not_ready: schema(Schema.Struct({ committed: optional(Schema.Boolean), revision: optional(Schema.Number) })),
   persistence_failed: schema(Schema.Struct({})),
+  invalid_configuration: schema(Schema.Struct({})),
+  invalid_source: schema(Schema.Struct({})),
 }
 export const Rpc = {
   id: "boc.controls.v1",
   methods: {
     info: { input: schema(Schema.Struct({})), output: schema(Info) },
     getState: { input: schema(Schema.Struct({})), output: schema(State), errors },
+    getConfiguration: {
+      input: schema(Schema.Struct({ scope: ConfigurationScope })),
+      output: schema(Configuration),
+      errors,
+    },
+    saveConfiguration: {
+      input: schema(
+        Schema.Struct({ scope: ConfigurationScope, content: Schema.String, expectedRevision: Schema.String }),
+      ),
+      output: schema(Configuration),
+      errors,
+    },
+    getSource: {
+      input: schema(Schema.Struct({ kind: SourceKind, id: Schema.String.check(Schema.isMinLength(1)) })),
+      output: schema(Source),
+      errors,
+    },
+    saveSource: {
+      input: schema(
+        Schema.Struct({
+          kind: SourceKind,
+          id: Schema.String.check(Schema.isMinLength(1)),
+          content: Schema.String,
+          expectedRevision: Schema.String,
+        }),
+      ),
+      output: schema(Source),
+      errors,
+    },
+    createSource: {
+      input: schema(
+        Schema.Struct({
+          kind: SourceKind,
+          scope: ConfigurationScope,
+          name: Schema.String.check(Schema.isMinLength(1)),
+          content: Schema.String,
+        }),
+      ),
+      output: schema(Source),
+      errors,
+    },
+    deleteSource: {
+      input: schema(
+        Schema.Struct({
+          kind: SourceKind,
+          id: Schema.String.check(Schema.isMinLength(1)),
+          expectedRevision: Schema.String,
+        }),
+      ),
+      output: schema(Schema.Struct({})),
+      errors,
+    },
     setEnabled: {
       input: schema(Schema.Struct({ ...Target.fields, enabled: Schema.Boolean })),
       output: schema(State),

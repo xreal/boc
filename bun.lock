@@ -114,6 +114,7 @@
       "name": "@boc/extensions",
       "version": "0.0.0",
       "dependencies": {
+        "@kobalte/core": "catalog:",
         "@opencode/client": "workspace:*",
         "@opencode/core": "workspace:*",
         "@opencode/plugin": "workspace:*",
@@ -124,6 +125,7 @@
         "drizzle-orm": "catalog:",
         "effect": "catalog:",
         "electron-store": "11.0.2",
+        "jsonc-parser": "3.3.1",
         "marked": "catalog:",
         "solid-js": "catalog:",
         "yaml": "2.9.0",

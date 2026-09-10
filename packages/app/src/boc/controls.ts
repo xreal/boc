@@ -9,6 +9,7 @@ import { ServerConnection, serverName, useServers } from "@/runtime/server/regis
 import { useGlobal } from "@/runtime/server/runtime"
 import { useCurrentRoute } from "@/shell/state/layout"
 import { showToast } from "@/shell/notifications/toast"
+import { usePlatform } from "@/runtime/platform/platform"
 
 const preferences = Persistence.struct({
   selection: Persistence.optional(
@@ -23,6 +24,7 @@ export function createBocControls(): ControlsHost {
   const navigate = useNavigate()
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
+  const platform = usePlatform()
   // Keep the previous preference key so existing window selections survive the rename.
   const [saved, setSaved, , ready] = persisted(Persist.window("boc.bergflow"), preferences, {})
   return {
@@ -43,7 +45,7 @@ export function createBocControls(): ControlsHost {
           ].filter(Boolean),
           projects: [...projects.values()].map((project) => ({
             directory: project.worktree,
-            name: project.name ?? project.worktree,
+            name: project.name ?? project.worktree.split(/[\\/]/).filter(Boolean).at(-1) ?? project.worktree,
             locations: [
               ...new Set([project.worktree, ...(project.worktrees ?? []).map((worktree) => worktree.directory)]),
             ],
@@ -55,6 +57,46 @@ export function createBocControls(): ControlsHost {
       return saved.selection
     },
     remember: (selection) => setSaved("selection", selection),
+    async models(selection, scope) {
+      const server = servers.list.find((server) => ServerConnection.key(server) === selection.server)
+      if (!server) throw new Error("boc.controls.server_unavailable")
+      const result = await global
+        .ensureServerCtx(server)
+        .sdk.api.model.list(scope === "project" ? { location: { directory: selection.directory } } : {})
+      return result.data
+        .filter((model) => model.enabled)
+        .flatMap((model) => [
+          { id: `${model.providerID}/${model.id}`, name: model.name, provider: model.providerID },
+          ...model.variants.map((variant) => ({
+            id: `${model.providerID}/${model.id}#${variant.id}`,
+            name: `${model.name} · ${variant.id}`,
+            provider: model.providerID,
+          })),
+        ])
+    },
+    async connectMcp(selection, id) {
+      const server = servers.list.find((server) => ServerConnection.key(server) === selection.server)
+      if (!server) throw new Error("boc.controls.server_unavailable")
+      const api = global.ensureServerCtx(server).sdk.api
+      const location = { directory: selection.directory }
+      const mcp = (await api.mcp.list({ location })).data.find((item) => item.name === id)
+      if (!mcp) throw new Error("boc.controls.mcp_unavailable")
+      if (mcp.status.status === "connected") return
+      if (mcp.status.status !== "needs_auth") {
+        await api.mcp.connect({ server: id, location })
+        return
+      }
+      if (!mcp.integrationID) throw new Error("boc.controls.mcp_auth_unavailable")
+      const integration = await api.integration.get({ integrationID: mcp.integrationID, location })
+      const method = integration.data?.methods.find((item) => item.type === "oauth" && !item.form?.length)
+      if (!method || method.type !== "oauth") throw new Error("boc.controls.mcp_auth_form_required")
+      const attempt = await api.integration.oauth.connect({
+        integrationID: mcp.integrationID,
+        methodID: method.id,
+        location,
+      })
+      platform.openExternal(attempt.data.url)
+    },
     connect: (key) => {
       const server = servers.list.find((server) => ServerConnection.key(server) === key)
       if (!server) return

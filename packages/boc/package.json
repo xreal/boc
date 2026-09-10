@@ -25,10 +25,12 @@
     "@opencode/ui": "workspace:*",
     "@opencode/util": "workspace:*",
     "@solid-primitives/i18n": "2.2.1",
+    "@kobalte/core": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "electron-store": "11.0.2",
     "marked": "catalog:",
+    "jsonc-parser": "3.3.1",
     "solid-js": "catalog:",
     "yaml": "2.9.0",
     "@opencode/client": "workspace:*"

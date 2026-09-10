@@ -1,0 +1,17 @@
+[data-slot="segmented-control-v2"].controls-choice {
+  inline-size: fit-content;
+  block-size: auto;
+  min-block-size: 30px;
+  max-inline-size: 100%;
+  flex-wrap: wrap;
+}
+[data-slot="segmented-control-v2"].controls-choice [data-slot="segmented-control-v2-item"] {
+  flex: 0 0 auto;
+  min-inline-size: min-content;
+  block-size: 30px;
+  padding-inline: 10px;
+}
+[data-slot="segmented-control-v2"].controls-choice [data-slot="segmented-control-v2-item-label"] {
+  overflow: visible;
+  max-inline-size: none;
+}

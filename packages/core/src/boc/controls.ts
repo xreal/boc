@@ -1,14 +1,19 @@
 export * as BocProjectControls from "./controls.js"
 
 import { BocControls } from "@opencode/schema/boc/controls"
+import { Info } from "@opencode/schema/config"
 import type { Plugin } from "@opencode/schema/plugin"
 import type { RpcCallContext } from "@opencode/plugin/effect/rpc"
 import { define } from "@opencode/plugin/effect/plugin"
 import { FSUtil } from "@opencode/util/fs-util"
 import { Global } from "@opencode/util/global"
-import { Effect, Stream } from "effect"
+import { Hash } from "@opencode/util/hash"
+import { Effect, Option, Schema, Stream } from "effect"
+import { applyEdits, modify, parse, type ParseError } from "jsonc-parser"
 import path from "path"
 import { Config } from "../config.js"
+import { ConfigNormalize } from "../config/normalize.js"
+import { SkillFile } from "../config/plugin/skill-file.js"
 import { Tool } from "../tool.js"
 import { McpTool } from "../tool/mcp.js"
 import { BocControlPolicy } from "./control-policy.js"
@@ -23,6 +28,11 @@ type Capability = {
   value?: object
   source?: string
   namespace?: string
+  defaultAgent?: boolean
+  agentMode?: "primary" | "subagent" | "all"
+  model?: string
+  nativeOverride?: boolean
+  definition?: object
   defaultEnabled: boolean
   mutable: boolean
 }
@@ -34,6 +44,7 @@ export const Definition = define({
     const policies = yield* BocControlPolicy.Service
     const config = yield* Config.Service
     const global = yield* Global.Service
+    const fs = yield* FSUtil.Service
     const tools = yield* Tool.Service
     const selection = yield* BocSelection.Service
     const discovery = yield* InstructionDiscovery.Service
@@ -46,7 +57,156 @@ export const Definition = define({
       instruction: [],
     }
     const failed = new Set<BocControls.Kind>()
+    const pending = new Set<BocControls.Kind>()
     const disabled = (kind: BocControls.Kind, id: string) => project.policy.settings[kind][id] === false
+    const configurationPath = (scope: BocControls.ConfigurationScope) =>
+      scope === "global"
+        ? path.join(global.config, "opencode.jsonc")
+        : path.join(ctx.location.directory, ".opencode", "opencode.jsonc")
+    const sourceScope = (filepath: string) => {
+      if (
+        [global.config, path.join(global.home, ".agents"), path.join(global.home, ".claude")].some((root) =>
+          FSUtil.contains(root, filepath),
+        )
+      )
+        return "global" as const
+      if ([ctx.location.project.canonical, ctx.location.directory].some((root) => FSUtil.contains(root, filepath)))
+        return "project" as const
+      return
+    }
+    const rawInfo = Effect.fn("BocProjectControls.rawInfo")(function* (filepath: string | undefined) {
+      if (!filepath) return
+      const content = yield* fs.readFileStringSafe(filepath)
+      if (content === undefined) return
+      const errors: ParseError[] = []
+      const value = parse(content, errors, { allowTrailingComma: true })
+      if (errors.length) return
+      const normalized = ConfigNormalize.normalize(value)
+      if (normalized.type === "rejected") return
+      return Option.getOrUndefined(Schema.decodeUnknownOption(Info)(normalized.encoded))
+    })
+    const rawDefinition = Effect.fn("BocProjectControls.rawDefinition")(function* (
+      filepath: string | undefined,
+      kind: "agent" | "mcp",
+      id: string,
+    ) {
+      const info = yield* rawInfo(filepath)
+      if (kind === "agent") return info?.agents?.[id]
+      return info?.mcp?.servers?.[id]
+    })
+    const configuration = Effect.fn("BocProjectControls.configuration")(function* (
+      scope: BocControls.ConfigurationScope,
+    ) {
+      const filepath = configurationPath(scope)
+      const content = (yield* fs.readFileStringSafe(filepath)) ?? "{}\n"
+      const instructionExists = yield* fs.existsSafe(
+        path.join(scope === "global" ? global.config : ctx.location.directory, "AGENTS.md"),
+      )
+      const entries = (yield* config.entries()).filter(
+        (entry) =>
+          entry.type === "document" &&
+          (scope === "project" || (entry.path && FSUtil.contains(global.config, entry.path))),
+      )
+      const mcp = Object.assign(
+        {},
+        ...(yield* Effect.forEach(entries, (entry) =>
+          rawInfo(entry.path).pipe(Effect.map((info) => info?.mcp?.servers ?? {})),
+        )),
+      )
+      return {
+        scope,
+        path: filepath,
+        content,
+        revision: Hash.sha256(content),
+        ...(Object.keys(mcp).length ? { mcp } : {}),
+        instructionExists,
+      }
+    })
+    const saveConfiguration = Effect.fn("BocProjectControls.saveConfiguration")(function* (input: {
+      scope: BocControls.ConfigurationScope
+      content: string
+      expectedRevision: string
+    }) {
+      const current = yield* configuration(input.scope)
+      if (current.revision !== input.expectedRevision) return { type: "conflict" as const, revision: current.revision }
+      if (!validConfiguration(input.content)) return { type: "invalid" as const }
+      yield* fs.writeWithDirs(current.path, input.content)
+      return { type: "saved" as const, configuration: yield* configuration(input.scope) }
+    })
+    const source = Effect.fn("BocProjectControls.source")(function* (input: {
+      kind: BocControls.SourceKind
+      id: string
+    }) {
+      yield* state()
+      const item = inventory[input.kind].find((item) => item.id === input.id)
+      if (!item?.source) return
+      const scope = sourceScope(item.source)
+      if (!scope) return
+      const content = yield* fs.readFileStringSafe(item.source)
+      if (content === undefined) return
+      return { kind: input.kind, scope, id: input.id, path: item.source, content, revision: Hash.sha256(content) }
+    })
+    const saveSource = Effect.fn("BocProjectControls.saveSource")(function* (input: {
+      kind: BocControls.SourceKind
+      id: string
+      content: string
+      expectedRevision: string
+    }) {
+      const current = yield* source(input)
+      if (!current) return { type: "missing" as const }
+      if (current.revision !== input.expectedRevision) return { type: "conflict" as const }
+      if (!validSource(current, input.content)) return { type: "invalid" as const }
+      yield* fs.writeFileString(current.path, input.content)
+      return {
+        type: "saved" as const,
+        source: { ...current, content: input.content, revision: Hash.sha256(input.content) },
+      }
+    })
+    const createSource = Effect.fn("BocProjectControls.createSource")(function* (input: {
+      kind: BocControls.SourceKind
+      scope: BocControls.ConfigurationScope
+      name: string
+      content: string
+    }) {
+      if (input.kind === "skill" && !safeSourceName(input.name)) return { type: "invalid" as const }
+      const filepath =
+        input.kind === "skill"
+          ? path.join(
+              input.scope === "global" ? global.config : path.join(ctx.location.directory, ".opencode"),
+              "skill",
+              input.name,
+              "SKILL.md",
+            )
+          : input.name === "AGENTS.md"
+            ? path.join(input.scope === "global" ? global.config : ctx.location.directory, "AGENTS.md")
+            : undefined
+      if (!filepath || !validSource({ kind: input.kind, path: filepath }, input.content))
+        return { type: "invalid" as const }
+      if (yield* fs.existsSafe(filepath)) return { type: "conflict" as const }
+      yield* fs.writeWithDirs(filepath, input.content)
+      return {
+        type: "saved" as const,
+        source: {
+          kind: input.kind,
+          scope: input.scope,
+          id: input.kind === "skill" ? input.name : "AGENTS.md",
+          path: filepath,
+          content: input.content,
+          revision: Hash.sha256(input.content),
+        },
+      }
+    })
+    const deleteSource = Effect.fn("BocProjectControls.deleteSource")(function* (input: {
+      kind: BocControls.SourceKind
+      id: string
+      expectedRevision: string
+    }) {
+      const current = yield* source(input)
+      if (!current) return { type: "missing" as const }
+      if (current.revision !== input.expectedRevision) return { type: "conflict" as const }
+      yield* fs.remove(current.path)
+      return { type: "deleted" as const }
+    })
 
     yield* ctx.skill.transform((editor) => {
       inventory.skill = editor.list().map((skill) => ({
@@ -78,8 +238,12 @@ export const Definition = define({
         description: "",
         value,
         defaultEnabled: !value.disabled,
-        mutable: true,
+        source: sourceOf(value),
+        mutable: !pluginSource(value),
+        ...(value.disabled === undefined ? {} : { nativeOverride: !value.disabled }),
       }))
+      // Preserve established MCP policy behavior until each saved override is
+      // explicitly migrated or cleared through native configuration.
       inventory.mcp.forEach((item) => {
         const enabled = project.policy.settings.mcp[item.id]
         if (enabled !== undefined)
@@ -128,15 +292,30 @@ export const Definition = define({
       source: "bundled" as const,
       scope: "project-on-server" as const,
       categories: [...BocControls.kinds],
-      operations: ["info", "getState", "setEnabled", "clearOverride", "retryApply"],
+      operations: [
+        "info",
+        "getState",
+        "getConfiguration",
+        "saveConfiguration",
+        "getSource",
+        "saveSource",
+        "createSource",
+        "deleteSource",
+        "setEnabled",
+        "clearOverride",
+        "retryApply",
+      ],
     })
     const reload = (kind: BocControls.Kind) => {
+      if (kind === "agent") return ctx.agent.reload()
       if (kind === "skill") return ctx.skill.reload()
       if (kind === "tool") return ctx.tool.reload()
       if (kind === "mcp") return ctx.mcp.reload()
       return Effect.void
     }
     const state = Effect.fn("BocProjectControls.state")(function* () {
+      const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
+      const defaultAgent = Config.latest(documents, "default_agent")
       const agents = yield* ctx.agent.list({})
       inventory.agent = agents.data.map((agent) => ({
         id: agent.id,
@@ -144,20 +323,59 @@ export const Definition = define({
         description: agent.description ?? "",
         value: agent,
         defaultEnabled: true,
-        mutable: false,
+        source: sourceOf(agent),
+        mutable: true,
+        ...(defaultAgent === agent.id && agent.mode !== "subagent" ? { defaultAgent: true } : {}),
+        ...(agent.mode ? { agentMode: agent.mode } : {}),
+        ...(agent.model ? { model: formatModel(agent.model) } : {}),
       }))
+      const configuredAgents = new Map(
+        documents.flatMap((document) =>
+          Object.entries(document.info.agents ?? {}).map(
+            ([id, agent]) => [id, { id, agent, source: document.path }] as const,
+          ),
+        ),
+      )
+      Array.from(configuredAgents.values())
+        .filter(({ id }) => !inventory.agent.some((agent) => agent.id === id))
+        .forEach(({ id, agent, source }) =>
+          inventory.agent.push({
+            id,
+            name: id,
+            description: agent.description ?? "",
+            source,
+            definition: agent,
+            ...(agent.disabled === undefined ? {} : { nativeOverride: !agent.disabled }),
+            defaultEnabled: true,
+            mutable: true,
+            ...(defaultAgent === id && agent.mode !== "subagent" && !agent.disabled ? { defaultAgent: true } : {}),
+            ...(agent.mode ? { agentMode: agent.mode } : {}),
+            ...(agent.model ? { model: formatModel(agent.model) } : {}),
+          }),
+        )
+      configuredAgents.forEach(({ id, agent }) => {
+        const capability = inventory.agent.find((item) => item.id === id)
+        if (capability) capability.definition = agent
+      })
       // Transforms capture inventory. Listing and snapshotting force those transforms to run.
       yield* ctx.skill.list({})
       yield* tools.snapshot()
       const mcp = yield* ctx.mcp.list({})
       const instructions = yield* discovery.list()
       const plugins = yield* ctx.plugin.list({})
-      const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
+      inventory.agent.forEach((agent) => {
+        const source = agent.value && BocControlSource.get(agent.value)
+        if (!source || !("plugin" in source)) return
+        const plugin = plugins.data.find((item) => item.id === source.plugin)
+        if (plugin?.source.type === "builtin" || plugin?.source.type === "sdk") return
+        agent.mutable = false
+      })
       const statuses = new Map(mcp.data.map((item) => [item.name, item.status.status]))
       const incomplete: BocControls.Kind[] = Array.isArray(instructions) ? [] : ["instruction"]
       const items = BocControls.kinds.flatMap((kind) => {
         const known = new Set(inventory[kind].map((item) => item.id))
         const missing = Object.keys(project.policy.settings[kind])
+          .filter(() => kind !== "agent")
           .filter((id) => !known.has(id))
           .map((id) => ({ id, name: id, description: "", defaultEnabled: true, mutable: false }))
         return [...inventory[kind], ...missing].map((item) =>
@@ -167,6 +385,7 @@ export const Definition = define({
             present: known.has(item.id),
             policy: project.policy,
             failed,
+            pending,
             incomplete,
             status: statuses.get(item.id),
             provenance: originOf(item, {
@@ -241,11 +460,144 @@ export const Definition = define({
           return yield* state().pipe(Effect.orDie)
         }).pipe(Effect.uninterruptible),
       )
+    const mutateNative = (
+      change: {
+        kind: "agent" | "mcp"
+        id: string
+        expectedRevision: number
+        action: "set" | "clear"
+        enabled?: boolean
+      },
+      call: RpcCallContext<typeof BocControls.Rpc.methods.setEnabled>,
+    ) =>
+      policies.lock.withPermits(1)(
+        Effect.gen(function* () {
+          if (change.expectedRevision !== project.policy.revision)
+            return yield* Effect.fail(
+              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+            )
+          const current = yield* state().pipe(Effect.orDie)
+          const item = current.items.find((item) => item.kind === change.kind && item.id === change.id)
+          if (!item) return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
+          if (!item.mutable) return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
+          const capability = inventory[change.kind].find((item) => item.id === change.id)
+          const scope = "project" as const
+          const document = yield* configuration(scope).pipe(Effect.orDie)
+          const targetContainsDefinition = capability?.source === document.path
+          const definition =
+            !targetContainsDefinition && change.action === "set"
+              ? yield* rawDefinition(capability?.source, change.kind, change.id).pipe(Effect.orDie)
+              : undefined
+          if (!targetContainsDefinition && change.action === "set" && !definition)
+            return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
+          const path =
+            !targetContainsDefinition && change.action === "set"
+              ? change.kind === "agent"
+                ? ["agents", change.id]
+                : ["mcp", "servers", change.id]
+              : change.kind === "agent"
+                ? ["agents", change.id, "disabled"]
+                : ["mcp", "servers", change.id, "disabled"]
+          const value =
+            change.action === "clear"
+              ? undefined
+              : !targetContainsDefinition
+                ? { ...definition, disabled: !change.enabled }
+                : !change.enabled
+          const edits =
+            change.action === "clear" && !targetContainsDefinition
+              ? []
+              : modify(document.content, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } })
+          // The real config watcher can publish before this RPC resumes after the
+          // write, so mark pending before saving rather than after it.
+          yield* Effect.sync(() => pending.add(change.kind))
+          const saved = yield* saveConfiguration({
+            scope,
+            content: applyEdits(document.content, edits),
+            expectedRevision: document.revision,
+          }).pipe(Effect.orDie)
+          if (saved.type === "conflict") {
+            pending.delete(change.kind)
+            return yield* Effect.fail(
+              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+            )
+          }
+          if (saved.type === "invalid") {
+            pending.delete(change.kind)
+            return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
+          }
+          const legacy = { ...project.policy.settings[change.kind] }
+          delete legacy[change.id]
+          const settings = { ...project.policy.settings, [change.kind]: legacy }
+          yield* policies.save(ctx.location.project.id, project, { revision: project.policy.revision + 1, settings })
+          yield* Effect.forEach(project.members, (member) => member.changed())
+          return yield* state().pipe(Effect.orDie)
+        }).pipe(Effect.uninterruptible),
+      )
     const registration = yield* ctx.rpc.register(BocControls.Rpc, {
       info: () => Effect.succeed(info()),
       getState: () => policies.lock.withPermits(1)(state().pipe(Effect.orDie)),
-      setEnabled: (target, call) => mutate({ ...target, action: "set" }, call),
-      clearOverride: (target, call) => mutate({ ...target, action: "clear" }, call),
+      getConfiguration: ({ scope }) => configuration(scope).pipe(Effect.orDie),
+      saveConfiguration: (input, call) =>
+        policies.lock.withPermits(1)(
+          Effect.gen(function* () {
+            const result = yield* saveConfiguration(input).pipe(Effect.orDie)
+            if (result.type === "saved") return result.configuration
+            if (result.type === "conflict")
+              return yield* Effect.fail(
+                call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+              )
+            return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
+          }),
+        ),
+      getSource: (input, call) =>
+        Effect.gen(function* () {
+          const result = yield* source(input).pipe(Effect.orDie)
+          if (result) return result
+          return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
+        }),
+      saveSource: (input, call) =>
+        Effect.gen(function* () {
+          const result = yield* saveSource(input).pipe(Effect.orDie)
+          if (result.type === "saved") return result.source
+          if (result.type === "conflict")
+            return yield* Effect.fail(
+              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+            )
+          if (result.type === "invalid")
+            return yield* Effect.fail(call.error("invalid_source", "boc.controls.invalid_source", {}))
+          return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
+        }),
+      createSource: (input, call) =>
+        Effect.gen(function* () {
+          const result = yield* createSource(input).pipe(Effect.orDie)
+          if (result.type === "saved") return result.source
+          if (result.type === "conflict")
+            return yield* Effect.fail(
+              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+            )
+          return yield* Effect.fail(call.error("invalid_source", "boc.controls.invalid_source", {}))
+        }),
+      deleteSource: (input, call) =>
+        Effect.gen(function* () {
+          const result = yield* deleteSource(input).pipe(Effect.orDie)
+          if (result.type === "deleted") return {}
+          if (result.type === "conflict")
+            return yield* Effect.fail(
+              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+            )
+          return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
+        }),
+      setEnabled: (target, call) => {
+        if (target.kind === "agent") return mutateNative({ ...target, kind: "agent", action: "set" }, call)
+        if (target.kind === "mcp") return mutateNative({ ...target, kind: "mcp", action: "set" }, call)
+        return mutate({ ...target, action: "set" }, call)
+      },
+      clearOverride: (target, call) => {
+        if (target.kind === "agent") return mutateNative({ ...target, kind: "agent", action: "clear" }, call)
+        if (target.kind === "mcp") return mutateNative({ ...target, kind: "mcp", action: "clear" }, call)
+        return mutate({ ...target, action: "clear" }, call)
+      },
       retryApply: (target, call) => mutate({ ...target, action: "retry" }, call),
     })
     member.changed = () =>
@@ -259,7 +611,16 @@ export const Definition = define({
         ),
       ),
       Stream.debounce("100 millis"),
-      Stream.runForEach(() => member.changed()),
+      Stream.runForEach((event) =>
+        Effect.sync(() => {
+          if (event.type === "config.updated") {
+            pending.delete("agent")
+            pending.delete("mcp")
+          }
+          if (event.type === "agent.updated") pending.delete("agent")
+          if (["mcp.status.changed", "mcp.tools.changed"].includes(event.type)) pending.delete("mcp")
+        }).pipe(Effect.andThen(member.changed())),
+      ),
       Effect.forkScoped({ startImmediately: true }),
     )
   }, Effect.orDie),
@@ -271,16 +632,26 @@ function describe(input: {
   present: boolean
   policy: BocControls.Policy
   failed: Set<BocControls.Kind>
+  pending: Set<BocControls.Kind>
   incomplete: readonly BocControls.Kind[]
   status: string | undefined
   provenance: { source: string; origin: typeof BocControls.Origin.Type }
 }): BocControls.Item {
-  const override = input.policy.settings[input.kind][input.item.id] ?? null
+  // Agent activation is native. Existing MCP policy overrides retain their
+  // prior precedence until users explicitly migrate or clear them.
+  const policyOverride = input.policy.settings[input.kind][input.item.id]
+  const override =
+    input.kind === "agent"
+      ? (input.item.nativeOverride ?? null)
+      : input.kind === "mcp"
+        ? (policyOverride ?? input.item.nativeOverride ?? null)
+        : (policyOverride ?? null)
   const enabled = override ?? input.item.defaultEnabled
   const unconfirmed =
     !input.present ||
     (override !== null && !input.item.mutable) ||
     input.failed.has(input.kind) ||
+    input.pending.has(input.kind) ||
     input.incomplete.includes(input.kind)
   return {
     kind: input.kind,
@@ -290,10 +661,13 @@ function describe(input: {
     ...input.provenance,
     override,
     defaultEnabled: input.present ? input.item.defaultEnabled : null,
+    ...(input.item.defaultAgent ? { defaultAgent: true } : {}),
+    ...(input.item.agentMode ? { agentMode: input.item.agentMode } : {}),
+    ...(input.item.model ? { model: input.item.model } : {}),
     mutable: input.present && input.item.mutable,
     present: input.present,
     effective: unconfirmed ? "unknown" : enabled ? "enabled" : "disabled",
-    application: input.failed.has(input.kind) ? "failed" : "applied",
+    application: input.failed.has(input.kind) ? "failed" : input.pending.has(input.kind) ? "pending" : "applied",
     availability: availability(input.kind, input.present, enabled, input.status),
     ...reason(input.present, input.failed.has(input.kind), input.item.mutable, override),
     effect: effect(input.kind),
@@ -336,7 +710,10 @@ function originOf(
   if (file) return { source: file, origin: fileOrigin(file, ctx.global, ctx.canonical, ctx.directory) }
   return {
     source: declaration ?? (recorded && "plugin" in recorded ? recorded.plugin : "opencode.registry"),
-    origin: pluginOrigin(plugin?.source),
+    origin:
+      recorded && "plugin" in recorded && recorded.plugin.startsWith("opencode.")
+        ? "system"
+        : pluginOrigin(plugin?.source),
   }
 }
 
@@ -387,4 +764,35 @@ function fileOrigin(
 
 function pluginOrigin(source: Plugin.Source | undefined): typeof BocControls.Origin.Type {
   return source?.type === "builtin" || source?.type === "sdk" ? "system" : "plugin"
+}
+
+function validConfiguration(content: string) {
+  const errors: ParseError[] = []
+  const value = parse(content, errors, { allowTrailingComma: true })
+  if (errors.length || !value || typeof value !== "object" || Array.isArray(value)) return false
+  return ConfigNormalize.normalize(value).type === "normalized"
+}
+
+function validSource(source: Pick<BocControls.Source, "kind" | "path">, content: string) {
+  if (source.kind === "instruction") return true
+  return SkillFile.parse(path.dirname(source.path), source.path, content)._tag === "Parsed"
+}
+
+function safeSourceName(name: string) {
+  return /^[a-zA-Z0-9][a-zA-Z0-9_-]*$/.test(name)
+}
+
+function formatModel(model: { providerID: string; id?: string; model?: string; variant?: string }) {
+  const id = model.id ?? model.model
+  return id ? `${model.providerID}/${id}${model.variant ? `#${model.variant}` : ""}` : model.providerID
+}
+
+function sourceOf(value: object) {
+  const source = BocControlSource.get(value)
+  return source && "file" in source ? source.file : undefined
+}
+
+function pluginSource(value: object) {
+  const source = BocControlSource.get(value)
+  return source && "plugin" in source
 }

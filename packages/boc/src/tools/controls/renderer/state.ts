@@ -15,6 +15,7 @@ export type ControlError =
   | "unknown"
   | "reconciled"
   | "rejected"
+  | "connection"
 type Snapshot = Omit<ControlState, "items"> & { items: Array<ControlItem & { key: string }> }
 
 export function createProjectControls(host: ControlsHost, initial?: ControlsSelection) {
@@ -159,7 +160,11 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
     writing?.abort()
   })
 
-  const mutate = async (item: ControlItem & { key: string }, action: "set" | "clear" | "retry", enabled?: boolean) => {
+  const mutate = async (
+    item: ControlItem & { key: string },
+    action: "set" | "clear" | "retry" | "connect",
+    enabled?: boolean,
+  ) => {
     const selected = view.selection
     const snapshot = view.snapshot
     const transport = connection()
@@ -176,12 +181,17 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
     const client = transport.client()
     setView({ pending: item.key, loading: false, rowError: undefined, error: undefined })
     try {
+      if (action === "connect") {
+        await host.connectMcp?.(selected, item.id)
+      }
       const result =
-        action === "clear"
-          ? await client.clearOverride(target, options)
-          : action === "retry"
-            ? await client.retryApply(target, options)
-            : await client.setEnabled({ ...target, enabled: enabled === true }, options)
+        action === "connect"
+          ? await client.getState({}, options)
+          : action === "clear"
+            ? await client.clearOverride(target, options)
+            : action === "retry"
+              ? await client.retryApply(target, options)
+              : await client.setEnabled({ ...target, enabled: enabled === true }, options)
       if (current !== epoch || identity !== transport.identity()) return
       if (
         result.info.project.id !== snapshot.info.project.id ||
@@ -191,7 +201,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
       adopt(result)
     } catch (error) {
       if (current !== epoch) return
-      const kind = failure(error, true)
+      const kind = action === "connect" ? "connection" : failure(error, true)
       setView({ rowError: { key: item.key, error: kind }, ...(kind === "unknown" ? { error: kind, stale: true } : {}) })
       refreshAfterWrite = true
     } finally {
