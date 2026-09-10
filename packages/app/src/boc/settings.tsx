@@ -1,9 +1,11 @@
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Select } from "@opencode/ui/select"
-import { createEffect, createMemo, Show } from "solid-js"
-import { createStore } from "solid-js/store"
+import { Schema } from "effect"
+import { createMemo, Show } from "solid-js"
 import { BocEnvironmentProjectSetting } from "@/boc/environments/settings"
 import { useLanguage } from "@/runtime/i18n/language"
+import { Persistence } from "@/runtime/persistence/schema"
+import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
 import { SettingsList } from "@/settings/list"
@@ -15,15 +17,15 @@ import { pathKey } from "@/workspaces/path-key"
 import { sameDirectory } from "@/workspaces/paths"
 import { LocationProvider } from "@/workspaces/location"
 
+const preferences = Persistence.struct({
+  projects: Persistence.record(Schema.String),
+})
+
 export function BocSettings(props: { directory?: string }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const global = useGlobal()
-  const [state, setState] = createStore({
-    server: undefined as ServerConnection.Key | undefined,
-    directory: undefined as string | undefined,
-    project: undefined as string | undefined,
-  })
+  const [saved, setSaved, , ready] = persisted(Persist.window("boc.settings"), preferences, { projects: {} })
   const server = global.settings.server.selected
   const projects = createMemo(() => {
     const selected = server()
@@ -33,25 +35,21 @@ export function BocSettings(props: { directory?: string }) {
       .projects.list()
       .filter((project) => project.id && project.id !== "global")
   })
-  const project = createMemo(() => projects().find((item) => pathKey(item.worktree) === state.project))
+  const project = createMemo(() => {
+    const selected = server()
+    if (!selected || !ready()) return
+    const remembered = saved.projects[ServerConnection.key(selected)]
+    const directory = props.directory
+    return (
+      projects().find((item) => pathKey(item.worktree) === remembered) ??
+      (directory ? projects().find((item) => sameDirectory(item.worktree, directory)) : undefined)
+    )
+  })
   const selection = createMemo(() => {
     const selectedServer = server()
     const selectedProject = project()
     if (!selectedServer || !selectedProject) return
     return { server: selectedServer, project: selectedProject }
-  })
-
-  createEffect(() => {
-    const selected = server()
-    const serverKey = selected ? ServerConnection.key(selected) : undefined
-    if (state.server === serverKey && state.directory === props.directory) return
-    const directory = props.directory
-    const contextual = directory ? projects().find((project) => sameDirectory(project.worktree, directory)) : undefined
-    setState({
-      server: serverKey,
-      directory: props.directory,
-      project: contextual ? pathKey(contextual.worktree) : undefined,
-    })
   })
 
   return (
@@ -64,7 +62,7 @@ export function BocSettings(props: { directory?: string }) {
               {t("boc.settings.description")}
             </span>
           </div>
-          <InlineServerSelect onServerSelect={() => setState("project", undefined)} />
+          <InlineServerSelect />
         </div>
       </div>
 
@@ -80,8 +78,12 @@ export function BocSettings(props: { directory?: string }) {
                 value={(item) => pathKey(item.worktree)}
                 label={displayName}
                 placeholder={t("boc.settings.project.select")}
-                disabled={!server() || projects().length === 0}
-                onSelect={(item) => setState("project", item ? pathKey(item.worktree) : undefined)}
+                disabled={!ready() || !server() || projects().length === 0}
+                onSelect={(item) => {
+                  const selected = server()
+                  if (!selected || !item) return
+                  setSaved("projects", ServerConnection.key(selected), pathKey(item.worktree))
+                }}
               />
             </SettingsRow>
           </SettingsList>

@@ -27,7 +27,7 @@ This is the operational map of Boc's deliberate differences from `upstream/beta`
 
 Development-environment controls use grouped menus, content-sized labeled split buttons, semantic success/warning/danger cards, and a bounded LTR monospace log with terminal control sequences removed for display. Session tab menus keep Rename and Close tab first, followed by an environment submenu and direct checkout shortcuts. Checkout-path copying is available in both menus; macOS desktop additionally opens that checkout in Terminal through the existing platform API.
 
-Boc settings reuse the upstream settings sections, lists and rows for project selection and development-environment controls. The domain input sits alongside its label, and shared-service details use an expandable note below the controls.
+Boc settings reuse the upstream settings sections, lists and rows for project selection and development-environment controls. The selected project is remembered per server in window preferences; the current project provides the fallback when no saved selection is available. The domain input sits alongside its label, and shared-service details use an expandable note below the controls.
 
 Configured stacks expose Open in browser directly in the session tab menu, before the environment submenu. Its icon reports container state: success for running, danger for stopped or absent containers, and warning for partial, unknown or refreshing/failed inspection. The same status is available as a tooltip and accessible description; container status does not imply HTTP readiness.
 
