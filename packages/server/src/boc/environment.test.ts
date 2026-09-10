@@ -34,7 +34,7 @@ it.live("serves environment RPC and accepts registered Lane linked worktrees", (
 
     const boc = yield* backend(tmp.path, "boc")
     const environments = boc.api.rpc(BocEnvironmentRpc.Rpc)
-    expect(yield* Effect.promise(() => environments.info({}, options))).toEqual({ protocol: 1 })
+    expect(yield* Effect.promise(() => environments.info({}, options))).toEqual({ protocol: 2 })
     const unauthenticated = yield* Effect.promise(() =>
       boc.handler(
         new Request(
