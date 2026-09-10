@@ -1,3 +1,42 @@
-[data-slot="boc-project-tab"][data-worktree] [data-slot="project-avatar-surface"] {
-  box-shadow: inset 0 0 0 1px var(--v2-icon-icon-accent);
+[data-boc-worktree-state] {
+  --boc-worktree-ring: var(--v2-icon-icon-accent);
+  --boc-worktree-ring-style: dashed;
+}
+
+[data-boc-worktree-state="running"] {
+  --boc-worktree-ring: var(--v2-state-fg-success);
+  --boc-worktree-ring-style: solid;
+}
+
+[data-boc-worktree-state="partial"] {
+  --boc-worktree-ring: var(--v2-state-fg-warning);
+  --boc-worktree-ring-style: solid;
+}
+
+[data-boc-worktree-state="stopped"] {
+  --boc-worktree-ring: var(--v2-icon-icon-muted);
+}
+
+[data-boc-worktree-state] [data-component="project-avatar-v2"]::before {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px var(--boc-worktree-ring-style) var(--boc-worktree-ring);
+  border-radius: 8px;
+  /* Match the actual tab surface, including its hover and selected overlays. */
+  background:
+    linear-gradient(var(--tab-overlay, transparent), var(--tab-overlay, transparent)),
+    var(--tab-base, var(--v2-background-bg-deep));
+  pointer-events: none;
+}
+[data-slot="boc-project-tab"] [data-slot="project-avatar-slot"] {
+  width: 24px;
+  height: 24px;
+}
+
+[data-slot="boc-project-tab"]
+  [data-titlebar-tab][data-orientation="vertical"]:has([data-slot="tab-project"])
+  [data-slot="tab-link"] {
+  grid-template-columns: 24px minmax(0, 1fr);
+  grid-template-rows: 24px var(--line-height-compact);
 }

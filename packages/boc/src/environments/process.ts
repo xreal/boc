@@ -33,4 +33,5 @@ export interface ProcessHost {
     onOutput: (event: { data: Uint8Array; end: number }) => void,
   ) => Promise<ProcessObservation>
   readonly terminate: (id: string) => Promise<void>
+  readonly resize: (id: string, cols: number, rows: number) => Promise<void>
 }

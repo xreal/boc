@@ -26,10 +26,12 @@ export const node = makeGlobalNode({
           effect: (context) =>
             Effect.gen(function* () {
               yield* context.rpc.register(BocEnvironmentRpc.Rpc, {
-                info: () => Effect.succeed({ protocol: 1 as const }),
+                info: () => Effect.succeed({ protocol: 2 as const }),
                 inspect: (input) => Effect.promise(() => environments.inspect(input.projectID, input.directory)),
                 run: (input) => Effect.promise(() => environments.run(input)),
                 cancel: (input) => Effect.promise(() => environments.cancel(input.projectID, input.directory)),
+                logs: (input) => Effect.promise(() => environments.logs(input)),
+                resize: (input) => Effect.promise(() => environments.resize(input)),
               })
             }).pipe(Effect.orDie),
         }),

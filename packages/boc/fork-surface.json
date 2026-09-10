@@ -18,6 +18,10 @@
   ],
   "approved": [
     {
+      "path": "packages/storybook/.storybook/mocks/app/context/layout.ts",
+      "reason": "Supply the current route to the real settings-surface provider used by Boc environment stories"
+    },
+    {
       "path": "packages/desktop/src/main/service/desktop-cli.ts",
       "reason": "Stage Boc backends by artifact identity and compile the native Boc backend for local desktop development"
     },

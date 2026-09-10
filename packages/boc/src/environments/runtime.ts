@@ -109,6 +109,7 @@ export const configured = (options: Options = {}) =>
             }
           },
           terminate: (id) => run(persistentPty.remove(Pty.ID.make(id))),
+          resize: (id, cols, rows) => run(persistentPty.resize(Pty.ID.make(id), cols, rows)),
         }
         return EnvironmentBackendService.of(
           createEnvironmentBackend({

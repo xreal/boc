@@ -13,6 +13,8 @@ describe("shared environment store", () => {
       },
       run: async () => ({ accepted: true as const, environment: environmentFixtures.running }),
       cancel: async () => ({ cancelled: true, environment: environmentFixtures.setupCancelled }),
+      logs: async () => ({ available: true, text: "", checkedAt: 0 }),
+      resize: async () => true,
     })
     const registry = createEnvironmentRegistry()
     const input = {
@@ -59,6 +61,8 @@ describe("shared environment store", () => {
           }
         },
         cancel: async () => ({ cancelled: true, environment: environmentFixtures.setupCancelled }),
+        logs: async () => ({ available: true, text: "", checkedAt: 0 }),
+        resize: async () => true,
       }),
     })
 
@@ -92,6 +96,8 @@ describe("shared environment store", () => {
         },
         run: async () => ({ accepted: true as const, environment: environmentFixtures.setupRunning }),
         cancel: async () => ({ cancelled: true, environment: environmentFixtures.setupCancelled }),
+        logs: async () => ({ available: true, text: "", checkedAt: 0 }),
+        resize: async () => true,
       }),
     })
 
@@ -115,6 +121,8 @@ describe("shared environment store", () => {
         inspect: async () => environmentFixtures.setupRunning,
         run: async () => ({ accepted: true as const, environment: environmentFixtures.setupRunning }),
         cancel: async () => ({ cancelled: true, environment: environmentFixtures.setupCancelled }),
+        logs: async () => ({ available: true, text: "", checkedAt: 0 }),
+        resize: async () => true,
       }),
     })
 
@@ -138,6 +146,8 @@ describe("shared environment store", () => {
           environment: environmentFixtures.setupRunning,
         }),
         cancel: async () => ({ cancelled: true, environment: environmentFixtures.setupCancelled }),
+        logs: async () => ({ available: true, text: "", checkedAt: 0 }),
+        resize: async () => true,
       }),
     })
 

@@ -12,10 +12,15 @@ export function environmentApi(api: Pick<OpenCodeClient, "rpc">) {
       directory: string
       sessionID: string
       action: BocEnvironment.Action
+      containerID?: string
       domain?: string
       confirmation?: "remove-environment"
     }) => rpc.run(input, { location: { directory: input.directory } }),
     cancel: (input: { projectID: string; directory: string }) =>
       rpc.cancel(input, { location: { directory: input.directory } }),
+    logs: (input: { projectID: string; directory: string; containerID: string }) =>
+      rpc.logs(input, { location: { directory: input.directory } }),
+    resize: (input: { projectID: string; directory: string; runID: string; cols: number; rows: number }) =>
+      rpc.resize(input, { location: { directory: input.directory } }),
   }
 }

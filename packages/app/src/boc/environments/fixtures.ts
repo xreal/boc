@@ -4,6 +4,18 @@ import { AbsolutePath } from "@opencode/schema/schema"
 
 const now = Date.UTC(2026, 8, 6, 9, 30)
 
+function fixtureContainers(running: number): BocEnvironment.Container[] {
+  return ["lb", "shop", "ssr", "api-php81", "api-php83", "api-php84"].map((service, index) => ({
+    id: `container-${service}`,
+    name: `devenv-boc-204-environments-${service}-1`,
+    service,
+    state: index < running ? "running" : "exited",
+    health: index === 1 && index < running ? "healthy" : index === 2 && running === 4 ? "unhealthy" : "none",
+    ports: index === 0 ? ["127.0.0.1:8443 → 443/tcp"] : [],
+    exitCode: index >= running && running === 4 ? 1 : 0,
+  }))
+}
+
 const base: BocEnvironment.State = {
   backend: "local",
   projectID: Project.ID.make("project_fixture"),
@@ -53,7 +65,7 @@ export const environmentFixtures = {
   setupCancelled: {
     ...base,
     stack: configured,
-    containers: { status: "partial", total: 6, running: 2 },
+    containers: { status: "partial", total: 6, running: 2, items: fixtureContainers(2) },
     latestRun: {
       id: "run_setup_cancelled",
       action: "setup",
@@ -73,7 +85,7 @@ export const environmentFixtures = {
   stopped: {
     ...base,
     stack: configured,
-    containers: { status: "stopped", total: 6, running: 0 },
+    containers: { status: "stopped", total: 6, running: 0, items: fixtureContainers(0) },
     latestRun: {
       id: "run_stop_succeeded",
       action: "stop",
@@ -88,7 +100,7 @@ export const environmentFixtures = {
   running: {
     ...base,
     stack: configured,
-    containers: { status: "running", total: 6, running: 6 },
+    containers: { status: "running", total: 6, running: 6, items: fixtureContainers(6) },
     http: { status: "ready", checkedAt: now - 2_000, statusCode: 200 },
     latestRun: {
       id: "run_start_succeeded",
@@ -104,7 +116,7 @@ export const environmentFixtures = {
   partial: {
     ...base,
     stack: configured,
-    containers: { status: "partial", total: 6, running: 4 },
+    containers: { status: "partial", total: 6, running: 4, items: fixtureContainers(4) },
     http: { status: "unreachable", checkedAt: now - 5_000 },
   },
   invalidAssignment: {

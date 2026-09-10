@@ -5,7 +5,7 @@ import { AbsolutePath, NonNegativeInt, optional } from "../schema.js"
 export const Backend = Schema.Literal("local")
 export type Backend = typeof Backend.Type
 
-export const Action = Schema.Literals(["setup", "start", "stop", "remove"])
+export const Action = Schema.Literals(["setup", "start", "stop", "restart", "remove"])
 export type Action = typeof Action.Type
 
 export const RunStatus = Schema.Literals(["running", "succeeded", "failed", "cancelled", "unknown"])
@@ -39,6 +39,10 @@ export const Run = Schema.Struct({
   exitCode: optional(Schema.Number),
   log: Schema.String,
   truncated: Schema.Boolean,
+  logStart: optional(NonNegativeInt),
+  containerID: optional(Schema.String),
+  service: optional(Schema.String),
+  phase: optional(Schema.Literals(["command", "readiness"])),
 }).annotate({ identifier: "BocEnvironment.Run" })
 
 export const Stack = Schema.Union([
@@ -56,11 +60,30 @@ export const Stack = Schema.Union([
 ]).annotate({ identifier: "BocEnvironment.Stack" })
 export type Stack = typeof Stack.Type
 
+export interface Container extends Schema.Schema.Type<typeof Container> {}
+export const Container = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  service: Schema.String,
+  state: Schema.Literals(["created", "running", "paused", "restarting", "removing", "exited", "dead", "unknown"]),
+  health: Schema.Literals(["none", "starting", "healthy", "unhealthy"]),
+  ports: Schema.Array(Schema.String),
+  exitCode: Schema.Number,
+}).annotate({ identifier: "BocEnvironment.Container" })
+
+export interface ContainerLogs extends Schema.Schema.Type<typeof ContainerLogs> {}
+export const ContainerLogs = Schema.Struct({
+  available: Schema.Boolean,
+  text: Schema.String,
+  checkedAt: Schema.Number,
+}).annotate({ identifier: "BocEnvironment.ContainerLogs" })
+
 export interface Containers extends Schema.Schema.Type<typeof Containers> {}
 export const Containers = Schema.Struct({
   status: Schema.Literals(["unknown", "absent", "stopped", "running", "partial"]),
   total: NonNegativeInt,
   running: NonNegativeInt,
+  items: optional(Schema.Array(Container)),
 }).annotate({ identifier: "BocEnvironment.Containers" })
 
 export const HttpReadiness = Schema.Union([

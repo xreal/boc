@@ -284,10 +284,13 @@ function EnvironmentMenuItems(props: {
   const running = () => environment()?.latestRun?.status === "running"
   const retry = () => retryableEnvironmentAction(environment())
   const configured = () => environment()?.stack.status === "configured"
-  const canStart = () => configured() && environment()?.containers.status === "stopped"
+  const canStart = () => {
+    const status = environment()?.containers.status
+    return configured() && environment()?.availability.available && (status === "stopped" || status === "partial")
+  }
   const canStop = () => {
     const status = environment()?.containers.status
-    return status === "running" || status === "partial"
+    return environment()?.availability.available && (status === "running" || status === "partial")
   }
   const runAndShowDetails = (action: "setup" | "start" | "stop") => () => void props.actions.runAndShowDetails(action)
 
@@ -341,16 +344,16 @@ function EnvironmentMenuItems(props: {
               {props.t("boc.environments.setupAgain")}
             </Menu.Item>
           </Show>
-          <Show when={!running() && !retry() && canStart()}>
+          <Show when={!running() && canStart()}>
             <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("start")}>
               <Icon name="circle-check" size="small" />
-              {props.t("boc.environments.start")}
+              {props.t("boc.environments.panel.startAll")}
             </Menu.Item>
           </Show>
-          <Show when={!running() && !retry() && canStop()}>
+          <Show when={!running() && canStop()}>
             <Menu.Item disabled={!!props.resource.state.acting} onSelect={runAndShowDetails("stop")}>
               <Icon name="stop" size="small" />
-              {props.t("boc.environments.stop")}
+              {props.t("boc.environments.panel.stopAll")}
             </Menu.Item>
           </Show>
           <Show when={configured()}>
@@ -495,6 +498,7 @@ function createEnvironmentActions(input: {
     if (action === "remove") return remove()
     await input.resource.run(action, input.target.session.id, {
       domain: action === "setup" ? input.domain() : undefined,
+      containerID: input.resource.state.environment?.latestRun?.containerID,
     })
     await details()
   }
@@ -513,7 +517,7 @@ function createEnvironmentActions(input: {
   }
 }
 
-export function actionLabel(t: BocTranslator, action: "setup" | "start" | "stop" | "remove") {
+export function actionLabel(t: BocTranslator, action: BocEnvironment.Action) {
   return t(`boc.environments.action.${action}`)
 }
 

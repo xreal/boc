@@ -54,6 +54,7 @@ const view = {
 
 export function useLayout() {
   return {
+    route: useCurrentRoute(),
     tabs: () => tabs,
     view: () => view,
     fileTree: {

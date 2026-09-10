@@ -2,7 +2,15 @@ import { afterEach, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { createStackAssignment, inspectStack, preflight, resolveDevenv, type DevenvInstallation } from "./devenv"
+import {
+  createStackAssignment,
+  inspectContainers,
+  inspectStack,
+  preflight,
+  resolveDevenv,
+  runCommand,
+  type DevenvInstallation,
+} from "./devenv"
 
 const cleanup: string[] = []
 
@@ -11,6 +19,52 @@ afterEach(async () => {
 })
 
 describe("devenv adapter", () => {
+  test("reports Docker health separately from running state and preserves published ports", async () => {
+    const root = await temporary("devenv-containers-")
+    const installation = fixtureInstallation(root)
+    const stack = createStackAssignment(installation, path.join(root, "src", ".lane", "trees", "checkout"))
+    if (!stack) throw new Error("Expected stack assignment")
+    const container = {
+      Id: "a".repeat(64),
+      Name: "/devenv-checkout-shop-1",
+      Config: {
+        Labels: {
+          "com.docker.compose.project": stack.composeProject,
+          "com.docker.compose.service": "shop",
+          "com.docker.compose.project.working_dir": root,
+          "com.docker.compose.project.config_files": `${path.join(root, "docker-compose.yml")},${path.join(root, "docker-compose.worktree.yml")}`,
+        },
+      },
+      State: { Running: true, Status: "running", ExitCode: 0, Health: { Status: "unhealthy" } },
+      NetworkSettings: { Ports: { "443/tcp": [{ HostIp: "127.0.0.1", HostPort: "8443" }], "80/tcp": null } },
+    }
+    const inspect = () =>
+      inspectContainers(installation, stack, async (command) => ({
+        exitCode: 0,
+        stderr: "",
+        stdout: command.args[0] === "ps" ? `${container.Id}\n` : JSON.stringify([container]),
+      }))
+    expect(await inspect()).toMatchObject({
+      status: "running",
+      owned: true,
+      items: [{ service: "shop", health: "unhealthy", ports: ["127.0.0.1:8443 → 443/tcp"] }],
+    })
+    container.Config.Labels["com.docker.compose.project"] = "other-project"
+    expect(await inspect()).toMatchObject({ status: "unknown", owned: false })
+  })
+
+  test("bounds real process output while draining both streams and preserving UTF-8", async () => {
+    const result = await runCommand({
+      executable: process.execPath,
+      args: ["-e", "process.stdout.write('✓'.repeat(30000)); process.stderr.write('warning\\n')"],
+      outputLimit: 1024,
+    })
+    expect(result.exitCode).toBe(0)
+    expect(Buffer.byteLength(result.stdout)).toBeLessThanOrEqual(1024)
+    expect(result.stdout).not.toContain("�")
+    expect(result.stderr).toBe("warning\n")
+  })
+
   test("resolves the active executable and Lane lifecycle scripts", async () => {
     const root = await temporary("devenv-resolution-")
     const bin = path.join(root, "bin")

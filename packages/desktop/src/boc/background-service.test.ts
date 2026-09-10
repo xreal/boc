@@ -120,7 +120,7 @@ describe("Boc background service", () => {
   test("recognizes only an enabled Boc backend", async () => {
     const responses = [
       new Response(JSON.stringify({ healthy: true, version: "1.2.3", pid: 1 })),
-      Response.json({ output: { protocol: 1 } }),
+      Response.json({ output: { protocol: 2 } }),
       new Response(
         JSON.stringify({
           output: {
@@ -143,11 +143,19 @@ describe("Boc background service", () => {
     })
   })
 
+  test("rejects the old environment contract without service controls", async () => {
+    const responses = [Response.json({ version: "1.2.3" }), Response.json({ output: { protocol: 1 } })]
+    expect(await inspectBocService(official, "/project", undefined, async () => responseFrom(responses))).toEqual({
+      version: "1.2.3",
+      boc: false,
+    })
+  })
+
   test("rejects an older Boc backend even when its server version matches", async () => {
     const requests: { url: URL; init?: RequestInit }[] = []
     const responses = [
       Response.json({ version: "1.2.3" }),
-      Response.json({ output: { protocol: 1 } }),
+      Response.json({ output: { protocol: 2 } }),
       new Response("missing", { status: 404 }),
     ]
     expect(

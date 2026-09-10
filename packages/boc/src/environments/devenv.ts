@@ -1,11 +1,14 @@
 import fs from "node:fs/promises"
 import path from "node:path"
+import { Option, Schema } from "effect"
+import { BocEnvironment } from "@opencode/schema/boc/environment"
 
 export type Command = {
   readonly executable: string
   readonly args: readonly string[]
   readonly cwd?: string
   readonly env?: Readonly<Record<string, string>>
+  readonly outputLimit?: number
 }
 
 export type CommandResult = {
@@ -30,6 +33,7 @@ export type ContainerInspection = {
   readonly total: number
   readonly running: number
   readonly owned: boolean
+  readonly items?: readonly BocEnvironment.Container[]
 }
 
 export type DevenvInstallation = {
@@ -110,7 +114,14 @@ export async function inspectContainers(
 ): Promise<ContainerInspection> {
   const listed = await run({
     executable: "docker",
-    args: ["ps", "--all", "--quiet", "--filter", `label=com.docker.compose.project=${stack.composeProject}`],
+    args: [
+      "ps",
+      "--all",
+      "--quiet",
+      "--no-trunc",
+      "--filter",
+      `label=com.docker.compose.project=${stack.composeProject}`,
+    ],
     env: installation.environment,
   }).catch(() => undefined)
   if (!listed || listed.exitCode !== 0) return { status: "unknown", total: 0, running: 0, owned: false }
@@ -121,7 +132,7 @@ export async function inspectContainers(
   if (ids.length === 0) return { status: "absent", total: 0, running: 0, owned: true }
   const inspected = await run({
     executable: "docker",
-    args: ["inspect", "--format", "{{json .Config.Labels}}\t{{.State.Running}}", ...ids],
+    args: ["inspect", ...ids],
     env: installation.environment,
   }).catch(() => undefined)
   if (!inspected || inspected.exitCode !== 0) return { status: "unknown", total: ids.length, running: 0, owned: false }
@@ -129,41 +140,85 @@ export async function inspectContainers(
     path.join(installation.root, "docker-compose.yml"),
     path.join(installation.root, "docker-compose.worktree.yml"),
   ]
-  const containers = inspected.stdout
-    .split(/\r?\n/)
-    .filter(Boolean)
-    .map((line) => {
-      const separator = line.lastIndexOf("\t")
-      if (separator < 0) return
-      const labels = parseLabels(line.slice(0, separator))
-      if (!labels) return
-      const files = (labels["com.docker.compose.project.config_files"] ?? "").split(",")
-      const workingDirectory = labels["com.docker.compose.project.working_dir"]
-      return {
-        running: line.slice(separator + 1) === "true",
-        owned:
-          labels["com.docker.compose.project"] === stack.composeProject &&
-          !!workingDirectory &&
-          path.resolve(workingDirectory) === installation.root &&
-          expectedFiles.every((file) => files.includes(file)),
-      }
-    })
-  if (containers.length !== ids.length || containers.some((value) => !value?.owned)) {
+  const containers = Option.getOrUndefined(decodeContainers(inspected.stdout))
+  if (!containers || containers.length !== ids.length) {
     return { status: "unknown", total: ids.length, running: 0, owned: false }
   }
-  const running = containers.filter((value) => value?.running).length
+  const owned = containers.every((container) => {
+    const labels = container.Config.Labels
+    const files = (labels["com.docker.compose.project.config_files"] ?? "").split(",")
+    const workingDirectory = labels["com.docker.compose.project.working_dir"]
+    return (
+      ids.includes(container.Id) &&
+      labels["com.docker.compose.project"] === stack.composeProject &&
+      !!workingDirectory &&
+      path.resolve(workingDirectory) === installation.root &&
+      expectedFiles.every((file) => files.includes(file))
+    )
+  })
+  if (!owned) {
+    return { status: "unknown", total: ids.length, running: 0, owned: false }
+  }
+  const running = containers.filter((value) => value.State.Running).length
   const status = running === 0 ? "stopped" : running === containers.length ? "running" : "partial"
-  return { status, total: containers.length, running, owned: true }
+  const items = containers
+    .map(
+      (container): BocEnvironment.Container => ({
+        id: container.Id,
+        name: container.Name.replace(/^\//, ""),
+        service: container.Config.Labels["com.docker.compose.service"] || container.Name.replace(/^\//, ""),
+        state: container.State.Status,
+        health: container.State.Health?.Status ?? "none",
+        exitCode: container.State.ExitCode,
+        ports: Object.entries(container.NetworkSettings.Ports).flatMap(([port, bindings]) =>
+          (bindings ?? []).map((binding) => `${binding.HostIp}:${binding.HostPort} → ${port}`),
+        ),
+      }),
+    )
+    .sort((left, right) => left.service.localeCompare(right.service) || left.name.localeCompare(right.name))
+  return { status, total: containers.length, running, owned: true, items }
 }
+
+const DockerContainer = Schema.Struct({
+  Id: Schema.String,
+  Name: Schema.String,
+  Config: Schema.Struct({ Labels: Schema.Record(Schema.String, Schema.String) }),
+  State: Schema.Struct({
+    Running: Schema.Boolean,
+    Status: BocEnvironment.Container.fields.state,
+    ExitCode: Schema.Number,
+    Health: Schema.optional(Schema.Struct({ Status: BocEnvironment.Container.fields.health })),
+  }),
+  NetworkSettings: Schema.Struct({
+    Ports: Schema.Record(
+      Schema.String,
+      Schema.NullOr(Schema.Array(Schema.Struct({ HostIp: Schema.String, HostPort: Schema.String }))),
+    ),
+  }),
+})
+const decodeContainers = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Array(DockerContainer)))
 
 export async function checkReadiness(
   installation: DevenvInstallation,
   stack: StackAssignment,
   run: CommandRunner = runCommand,
+  timeout = 15,
 ) {
   const response = await run({
     executable: "curl",
-    args: ["-k", "-sS", "-D", "-", "-o", "/dev/null", "--connect-timeout", "2", "--max-time", "15", stack.url],
+    args: [
+      "-k",
+      "-sS",
+      "-D",
+      "-",
+      "-o",
+      "/dev/null",
+      "--connect-timeout",
+      "2",
+      "--max-time",
+      String(timeout),
+      stack.url,
+    ],
     env: installation.environment,
   }).catch(() => undefined)
   if (!response || response.exitCode !== 0) return { ready: false as const }
@@ -203,12 +258,21 @@ export const runCommand: CommandRunner = async (command) => {
     stdout: "pipe",
     stderr: "pipe",
   })
-  const [stdout, stderr, exitCode] = await Promise.all([
-    new Response(child.stdout).text(),
-    new Response(child.stderr).text(),
-    child.exited,
-  ])
-  return { exitCode, stdout, stderr }
+  const output = { stdout: Buffer.alloc(0), stderr: Buffer.alloc(0) }
+  const read = async (stream: ReadableStream<Uint8Array>, channel: "stdout" | "stderr") => {
+    const reader = stream.getReader()
+    const limit = command.outputLimit ?? 4 * 1024 * 1024
+    while (true) {
+      const chunk = await reader.read()
+      if (chunk.done) return
+      const next = Buffer.concat([output[channel], chunk.value])
+      let start = Math.max(0, next.byteLength - limit)
+      while (start < next.byteLength && (next[start] & 0xc0) === 0x80) start += 1
+      output[channel] = next.subarray(start)
+    }
+  }
+  const [, , exitCode] = await Promise.all([read(child.stdout, "stdout"), read(child.stderr, "stderr"), child.exited])
+  return { exitCode, stdout: output.stdout.toString("utf8"), stderr: output.stderr.toString("utf8") }
 }
 
 async function findExecutable(name: string, value: string | undefined) {
@@ -271,6 +335,8 @@ function processEnvironment(environment: NodeJS.ProcessEnv, executable: string, 
     DEVENV_BIN: executable,
     DEVENV_BASE_DIRECTORY: root,
     TERM: "xterm-256color",
+    COMPOSE_PROGRESS: "plain",
+    COMPOSE_ANSI: "never",
   }
 }
 
@@ -297,15 +363,4 @@ function sameAssignment(left: StackAssignment, right: StackAssignment) {
     left.url === right.url &&
     left.sourceDirectory === right.sourceDirectory
   )
-}
-
-function parseLabels(value: string) {
-  try {
-    const parsed: unknown = JSON.parse(value)
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return
-    if (!Object.values(parsed).every((item) => typeof item === "string")) return
-    return parsed as Record<string, string>
-  } catch {
-    return
-  }
 }

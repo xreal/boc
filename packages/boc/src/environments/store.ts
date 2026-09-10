@@ -5,7 +5,7 @@ import path from "node:path"
 
 const StoredRun = Schema.Struct({
   id: Schema.String,
-  action: Schema.Literals(["setup", "start", "stop", "remove"]),
+  action: Schema.Literals(["setup", "start", "stop", "restart", "remove"]),
   status: Schema.Literals(["running", "succeeded", "failed", "cancelled", "unknown"]),
   startedAt: Schema.Number,
   endedAt: Schema.optional(Schema.Number),
@@ -15,6 +15,10 @@ const StoredRun = Schema.Struct({
   sessionID: Schema.String,
   ptyID: Schema.optional(Schema.String),
   outputOffset: Schema.Number,
+  logStart: Schema.optional(Schema.Number),
+  containerID: Schema.optional(Schema.String),
+  service: Schema.optional(Schema.String),
+  phase: Schema.optional(Schema.Literals(["command", "readiness"])),
 })
 
 const Record = Schema.Struct({
@@ -48,7 +52,7 @@ const Record = Schema.Struct({
 
 export type EnvironmentRun = {
   id: string
-  action: "setup" | "start" | "stop" | "remove"
+  action: "setup" | "start" | "stop" | "restart" | "remove"
   status: "running" | "succeeded" | "failed" | "cancelled" | "unknown"
   startedAt: number
   endedAt?: number
@@ -58,6 +62,10 @@ export type EnvironmentRun = {
   sessionID: string
   ptyID?: string
   outputOffset: number
+  logStart?: number
+  containerID?: string
+  service?: string
+  phase?: "command" | "readiness"
 }
 
 export type EnvironmentRecord = {

@@ -21,6 +21,7 @@ import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { adjacentTabKey } from "@/shell/titlebar/tab-order"
 import { fileManagerApp } from "@/home/projects/file-manager"
+import { BocWorktreeRing } from "./environments/worktree-ring"
 import "./project-tabs.css"
 
 const preferences = Persistence.struct({
@@ -36,6 +37,7 @@ type ProjectGroup = {
   connection?: ServerConnection.Any
   project?: LocalProject
   worktree: boolean
+  directory?: string
   serverLabel?: string
 }
 
@@ -78,6 +80,7 @@ export function createBocProjectTabs(input: {
             connection: conn,
             project,
             worktree: !!directory && isWorkspaceDirectory(project, directory),
+            directory,
             serverLabel: servers.length > 1 && conn ? serverName(conn) : undefined,
           },
         ]
@@ -379,14 +382,22 @@ export function BocProjectTabList(props: {
                 </div>
               )}
             </Show>
-            <div
-              data-slot={props.enabled ? "boc-project-tab" : undefined}
-              data-worktree={props.enabled && props.groups.projects().get(tabKey(tab))?.worktree ? "" : undefined}
-              hidden={props.enabled && !props.groups.visible(tab)}
-              classList={{ contents: !props.enabled, "min-w-0 shrink-0 ps-5 empty:hidden": props.enabled }}
+            <BocWorktreeRing
+              worktree={!!(props.enabled && props.groups.projects().get(tabKey(tab))?.worktree)}
+              visible={!props.enabled || props.groups.visible(tab)}
+              server={props.groups.projects().get(tabKey(tab))?.connection}
+              project={props.groups.projects().get(tabKey(tab))?.project}
+              directory={props.groups.projects().get(tabKey(tab))?.directory}
             >
-              {props.children(tab)}
-            </div>
+              <div
+                data-slot={props.enabled ? "boc-project-tab" : undefined}
+                data-worktree={props.enabled && props.groups.projects().get(tabKey(tab))?.worktree ? "" : undefined}
+                hidden={props.enabled && !props.groups.visible(tab)}
+                classList={{ contents: !props.enabled, "min-w-0 shrink-0 ps-5 empty:hidden": props.enabled }}
+              >
+                {props.children(tab)}
+              </div>
+            </BocWorktreeRing>
           </>
         )}
       </For>

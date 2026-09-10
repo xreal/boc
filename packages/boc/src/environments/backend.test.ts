@@ -13,6 +13,102 @@ afterEach(async () => {
 })
 
 describe("development environments", () => {
+  test("operates only on verified checkout containers and does not wait for whole-app readiness", async () => {
+    const fixture = await environmentFixture()
+    const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
+    const state = await backend.inspect("project", fixture.checkout)
+    expect(state.containers.items).toMatchObject([
+      { id: "devenv-project-container", service: "shop", state: "running" },
+    ])
+    for (const input of [
+      { action: "stop" as const, containerID: "foreign-container" },
+      { action: "remove" as const, containerID: "devenv-project-container" },
+      { action: "restart" as const },
+    ]) {
+      expect(
+        await backend.run({ projectID: "project", directory: fixture.checkout, sessionID: "session", ...input }),
+      ).toMatchObject({ accepted: false, reason: "not-available" })
+    }
+    const result = await backend.run({
+      projectID: "project",
+      directory: fixture.checkout,
+      sessionID: "session",
+      action: "restart",
+      containerID: "devenv-project-container",
+    })
+    expect(result.accepted).toBe(true)
+    await eventually(() => expect(fixture.process.commands).toHaveLength(2))
+    expect(fixture.process.commands[1].input).toMatchObject({
+      command: "docker",
+      args: ["restart", "devenv-project-container"],
+    })
+    expect(result.environment.latestRun).toMatchObject({ containerID: "devenv-project-container", service: "shop" })
+    expect(
+      await backend.run({ projectID: "project", directory: fixture.checkout, sessionID: "session", action: "stop" }),
+    ).toMatchObject({ accepted: false, reason: "operation-running" })
+    fixture.containers.running = false
+    fixture.process.exit(fixture.process.commands[1].id, 0)
+    await eventually(async () =>
+      expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("succeeded"),
+    )
+  })
+
+  test("restricts container logs to current owned containers and bounds the requested tail", async () => {
+    const fixture = await environmentFixture()
+    const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
+    const input = { projectID: "project", directory: fixture.checkout, containerID: "devenv-project-container" }
+    expect(await backend.logs({ ...input, containerID: "foreign" })).toMatchObject({ available: false })
+    expect(await backend.logs(input)).toMatchObject({ available: true, text: "2026-09-10T09:30:00Z Ready\n" })
+    expect(fixture.commands.filter((command) => command.args[0] === "logs")).toEqual([
+      expect.objectContaining({
+        args: ["logs", "--timestamps", "--tail", "500", "devenv-project-container"],
+        outputLimit: 65536,
+      }),
+    ])
+    fixture.containers.owned = false
+    expect(await backend.logs(input)).toMatchObject({ available: false })
+    expect(fixture.commands.filter((command) => command.args[0] === "logs")).toHaveLength(1)
+  })
+
+  test("publishes live output, orders replay before early callbacks, and decodes split UTF-8", async () => {
+    const fixture = await environmentFixture()
+    const backend = fixture.backend(fixture.registered)
+    fixture.process.beforeObserve = (id) => {
+      fixture.process.output(id, "replay\n")
+      fixture.process.afterReplay = () => fixture.process.output(id, "live\n")
+    }
+    await setup(backend, "project", fixture.checkout)
+    await eventually(() => expect(fixture.process.commands).toHaveLength(1))
+    const id = fixture.process.commands[0].id
+    await eventually(() => expect(fixture.process.observers(id)).toBe(1))
+    const bytes = Buffer.from("✓ same\nsame\n")
+    fixture.process.output(id, bytes.subarray(0, 1))
+    fixture.process.output(id, bytes.subarray(1))
+    const running = await backend.inspect("project", fixture.checkout)
+    expect(running.latestRun?.status).toBe("running")
+    expect(running.latestRun?.log).toContain("replay\nlive\n✓ same\nsame\n")
+    expect(running.latestRun?.log.match(/replay/g)).toHaveLength(1)
+    expect(running.latestRun?.log.match(/live/g)).toHaveLength(1)
+    expect(
+      await backend.resize({ projectID: "project", directory: fixture.checkout, runID: "stale", cols: 100, rows: 12 }),
+    ).toBe(false)
+    expect(
+      await backend.resize({
+        projectID: "project",
+        directory: fixture.checkout,
+        runID: running.latestRun!.id,
+        cols: 100,
+        rows: 12,
+      }),
+    ).toBe(true)
+    fixture.process.exit(id, 1)
+    await eventually(async () =>
+      expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("failed"),
+    )
+  })
+
   test("rejects paths that are not registered isolated checkouts", async () => {
     const fixture = await environmentFixture()
     const backend = fixture.backend(async () => ({ available: false, reason: "checkout-not-registered" }))
@@ -208,10 +304,15 @@ describe("development environments", () => {
     expect(reconciled.containers.status).toBe("absent")
   })
 
-  test("runs start and stop as distinct fixed devenv actions", async () => {
+  test("starts and stops every verified checkout container, including profiled services", async () => {
     const fixture = await environmentFixture()
     const backend = fixture.backend(fixture.registered)
     await configure(fixture, backend)
+    fixture.containers.services = ["lb", "shop", "ssr", "api-php81", "api-php83", "api-php84"]
+    const ids = [
+      "devenv-project-container",
+      ...fixture.containers.services.slice(1).map((service) => `devenv-project-${service}-container`),
+    ].sort()
     fixture.containers.running = false
 
     expect(
@@ -224,7 +325,10 @@ describe("development environments", () => {
         })
       ).accepted,
     ).toBe(true)
-    await eventually(() => expect(fixture.process.commands[1].input.args).toEqual(["start"]))
+    await eventually(() => expect(fixture.process.commands).toHaveLength(2))
+    expect(fixture.process.commands[1].input.command).toBe("docker")
+    expect(fixture.process.commands[1].input.args[0]).toBe("start")
+    expect(fixture.process.commands[1].input.args.slice(1).sort()).toEqual(ids)
     fixture.containers.running = true
     fixture.process.exit(fixture.process.commands[1].id, 0)
     await eventually(async () => {
@@ -244,7 +348,10 @@ describe("development environments", () => {
         })
       ).accepted,
     ).toBe(true)
-    await eventually(() => expect(fixture.process.commands[2].input.args).toEqual(["stop"]))
+    await eventually(() => expect(fixture.process.commands).toHaveLength(3))
+    expect(fixture.process.commands[2].input.command).toBe("docker")
+    expect(fixture.process.commands[2].input.args[0]).toBe("stop")
+    expect(fixture.process.commands[2].input.args.slice(1).sort()).toEqual(ids)
     fixture.containers.running = false
     fixture.process.exit(fixture.process.commands[2].id, 0)
     await eventually(async () => {
@@ -347,8 +454,11 @@ async function environmentFixture(count = 1) {
     environment: { PATH: process.env.PATH ?? "" },
   }
   const processHost = new FakeProcessHost()
-  const containers = { present: false, running: true, owned: true }
+  const containers = { present: false, running: true, owned: true, services: ["shop"] }
+  const commands: Command[] = []
   const command = async (input: Command): Promise<CommandResult> => {
+    commands.push(input)
+    if (input.args[0] === "logs") return { exitCode: 0, stdout: "2026-09-10T09:30:00Z Ready\n", stderr: "" }
     if (input.executable === "curl") {
       const stackID = new URL(input.args.at(-1)!).hostname.split(".")[0]
       return { exitCode: 0, stdout: `HTTP/2 200\r\nx-devenv-worktree: ${stackID}\r\n\r\n`, stderr: "" }
@@ -356,16 +466,36 @@ async function environmentFixture(count = 1) {
     if (input.args[0] === "network") return { exitCode: 0, stdout: "[]", stderr: "" }
     if (input.args[0] === "ps") {
       const project = input.args.at(-1)?.split("=").at(-1)
-      return { exitCode: 0, stdout: containers.present ? `${project}-container\n` : "", stderr: "" }
+      return {
+        exitCode: 0,
+        stdout: containers.present
+          ? containers.services
+              .map((service, index) => (index === 0 ? `${project}-container` : `${project}-${service}-container`))
+              .join("\n") + "\n"
+          : "",
+        stderr: "",
+      }
     }
     if (input.args[0] === "inspect") {
-      const project = input.args.at(-1)?.replace(/-container$/, "")
+      const project = input.args[1]?.replace(/-container$/, "")
       const labels = {
         "com.docker.compose.project": project,
         "com.docker.compose.project.working_dir": containers.owned ? devenvRoot : path.join(root, "another-devenv"),
         "com.docker.compose.project.config_files": `${path.join(devenvRoot, "docker-compose.yml")},${path.join(devenvRoot, "docker-compose.worktree.yml")}`,
       }
-      return { exitCode: 0, stdout: `${JSON.stringify(labels)}\t${containers.running}\n`, stderr: "" }
+      return {
+        exitCode: 0,
+        stdout: JSON.stringify(
+          containers.services.map((service, index) => ({
+            Id: input.args[index + 1],
+            Name: `/${project}-${service}-1`,
+            Config: { Labels: { ...labels, "com.docker.compose.service": service } },
+            State: { Running: containers.running, Status: containers.running ? "running" : "exited", ExitCode: 0 },
+            NetworkSettings: { Ports: {} },
+          })),
+        ),
+        stderr: "",
+      }
     }
     return { exitCode: 1, stdout: "", stderr: "unexpected command" }
   }
@@ -394,6 +524,7 @@ async function environmentFixture(count = 1) {
     checkouts,
     process: processHost,
     containers,
+    commands,
     registered,
     backend,
     createContainers,
@@ -401,6 +532,8 @@ async function environmentFixture(count = 1) {
 }
 
 class FakeProcessHost implements ProcessHost {
+  beforeObserve?: (id: string) => void
+  afterReplay?: () => void
   closeBeforeObservation?: (input: ProcessInput) => boolean
   readonly commands: Array<{ id: string; input: ProcessInput }> = []
   readonly #processes = new Map<
@@ -445,15 +578,19 @@ class FakeProcessHost implements ProcessHost {
     const process = this.#processes.get(id)
     if (!process) throw new Error("process not found")
     if (process.closedBeforeObservation) throw new Error("process closed before attachment")
+    this.beforeObserve?.(id)
+    const replay = process.output.subarray(cursor)
+    const replayEnd = process.output.byteLength
     let resolveExit: (value: { exitCode?: number; finalOffset: number; disconnected?: boolean }) => void = () => {}
     const done = new Promise<{ exitCode?: number; finalOffset: number; disconnected?: boolean }>((resolve) => {
       resolveExit = resolve
     })
     process.observers.push({ output: onOutput, resolve: resolveExit })
+    this.afterReplay?.()
     if (process.status === "exited") resolveExit({ exitCode: process.exitCode, finalOffset: process.output.byteLength })
     return {
-      replay: process.output.subarray(cursor),
-      replayEnd: process.output.byteLength,
+      replay,
+      replayEnd,
       truncated: false,
       done,
       detach: () => undefined,
@@ -464,7 +601,9 @@ class FakeProcessHost implements ProcessHost {
     this.exit(id, 130)
   }
 
-  output(id: string, value: string) {
+  async resize(_id: string, _cols: number, _rows: number) {}
+
+  output(id: string, value: string | Uint8Array) {
     const process = this.#processes.get(id)!
     const data = Buffer.from(value)
     process.output = Buffer.concat([process.output, data])

@@ -3,6 +3,7 @@ import type {
   Availability,
   CancelResult,
   Containers,
+  ContainerLogs,
   OperationResult,
   Run,
   Stack,
@@ -11,6 +12,7 @@ import type {
 import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { StringDecoder } from "node:string_decoder"
 import type { ProcessHost, ProcessObservation } from "./process"
 import {
   checkReadiness,
@@ -58,14 +60,24 @@ export interface EnvironmentBackend {
     readonly action: Action
     readonly domain?: string
     readonly confirmation?: "remove-environment"
+    readonly containerID?: string
   }) => Promise<OperationResult>
   readonly cancel: (projectID: string, directory: string) => Promise<CancelResult>
+  readonly logs: (input: { projectID: string; directory: string; containerID: string }) => Promise<ContainerLogs>
+  readonly resize: (input: {
+    projectID: string
+    directory: string
+    runID: string
+    cols: number
+    rows: number
+  }) => Promise<boolean>
 }
 
 type ActiveOperation = {
   cancelled: boolean
   completion: Promise<void>
   observation?: ProcessObservation
+  record?: EnvironmentRecord
 }
 
 export function createEnvironmentBackend(options: EnvironmentBackendOptions): EnvironmentBackend {
@@ -89,7 +101,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     return result
   }
 
-  const inspect = async (projectID: string, requestedDirectory: string): Promise<State> => {
+  const inspect = async (projectID: string, requestedDirectory: string, readiness = true): Promise<State> => {
     const directory = path.resolve(requestedDirectory)
     const record = await store.read(projectID, directory)
     if (!options.enabled) return unavailable(projectID, directory, record, "backend-unavailable")
@@ -114,7 +126,9 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (record?.latestRun?.status === "running" && !active.has(key(projectID, checkout.checkout.directory))) {
       await reconcile(record, devenv)
     }
-    const latestRecord = await store.read(projectID, checkout.checkout.directory)
+    const latestRecord =
+      active.get(key(projectID, checkout.checkout.directory))?.record ??
+      (await store.read(projectID, checkout.checkout.directory))
     if (
       latestRecord?.assignment &&
       latestRecord.latestRun?.action === "remove" &&
@@ -131,6 +145,17 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     const containers = assignment
       ? await inspectContainers(devenv, assignment, command)
       : { status: "absent" as const, total: 0, running: 0, owned: true }
+    if (readiness && latestRecord && !active.has(key(projectID, checkout.checkout.directory))) {
+      const checked =
+        assignment && containers.running > 0 && containers.owned
+          ? await checkReadiness(devenv, assignment, command, 3)
+          : undefined
+      latestRecord.http = checked
+        ? checked.ready
+          ? { status: "ready", checkedAt: Date.now(), statusCode: checked.statusCode }
+          : { status: "unreachable", checkedAt: Date.now() }
+        : { status: "unknown" }
+    }
     return state(
       projectID,
       checkout.checkout.directory,
@@ -153,6 +178,12 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       }
       if (active.has(environmentKey)) return rejected("operation-running", before)
       if (!before.availability.available) return rejected("not-available", before)
+      if (
+        (input.containerID && !["start", "stop", "restart"].includes(input.action)) ||
+        (input.action === "restart" && !input.containerID)
+      ) {
+        return rejected("not-available", before)
+      }
       if (input.action === "remove" && input.confirmation !== "remove-environment") {
         return rejected("confirmation-required", before)
       }
@@ -179,6 +210,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
         })
       }
       if (
+        !input.containerID &&
         (input.action === "setup" || input.action === "start") &&
         !(await preflight(devenv, before.directory, input.action, command))
       ) {
@@ -202,6 +234,12 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
           containers: publicContainers(containers),
         })
       }
+      const container = input.containerID ? containers.items?.find((item) => item.id === input.containerID) : undefined
+      if (input.containerID && !container) return rejected("not-available", before)
+      const containerIDs = container ? [container.id] : (containers.items ?? []).map((item) => item.id)
+      if ((input.action === "start" || input.action === "stop") && containerIDs.length === 0) {
+        return rejected("not-configured", before)
+      }
       const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve() }
       active.set(environmentKey, operation)
       const record: EnvironmentRecord = {
@@ -216,10 +254,15 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
           truncated: false,
           sessionID: input.sessionID,
           outputOffset: 0,
+          logStart: 0,
+          containerID: container?.id,
+          service: container?.service,
+          phase: "command",
         },
       }
+      operation.record = record
       await store.write(record)
-      operation.completion = execute(record, checkout.checkout, devenv, operation, domain).finally(() =>
+      operation.completion = execute(record, checkout.checkout, devenv, operation, containerIDs, domain).finally(() =>
         release(operation, record),
       )
       void operation.completion
@@ -251,7 +294,48 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       return { cancelled: true, environment: await inspect(projectID, environment.directory) }
     })
 
-  return { inspect, run, cancel }
+  const logs: EnvironmentBackend["logs"] = async (input) => {
+    const environment = await inspect(input.projectID, input.directory, false)
+    const unavailable = { available: false, text: "", checkedAt: Date.now() }
+    if (!environment.availability.available || environment.stack.status !== "configured") return unavailable
+    const container = environment.containers.items?.find((item) => item.id === input.containerID)
+    if (!container) return unavailable
+    const devenv = await installation()
+    if (!devenv) return unavailable
+    const result = await command({
+      executable: "docker",
+      args: ["logs", "--timestamps", "--tail", "500", container.id],
+      env: devenv.environment,
+      outputLimit: LOG_LIMIT,
+    }).catch(() => undefined)
+    if (!result || result.exitCode !== 0) return unavailable
+    // Docker writes the two container streams to separate pipes. Its timestamps
+    // restore chronology after reading those pipes concurrently.
+    const text = [result.stdout, result.stderr]
+      .flatMap((output) => output.split("\n").filter(Boolean))
+      .sort((left, right) => left.split(" ", 1)[0].localeCompare(right.split(" ", 1)[0]))
+      .join("\n")
+    const bytes = Buffer.from(text ? `${text}\n` : "")
+    const start = Math.max(0, bytes.byteLength - LOG_LIMIT)
+    const boundary = start > 0 ? bytes.indexOf(10, start) + 1 : 0
+    return { available: true, text: bytes.subarray(boundary || start).toString("utf8"), checkedAt: Date.now() }
+  }
+
+  const resize: EnvironmentBackend["resize"] = async (input) => {
+    if (input.cols < 2 || input.cols > 500 || input.rows < 2 || input.rows > 200) return false
+    const checkout = await options.checkout(input.projectID, input.directory)
+    if (!options.enabled || !checkout.available) return false
+    const record = active.get(key(input.projectID, checkout.checkout.directory))?.record
+    const latest = record?.latestRun
+    if (!latest?.ptyID || latest.id !== input.runID || latest.status !== "running") return false
+    if (!(await owns(record, checkout.checkout))) return false
+    return options.process.resize(latest.ptyID, input.cols, input.rows).then(
+      () => true,
+      () => false,
+    )
+  }
+
+  return { inspect, run, cancel, logs, resize }
 
   async function reconcile(record: EnvironmentRecord, devenv: DevenvInstallation) {
     const latest = record.latestRun
@@ -269,7 +353,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       await store.write({ ...record, latestRun: { ...latest, status: "unknown", endedAt: Date.now() } })
       return
     }
-    const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve() }
+    const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve(), record }
     active.set(environmentKey, operation)
     operation.completion = continueExecution(record, devenv, operation, latest.ptyID).finally(() =>
       release(operation, record),
@@ -282,13 +366,14 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     checkout: Checkout,
     devenv: DevenvInstallation,
     operation: ActiveOperation,
+    containerIDs: readonly string[],
     domain?: string,
   ) {
     const latest = record.latestRun
     if (!latest) return
     try {
       if (operation.cancelled || latest.status === "cancelled") return
-      const spec = commandFor(devenv, checkout.directory, latest.action, domain)
+      const spec = commandFor(devenv, checkout.directory, latest.action, containerIDs, domain)
       append(latest, `$ ${[spec.command, ...spec.args].join(" ")}\n`)
       const process = await options.process.create({
         groupID: environmentGroup(record.projectID, record.directory),
@@ -327,16 +412,31 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
   ) {
     const latest = record.latestRun
     if (!latest) return
-    const observation = await options.process.observe(ptyID, latest.outputOffset, (event) => {
-      append(latest, Buffer.from(event.data).toString("utf8"))
+    const decoder = new StringDecoder("utf8")
+    // Live callbacks can arrive before observe resolves. Replay must be consumed first.
+    const pending: Array<{ data: Uint8Array; end: number }> = []
+    let replayed = false
+    const consume = (event: { data: Uint8Array; end: number }) => {
+      if (event.end <= latest.outputOffset) return
+      const start = event.end - event.data.byteLength
+      append(latest, decoder.write(Buffer.from(event.data.subarray(Math.max(0, latest.outputOffset - start)))))
       latest.outputOffset = event.end
+    }
+    const observation = await options.process.observe(ptyID, latest.outputOffset, (event) => {
+      if (!replayed) {
+        pending.push(event)
+        return
+      }
+      consume(event)
     })
     operation.observation = observation
-    if (observation.replay.byteLength) append(latest, Buffer.from(observation.replay).toString("utf8"))
-    latest.outputOffset = observation.replayEnd
+    consume({ data: observation.replay, end: observation.replayEnd })
+    replayed = true
+    pending.forEach(consume)
     if (observation.truncated) latest.truncated = true
     await store.write(record)
     const result = await observation.done
+    append(latest, decoder.end())
     operation.observation = undefined
     latest.outputOffset = result.finalOffset
     latest.exitCode = result.exitCode
@@ -364,7 +464,8 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (latest.action === "remove" && !(await completeRemoval(record, devenv))) {
       throw new Error("The environment containers were not safely removed.")
     }
-    if (latest.action === "setup" || latest.action === "start") {
+    if (!latest.containerID && (latest.action === "setup" || latest.action === "start")) {
+      latest.phase = "readiness"
       const ready = await waitForReadiness(
         record,
         devenv,
@@ -458,12 +559,18 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
   }
 }
 
-function commandFor(devenv: DevenvInstallation, directory: string, action: Action, domain?: string) {
+function commandFor(
+  devenv: DevenvInstallation,
+  directory: string,
+  action: Action,
+  containerIDs: readonly string[],
+  domain?: string,
+) {
   if (action === "setup") {
     return { command: devenv.up, args: [directory, ...(domain ? ["--domain", domain] : [])] }
   }
   if (action === "remove") return { command: devenv.down, args: [directory] }
-  return { command: devenv.executable, args: [action] }
+  return { command: "docker", args: [action, ...containerIDs] }
 }
 
 function key(projectID: string, directory: string) {
@@ -480,7 +587,10 @@ function append(run: EnvironmentRun, value: string) {
     run.log = next.toString("utf8")
     return
   }
-  run.log = next.subarray(next.byteLength - LOG_LIMIT).toString("utf8")
+  let start = next.byteLength - LOG_LIMIT
+  while (start < next.byteLength && (next[start] & 0xc0) === 0x80) start += 1
+  run.logStart = (run.logStart ?? 0) + start
+  run.log = next.subarray(start).toString("utf8")
   run.truncated = true
 }
 
@@ -495,6 +605,10 @@ function publicRun(run: EnvironmentRun | undefined): Run | undefined {
     exitCode: run.exitCode,
     log: run.log,
     truncated: run.truncated,
+    logStart: run.logStart ?? 0,
+    containerID: run.containerID,
+    service: run.service,
+    phase: run.phase,
   }
 }
 
@@ -549,7 +663,7 @@ function stackState(value: Awaited<ReturnType<typeof inspectStack>>): Stack {
 }
 
 function publicContainers(value: ContainerInspection): Containers {
-  return { status: value.status, total: value.total, running: value.running }
+  return { status: value.status, total: value.total, running: value.running, items: value.items ?? [] }
 }
 
 function rejected(
