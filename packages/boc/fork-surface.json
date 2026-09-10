@@ -42,10 +42,6 @@
       "reason": "Lock the BOC workspace and its app and desktop dependency edges"
     },
     {
-      "path": "packages/cli/src/server-process.ts",
-      "reason": "Use the standard session database when the Boc superset server owns the shared service"
-    },
-    {
       "path": "packages/cli/src/database-path.ts",
       "reason": "Keep the Boc channel on the standard session database after upstream centralized database path selection"
     },
