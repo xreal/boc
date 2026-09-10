@@ -2,17 +2,14 @@ import { resolveTemplate, translator } from "@solid-primitives/i18n"
 import { controlsEnglish } from "../tools/controls/i18n/en"
 import { deploymentsEnglish } from "../tools/deployments/i18n/en"
 import { jiraEnglish } from "../tools/jira/i18n/en"
-import { worktreesEnglish } from "../worktrees/i18n/en"
 import { environmentsEnglish } from "../environments/i18n/en"
 
 export const bocEnglish = {
   "boc.title": "Boc",
   "boc.settings.title": "Boc",
-  "boc.settings.description": "Configure Boc checkout and development environment behavior.",
-  "boc.settings.checkoutDefaults": "Checkout defaults",
-  "boc.settings.storage": "Storage",
+  "boc.settings.description": "Configure Boc development environment behavior.",
   "boc.settings.project": "Project settings",
-  "boc.settings.project.description": "Choose a server and project to configure its checkout and environment behavior.",
+  "boc.settings.project.description": "Choose a server and project to configure its environment behavior.",
   "boc.settings.project.select": "Select a project",
   "boc.settings.project.empty": "No project is selected.",
   "boc.projectTabs.reorder": "Drag to reorder projects, or use Alt+Arrow Up/Down. Click to collapse or expand.",
@@ -26,7 +23,6 @@ export const bocEnglish = {
   ...controlsEnglish,
   ...deploymentsEnglish,
   ...jiraEnglish,
-  ...worktreesEnglish,
   ...environmentsEnglish,
 } as const
 

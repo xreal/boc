@@ -2,7 +2,6 @@ import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
 import { connectBocService, inspectBocService } from "../../boc/background-service"
 import { bocServiceFile, isBocSourceBackend } from "../../boc/development"
-import { resolveRiftEnvironment } from "../../boc/rift"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages, DesktopCli } from "./desktop-cli"
@@ -39,7 +38,6 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const cli = yield* desktopCli.resolve
   const development = isBocSourceBackend(CHANNEL)
   const boc = CHANNEL === "boc" || development
-  const rift = yield* resolveRiftEnvironment
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
@@ -48,7 +46,6 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     version,
     command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--port", "0"] : [])],
     env: {
-      ...rift,
       ...(boc && isolatedService
         ? {
             XDG_STATE_HOME: app.getPath("userData"),

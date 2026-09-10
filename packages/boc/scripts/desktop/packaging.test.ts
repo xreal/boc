@@ -4,13 +4,11 @@ import type { Configuration } from "electron-builder"
 import upstream from "../../../desktop/electron-builder.config"
 import { CLI_BINARIES } from "../../../desktop/scripts/utils"
 import { bocBuilderConfig } from "./electron-builder.config"
-import { desktopDirectory, packagingRift, riftResource } from "./paths"
+import { desktopDirectory } from "./paths"
 import { developmentEnvironment, developmentOptions } from "./dev"
 
 test.each(CLI_BINARIES)("composes Boc identity and resources for $target", (target) => {
-  const rift = riftResource(target)?.file
-  expect(packagingRift(target.target)?.file).toBe(rift)
-  const config = bocBuilderConfig(upstream as Configuration, { rift, windowsSigning: false, publisher: undefined })
+  const config = bocBuilderConfig(upstream as Configuration, { windowsSigning: false, publisher: undefined })
   expect(config.appId).toBe("ai.boc.desktop.beta")
   expect(config.extraMetadata?.desktopName).toBe("ai.boc.desktop.beta.desktop")
   expect(config.linux?.executableName).toBe(config.appId)
@@ -22,16 +20,10 @@ test.each(CLI_BINARIES)("composes Boc identity and resources for $target", (targ
   ])
   expect(config.rpm?.fpm).toEqual(config.deb?.fpm)
   expect(config.rpm?.packageName).toBe("boc-beta")
-  expect(config.extraResources).toEqual([
-    ...[upstream.extraResources ?? []].flat(),
-    ...(rift ? [{ from: rift, to: "rift/rift" }] : []),
-  ])
-  expect(!!rift).toBe(target.os === "darwin" || (target.os === "linux" && target.cpu === "x64"))
-  if (rift) expect(rift).toContain(`/boc/resources/rift/${target.os}-${target.cpu}/rift`)
+  expect(config.extraResources).toBe(upstream.extraResources)
   // Upstream keeps ownership of dependency trimming, native installer hooks, and macOS signing.
   expect(config.files).toEqual([
     ...[upstream.files ?? []].flat(),
-    "!resources/rift{,/**/*}",
     "!resources/linux/opencode-desktop.desktop",
   ])
   expect(config.mac).toBe(upstream.mac)
@@ -57,7 +49,6 @@ test("replaces precomputed upstream release identities and legacy Linux launcher
 
 test("preserves signed Windows policy and explicitly bypasses signing for unsigned releases", () => {
   const signed = bocBuilderConfig(upstream as Configuration, {
-    rift: undefined,
     windowsSigning: true,
     publisher: "Boc Release Publisher",
   })
@@ -65,7 +56,6 @@ test("preserves signed Windows policy and explicitly bypasses signing for unsign
   expect(signed.win?.signtoolOptions?.publisherName).toBe("Boc Release Publisher")
   expect(signed.win?.verifyUpdateCodeSignature).toBe(true)
   const unsigned = bocBuilderConfig(upstream as Configuration, {
-    rift: undefined,
     windowsSigning: false,
     publisher: "Boc Release Publisher",
   })

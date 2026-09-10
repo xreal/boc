@@ -7,7 +7,6 @@ import type {
   Run,
   Stack,
   State,
-  Strategy,
 } from "@opencode/schema/boc/environment"
 import { createHash, randomUUID } from "node:crypto"
 import fs from "node:fs/promises"
@@ -33,7 +32,6 @@ const OWNER_FILE = "boc-environment-owner.json"
 
 export type Checkout = {
   readonly directory: string
-  readonly strategy: Strategy
   readonly gitDirectory: string
 }
 
@@ -142,7 +140,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
         return state(
           projectID,
           checkout.checkout.directory,
-          { available: true, strategy: checkout.checkout.strategy },
+          { available: true },
           { status: "unconfigured" },
           containers,
           reconciled,
@@ -160,7 +158,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     return state(
       projectID,
       checkout.checkout.directory,
-      { available: true, strategy: checkout.checkout.strategy },
+      { available: true },
       stackState(stack),
       containers,
       latestRecord,
@@ -467,11 +465,10 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (marker && (marker.projectID !== projectID || marker.directory !== checkout.directory)) return
     const owner = {
       token: marker?.token ?? randomUUID(),
-      strategy: checkout.strategy,
       gitDirectory: checkout.gitDirectory,
     }
     const next: EnvironmentRecord = {
-      version: 1,
+      version: 2,
       backend: "local",
       projectID,
       directory: checkout.directory,
@@ -613,7 +610,7 @@ function rejected(
 
 async function owns(record: EnvironmentRecord | undefined, checkout: Checkout) {
   if (!record) return true
-  if (record.directory !== checkout.directory || record.owner.strategy !== checkout.strategy) return false
+  if (record.directory !== checkout.directory) return false
   if (record.owner.gitDirectory !== checkout.gitDirectory) return false
   const marker = await readOwner(checkout.gitDirectory)
   return (

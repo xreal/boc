@@ -281,8 +281,7 @@ function StatusCard(props: { label: string; value: string; tone: "neutral" | "su
 
 function availabilityLabel(t: BocTranslator, environment?: BocEnvironment.State) {
   if (!environment) return t("boc.environments.checking")
-  if (environment.availability.available)
-    return t(`boc.environments.details.available.${environment.availability.strategy}`)
+  if (environment.availability.available) return t("boc.environments.details.available")
   return t(`boc.environments.details.unavailable.${environment.availability.reason}`)
 }
 

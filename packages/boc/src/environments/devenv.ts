@@ -375,12 +375,6 @@ function processEnvironment(environment: NodeJS.ProcessEnv, executable: string, 
     "XDG_CONFIG_HOME",
     "XDG_DATA_HOME",
     "XDG_RUNTIME_DIR",
-    "DEVENV_RIFT_CACHE_DIR",
-    "DEVENV_RIFT_CACHE_ENABLED",
-    "DEVENV_RIFT_CACHE_KEEP",
-    "DEVENV_RIFT_SETUP_CPUS",
-    "DEVENV_RIFT_READINESS_TIMEOUT",
-    "DEVENV_RIFT_READINESS_REQUEST_TIMEOUT",
   ]
   return {
     ...Object.fromEntries(keys.flatMap((key) => (environment[key] ? [[key, environment[key]]] : []))),

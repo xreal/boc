@@ -2,18 +2,12 @@ import { $ } from "bun"
 import { chmod, copyFile, cp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
 import { getCurrentCli } from "../../../desktop/scripts/utils"
-import { desktopDirectory, riftResource } from "./paths"
+import { desktopDirectory } from "./paths"
 
 export async function prepareBocIcons(local: boolean) {
   const destination = path.join(desktopDirectory, "resources/icons")
   await rm(destination, { recursive: true, force: true })
   await cp(path.join(desktopDirectory, "icons", local ? "boc-dev" : "boc"), destination, { recursive: true })
-}
-
-export async function prepareBocRift() {
-  const resource = riftResource(getCurrentCli())
-  if (!resource) return
-  await $`bun ../boc/scripts/rift/fetch.ts ${resource.target} ${resource.file}`.cwd(desktopDirectory)
 }
 
 export async function stageBocCli(root: string) {

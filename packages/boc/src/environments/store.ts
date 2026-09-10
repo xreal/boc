@@ -19,13 +19,12 @@ const StoredRun = Schema.Struct({
 })
 
 const Record = Schema.Struct({
-  version: Schema.Literal(1),
+  version: Schema.Literal(2),
   backend: Schema.Literal("local"),
   projectID: Schema.String,
   directory: Schema.String,
   owner: Schema.Struct({
     token: Schema.String,
-    strategy: Schema.Literals(["git", "boc/rift"]),
     gitDirectory: Schema.String,
   }),
   assignment: Schema.optional(
@@ -65,11 +64,11 @@ export type EnvironmentRun = {
 }
 
 export type EnvironmentRecord = {
-  version: 1
+  version: 2
   backend: "local"
   projectID: string
   directory: string
-  owner: { token: string; strategy: "git" | "boc/rift"; gitDirectory: string }
+  owner: { token: string; gitDirectory: string }
   assignment?: {
     stackID: string
     composeProject: string

@@ -204,7 +204,6 @@ export function createNewSessionWorkspaceController(input: {
       },
     },
     project: {
-      id: () => currentProject()?.id,
       root: projectRoot,
       workspaces: worktreeDirectories,
       managed: managedWorktrees,

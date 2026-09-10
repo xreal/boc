@@ -5,9 +5,6 @@ import { AbsolutePath, NonNegativeInt, optional } from "../schema.js"
 export const Backend = Schema.Literal("local")
 export type Backend = typeof Backend.Type
 
-export const Strategy = Schema.Literals(["git", "boc/rift"])
-export type Strategy = typeof Strategy.Type
-
 export const Action = Schema.Literals(["setup", "start", "stop", "remove"])
 export type Action = typeof Action.Type
 
@@ -27,7 +24,7 @@ export const AvailabilityReason = Schema.Literals([
 export type AvailabilityReason = typeof AvailabilityReason.Type
 
 export const Availability = Schema.Union([
-  Schema.Struct({ available: Schema.Literal(true), strategy: Strategy }),
+  Schema.Struct({ available: Schema.Literal(true) }),
   Schema.Struct({ available: Schema.Literal(false), reason: AvailabilityReason }),
 ]).annotate({ identifier: "BocEnvironment.Availability" })
 export type Availability = typeof Availability.Type

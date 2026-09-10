@@ -1,7 +1,5 @@
 export * as BocEnvironments from "./runtime"
 
-import { RiftBackendService } from "../worktrees/server/backend"
-import { BocWorktrees } from "../worktrees/server/runtime"
 import { App } from "@opencode/core/app"
 import { Database } from "@opencode/core/database/database"
 import { Git } from "@opencode/core/git"
@@ -41,7 +39,6 @@ export const configured = (options: Options = {}) =>
         const git = yield* Git.Service
         const global = yield* Global.Service
         const persistentPty = yield* PersistentPty.Service
-        const rift = yield* RiftBackendService
         const run = Effect.runPromiseWith(yield* Effect.context())
         const process: ProcessHost = {
           create: async (input) => {
@@ -127,7 +124,6 @@ export const configured = (options: Options = {}) =>
               const row = await run(
                 database.db
                   .select({
-                    strategy: WorktreeTable.strategy,
                     projectDirectory: ProjectTable.worktree,
                   })
                   .from(WorktreeTable)
@@ -137,52 +133,21 @@ export const configured = (options: Options = {}) =>
               )
               if (!row) return { available: false, reason: "checkout-not-registered" }
               if (directory === row.projectDirectory) return { available: false, reason: "checkout-not-isolated" }
-              if (row.strategy === "git") {
-                const repository = await run(git.repo.discover(directory as Parameters<typeof git.repo.discover>[0]))
-                if (!repository || repository.worktree !== directory) {
-                  return { available: false, reason: "checkout-ownership-mismatch" }
-                }
-                const worktrees = await run(git.worktree.list(repository)).catch(() => [])
-                if (!worktrees.some((worktree) => worktree.directory === directory && worktree.kind === "linked")) {
-                  return { available: false, reason: "checkout-ownership-mismatch" }
-                }
-                return {
-                  available: true,
-                  checkout: { directory, strategy: "git", gitDirectory: repository.gitDirectory },
-                }
+              const repository = await run(git.repo.discover(directory as Parameters<typeof git.repo.discover>[0]))
+              if (!repository || repository.worktree !== directory) {
+                return { available: false, reason: "checkout-ownership-mismatch" }
               }
-              if (row.strategy === "boc/rift") {
-                const ownership = await rift.ownership(directory)
-                if (!ownership) return { available: false, reason: "checkout-ownership-mismatch" }
-                const source = await run(
-                  database.db
-                    .select({ directory: WorktreeTable.directory })
-                    .from(WorktreeTable)
-                    .where(
-                      and(
-                        eq(WorktreeTable.project_id, project),
-                        eq(WorktreeTable.directory, AbsolutePath.make(ownership.sourceDirectory)),
-                      ),
-                    )
-                    .get(),
-                )
-                if (!source) return { available: false, reason: "checkout-ownership-mismatch" }
-                const repository = await run(git.repo.discover(directory as Parameters<typeof git.repo.discover>[0]))
-                if (!repository || repository.worktree !== directory) {
-                  return { available: false, reason: "checkout-ownership-mismatch" }
-                }
-                return {
-                  available: true,
-                  checkout: { directory, strategy: "boc/rift", gitDirectory: repository.gitDirectory },
-                }
+              const worktrees = await run(git.worktree.list(repository)).catch(() => [])
+              if (!worktrees.some((worktree) => worktree.directory === directory && worktree.kind === "linked")) {
+                return { available: false, reason: "checkout-ownership-mismatch" }
               }
-              return { available: false, reason: "checkout-not-isolated" }
+              return { available: true, checkout: { directory, gitDirectory: repository.gitDirectory } }
             },
           }),
         )
       }),
     ),
-    deps: [App.node, Database.node, Git.node, Global.node, PersistentPty.node, BocWorktrees.node],
+    deps: [App.node, Database.node, Git.node, Global.node, PersistentPty.node],
   })
 
 export const node = configured()

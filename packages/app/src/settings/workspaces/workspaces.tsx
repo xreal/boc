@@ -34,12 +34,10 @@ import {
   managedWorkspaceDirectories,
   mergeWorkspaceSessionInventory,
   removeWorkspacesSequentially,
-  sameDirectory,
   sessionsForWorkspace,
   type WorkspaceDeleteInspection,
   workspaceInventory,
 } from "@/workspaces/paths"
-import { BocRiftBadge, BocRiftDeleteDetail } from "@/boc/worktrees/settings"
 import { listAllSessions } from "@/session/list"
 import type { ServerScope } from "@/runtime/server/scope"
 import { normalizeProjectInfo } from "@/runtime/server/global-sync/utils"
@@ -165,10 +163,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
     if (!updated) return undefined
     return getRelativeTime(new Date(updated).toISOString(), language.t)
   }
-  const isRift = (workspace: Workspace) =>
-    workspace.project.worktrees.some(
-      (worktree) => worktree.strategy === "boc/rift" && sameDirectory(worktree.directory, workspace.directory),
-    )
   const sessionTime = (session: SessionInfo) => {
     if (!session.time.updated) return undefined
     return getRelativeTime(new Date(session.time.updated).toISOString(), language.t)
@@ -282,7 +276,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
           inspectionID={current}
           inspect={() => inspect(workspace, context)}
           inspectionMessages={inspectionMessages}
-          rift={isRift(workspace)}
           onDelete={() => transact(() => remove(workspace, true, context))}
         />
       ),
@@ -303,7 +296,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
           title={language.t("settings.workspaces.deleteAll")}
           confirmation={language.plural("settings.workspaces.deleteAll.confirm", inventory.length)}
           warning={language.t("settings.workspaces.deleteAll.warning")}
-          rift={inventory.some(isRift)}
           onDelete={() => transact(() => removeAll(inventory, context))}
         />
       ),
@@ -321,13 +313,13 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
           title={language.t("settings.workspaces.deleteWithoutSessions")}
           confirmation={language.plural("settings.workspaces.deleteWithoutSessions.confirm", inventory.length)}
           warning={language.t("settings.workspaces.deleteWithoutSessions.warning")}
-          rift={inventory.some(isRift)}
           onDelete={() => transact(() => removeAll(inventory, context))}
         />
       ),
       releaseConfirmation,
     )
   }
+
   return (
     <>
       <div class="settings-tab-header settings-workspaces-header">
@@ -424,11 +416,6 @@ export const SettingsWorkspaces: Component<{ activeDirectory?: string; resetProj
                         <div class="settings-workspaces-copy">
                           <div class="settings-workspaces-main">
                             <WorkspacePath directory={workspace().directory} />
-                            <Show when={isRift(workspace())}>
-                              <span class="ml-2 shrink-0">
-                                <BocRiftBadge />
-                              </span>
-                            </Show>
                           </div>
                           <span class="settings-workspaces-meta">{sessionCount(workspace())}</span>
                         </div>
@@ -522,7 +509,6 @@ function DialogDeleteWorkspaces(props: {
   title: string
   confirmation: string
   warning: string
-  rift?: boolean
   onDelete: () => Promise<void>
 }) {
   const dialog = useDialog()
@@ -542,9 +528,6 @@ function DialogDeleteWorkspaces(props: {
             <div class="flex flex-col gap-2">
               <div>{props.confirmation}</div>
               <div>{props.warning}</div>
-              <Show when={props.rift}>
-                <BocRiftDeleteDetail all />
-              </Show>
             </div>
           }
         />
@@ -567,7 +550,6 @@ function DialogDeleteWorkspace(props: {
   inspectionID: number
   inspect: () => Promise<{ result: WorkspaceDeleteInspection; sessions: SessionInfo[] }>
   inspectionMessages: (result: WorkspaceDeleteInspection) => string[]
-  rift: boolean
   onDelete: () => Promise<void>
 }) {
   const dialog = useDialog()
@@ -605,9 +587,6 @@ function DialogDeleteWorkspace(props: {
                 </code>
               </div>
               <div>{language.t("settings.workspaces.delete.warning")}</div>
-              <Show when={props.rift}>
-                <BocRiftDeleteDetail />
-              </Show>
               <For each={descriptions()}>{(description) => <div>{description}</div>}</For>
             </div>
           }

@@ -7,11 +7,9 @@ import { Icon } from "@opencode/ui/icon"
 import { getFilename } from "@opencode/util/path"
 import { useLanguage } from "@/runtime/i18n/language"
 import { sameDirectory } from "@/workspaces/paths"
-import { BocWorktreeCreationBadge } from "@/boc/worktrees/settings"
 
 export function PromptWorkspaceSelector(props: {
   value: string
-  projectID?: string
   projectRoot: string
   workspaces: string[]
   branches: string[]
@@ -140,7 +138,6 @@ export function PromptWorkspaceSelector(props: {
                   >
                     <span class="min-w-0 truncate">{language.t("workspace.new")}</span>
                   </Tooltip>
-                  <BocWorktreeCreationBadge projectID={props.projectID} />
                   <Show when={selected() === "create"}>
                     <Icon name="check" size="small" class="shrink-0" />
                   </Show>

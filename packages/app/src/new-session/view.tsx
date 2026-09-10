@@ -84,7 +84,6 @@ export function NewSessionView(props: {
                   >
                     <PromptWorkspaceSelector
                       value={props.workspace.selection.value()}
-                      projectID={props.workspace.project.id()}
                       projectRoot={props.workspace.project.root()}
                       workspaces={props.workspace.project.workspaces()}
                       branches={props.workspace.project.branches()}

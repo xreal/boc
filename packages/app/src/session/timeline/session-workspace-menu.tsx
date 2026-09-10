@@ -11,8 +11,7 @@ import { pathKey } from "@/workspaces/path-key"
 import { showToast } from "@/shell/notifications/toast"
 import { containsDirectory, sameDirectory, workspaceDirectories } from "@/workspaces/paths"
 import { createWorktree } from "@/workspaces/create"
-import { useBocWorktreeStrategy } from "@/boc/worktrees/policy"
-import { BocWorktreeCreationBadge } from "@/boc/worktrees/settings"
+import { bocWorktreeStrategy } from "@/boc/worktrees/policy"
 
 export function SessionWorkspaceMenu(props: {
   eligible?: boolean
@@ -29,7 +28,6 @@ export function SessionWorkspaceMenu(props: {
   const language = useLanguage()
   const serverSDK = useServerSDK()
   const data = useData()
-  const worktreeStrategy = useBocWorktreeStrategy()
   const [store, setStore] = createStore({ selected: undefined as string | undefined })
   const [directories, setDirectories] = createSignal(workspaceDirectories(props.project))
   const blocked = () => props.eligible === false || data.session.status(props.sessionID) === "running"
@@ -63,7 +61,7 @@ export function SessionWorkspaceMenu(props: {
               data,
               directory: props.directory,
               project: data.location.info({ directory: props.directory })?.project,
-              strategy: worktreeStrategy,
+              strategy: bocWorktreeStrategy(),
             })
           : selection
       if (!destination) return
@@ -103,8 +101,7 @@ export function SessionWorkspaceMenu(props: {
             </Show>
             <Menu.Item disabled={!!store.selected || blocked()} onSelect={() => void move("create")}>
               <Icon name="plus" />
-              <span class="min-w-0 flex-1 truncate">{language.t("workspace.new")}</span>
-              <BocWorktreeCreationBadge projectID={props.project.id} />
+              {language.t("workspace.new")}
             </Menu.Item>
             <Show when={workspaces().length > 0}>
               <Menu.Sub gutter={0} overlap overflowPadding={24}>

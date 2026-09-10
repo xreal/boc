@@ -121,7 +121,6 @@ describe("Boc background service", () => {
     const responses = [
       new Response(JSON.stringify({ healthy: true, version: "1.2.3", pid: 1 })),
       Response.json({ output: { protocol: 1 } }),
-      Response.json({ output: { protocol: 1 } }),
       new Response(
         JSON.stringify({
           output: {
@@ -149,7 +148,6 @@ describe("Boc background service", () => {
     const responses = [
       Response.json({ version: "1.2.3" }),
       Response.json({ output: { protocol: 1 } }),
-      Response.json({ output: { protocol: 1 } }),
       new Response("missing", { status: 404 }),
     ]
     expect(
@@ -159,7 +157,6 @@ describe("Boc background service", () => {
       }),
     ).toEqual({ version: "1.2.3", boc: false })
     expect(requests.slice(1).map((request) => request.url.pathname)).toEqual([
-      "/api/rpc/boc.worktrees.v1/info",
       "/api/rpc/boc.environments.v1/info",
       "/api/rpc/boc.controls.v1/info",
     ])

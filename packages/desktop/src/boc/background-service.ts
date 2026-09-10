@@ -1,6 +1,5 @@
 import type { Endpoint } from "@opencode/client/service"
 import { BocControls } from "@boc/extensions/controls"
-import { BocWorktreeRpc } from "@opencode/schema/boc/worktree-rpc"
 import { BocEnvironmentRpc } from "@opencode/schema/boc/environment-rpc"
 import { Option, Schema } from "effect"
 
@@ -59,7 +58,6 @@ export async function inspectBocService(
   if (!hasString(healthBody, "version")) throw new Error("Background service health response has no version")
 
   const boc =
-    (await hasBackendRpc(BocWorktreeRpc.Rpc.id, BocWorktreeRpc.Info, endpoint, directory, headers, request)) &&
     (await hasBackendRpc(BocEnvironmentRpc.Rpc.id, BocEnvironmentRpc.Info, endpoint, directory, headers, request)) &&
     (await hasProjectControls(endpoint, directory, headers, request))
   return { version: healthBody.version, boc }
@@ -67,7 +65,7 @@ export async function inspectBocService(
 
 async function hasBackendRpc(
   id: string,
-  info: typeof BocWorktreeRpc.Info,
+  info: typeof BocEnvironmentRpc.Info,
   endpoint: Endpoint,
   directory: string,
   headers: HeadersInit | undefined,

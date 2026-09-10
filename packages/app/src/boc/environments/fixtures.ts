@@ -8,7 +8,7 @@ const base: BocEnvironment.State = {
   backend: "local",
   projectID: Project.ID.make("project_fixture"),
   directory: AbsolutePath.make("/workspace/checkouts/BOC-204-environments"),
-  availability: { available: true, strategy: "git" },
+  availability: { available: true },
   stack: { status: "unconfigured" },
   containers: { status: "absent", total: 0, running: 0 },
   http: { status: "unknown" },

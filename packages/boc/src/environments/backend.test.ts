@@ -194,7 +194,7 @@ describe("development environments", () => {
 
     await fs.rm(stackFile)
     const reconciled = await backend.inspect("project", fixture.checkout)
-    expect(reconciled.availability).toEqual({ available: true, strategy: "git" })
+    expect(reconciled.availability).toEqual({ available: true })
     expect(reconciled.latestRun?.status).toBe("succeeded")
     expect(reconciled.stack.status).toBe("unconfigured")
     expect(reconciled.containers.status).toBe("absent")
@@ -298,7 +298,7 @@ describe("development environments", () => {
     await fs.mkdir(replacementGit)
     const reused = fixture.backend(async (_projectID, directory) => ({
       available: true,
-      checkout: { directory, strategy: "git", gitDirectory: replacementGit },
+      checkout: { directory, gitDirectory: replacementGit },
     }))
     expect((await reused.inspect("project", fixture.checkout)).availability).toEqual({
       available: false,
@@ -371,7 +371,7 @@ async function environmentFixture(count = 1) {
   const registered = async (_projectID: string, directory: string): Promise<CheckoutResult> => {
     const gitDirectory = gitDirectories.get(directory)
     if (!gitDirectory) return { available: false, reason: "checkout-not-registered" }
-    return { available: true, checkout: { directory, strategy: "git", gitDirectory } }
+    return { available: true, checkout: { directory, gitDirectory } }
   }
   const backend = (checkout: (projectID: string, directory: string) => Promise<CheckoutResult>) =>
     createEnvironmentBackend({

@@ -55,23 +55,7 @@
     },
     {
       "path": "packages/app/src/new-session/composer-adapter.ts",
-      "reason": "Apply the Boc checkout strategy, correlate local checkout preparation with the pending session, and notify the Boc bridge after successful session creation"
-    },
-    {
-      "path": "packages/app/src/new-session/view.tsx",
-      "reason": "Supply project identity to the checkout method hint"
-    },
-    {
-      "path": "packages/app/src/new-session/workspace/controller.ts",
-      "reason": "Expose the selected project identity to the checkout method hint"
-    },
-    {
-      "path": "packages/app/src/new-session/workspace/selector.tsx",
-      "reason": "Show the effective Boc checkout method beside new checkout"
-    },
-    {
-      "path": "packages/app/src/session/route.tsx",
-      "reason": "Mount Boc checkout preparation context, elapsed time, live output and connection feedback beside the existing loading indicator"
+      "reason": "Select Lane for Boc checkout creation and notify the Boc session-link bridge after successful session creation"
     },
     {
       "path": "packages/app/src/session/header/session-header.tsx",
@@ -79,19 +63,15 @@
     },
     {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
-      "reason": "Apply and display the Boc checkout strategy when moving a session"
+      "reason": "Select Lane when Boc creates a checkout while moving a session"
     },
     {
       "path": "packages/app/src/session/files/session-side-panel.tsx",
       "reason": "Render the channel-aware Boc brand mark in the empty file panel"
     },
     {
-      "path": "packages/app/src/settings/workspaces/workspaces.tsx",
-      "reason": "Display truthful Rift ownership and deletion details in workspace management"
-    },
-    {
       "path": "packages/app/src/workspaces/create.ts",
-      "reason": "Resolve an optional Boc checkout strategy and use the Boc tracked preparation route for local pending sessions"
+      "reason": "Accept one optional explicit strategy while preserving Git for ordinary upstream creation"
     },
     {
       "path": "packages/app/src/shell/routes/routes.tsx",
@@ -99,7 +79,7 @@
     },
     {
       "path": "packages/app/src/settings/shell.tsx",
-      "reason": "Register one Boc settings section for checkout and development environment preferences"
+      "reason": "Register one Boc settings section for development environment preferences"
     },
     {
       "path": "packages/app/src/shell/state/layout.tsx",
@@ -123,7 +103,7 @@
     },
     {
       "path": "packages/desktop/package.json",
-      "reason": "Register Boc workspace and schema dependencies plus explicit Boc development, preparation, build and packaging commands"
+      "reason": "Register Boc workspace and schema dependencies plus explicit Boc development, build and packaging commands"
     },
     {
       "path": "packages/desktop/electron.vite.config.ts",
@@ -155,15 +135,11 @@
     },
     {
       "path": "packages/server/package.json",
-      "reason": "Register the BOC server-side worktree and environment implementations"
+      "reason": "Register the BOC server-side environment implementation"
     },
     {
       "path": "packages/server/src/routes.ts",
-      "reason": "Compose the Boc process-global backend and its Location-scoped typed plugin RPC registrations"
-    },
-    {
-      "path": "packages/core/src/worktree.ts",
-      "reason": "Pass one optional checkout progress observer into fork-owned reporting without changing ordinary worktree creation"
+      "reason": "Compose the Boc process-global environment backend and its Location-scoped typed plugin RPC registration"
     },
     {
       "path": "packages/core/src/instruction-discovery.ts",

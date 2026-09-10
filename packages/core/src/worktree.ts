@@ -22,7 +22,6 @@ import { ProjectTable } from "./project/sql.js"
 import { AppProcess } from "@opencode/util/process"
 import { ChildProcess } from "effect/unstable/process"
 import { State } from "./state.js"
-import { WorktreeProgress } from "./boc/worktree-progress.js"
 
 export { DirectoryUnavailableError } from "./worktree/directory.js"
 export { OperationError } from "@opencode/schema/worktree"
@@ -93,7 +92,6 @@ export interface Strategy {
     sourceDirectory: AbsolutePath
     directory: AbsolutePath
     branch?: string
-    progress?: WorktreeProgress.Reporter
   }) => Effect.Effect<Info, unknown>
   readonly remove: (input: { directory: AbsolutePath; force: boolean }) => Effect.Effect<void, unknown>
   readonly list: (directory: AbsolutePath) => Effect.Effect<readonly ListEntry[], unknown>
@@ -117,7 +115,7 @@ export interface Editor {
 
 export interface Interface extends State.Transformable<Editor> {
   readonly list: () => Effect.Effect<List, Error>
-  readonly create: (input?: CreateInput, progress?: WorktreeProgress.Reporter) => Effect.Effect<Info, Error>
+  readonly create: (input?: CreateInput) => Effect.Effect<Info, Error>
   readonly remove: (input: RemoveInput) => Effect.Effect<void, Error>
   readonly refresh: () => Effect.Effect<RefreshResult, Error>
 }
@@ -232,10 +230,7 @@ const layer = Layer.effect(
       return found
     })
 
-    const create = Effect.fn("Worktree.create")(function* (
-      input: CreateInput = {},
-      progress?: WorktreeProgress.Reporter,
-    ) {
+    const create = Effect.fn("Worktree.create")(function* (input: CreateInput = {}) {
       yield* local
       const current = state.get()
       const selected = yield* getStrategy(input.strategy ?? current.selected, current.strategies)
@@ -251,13 +246,11 @@ const layer = Layer.effect(
         worktreeDirectory = AbsolutePath.make(path.join(directory, `${name}-${suffix}`))
       }
 
-      progress?.phase("creating-checkout")
       const created = yield* selected
         .create({
           directory: worktreeDirectory,
           sourceDirectory,
           branch: input.branch,
-          progress,
         })
         .pipe(Effect.mapError((error) => operationError(selected.id, "create", error)))
       const result = { directory: yield* canonical(fs, created.directory) }
@@ -277,17 +270,20 @@ const layer = Layer.effect(
       const command = project?.commands?.start?.trim()
       if (command) {
         const windows = process.platform === "win32"
-        const child = ChildProcess.make(windows ? command : "bash", windows ? [] : ["-lc", command], {
-          cwd: result.directory,
-          env: {
-            OPENCODE_WORKTREE_BASE: sourceDirectory,
-            OPENCODE_WORKTREE_PATH: result.directory,
-          },
-          extendEnv: true,
-          stdin: "ignore",
-          shell: windows,
-        })
-        yield* WorktreeProgress.runSetup(processService, child, progress)
+        yield* processService
+          .run(
+            ChildProcess.make(windows ? command : "bash", windows ? [] : ["-lc", command], {
+              cwd: result.directory,
+              env: {
+                OPENCODE_WORKTREE_BASE: sourceDirectory,
+                OPENCODE_WORKTREE_PATH: result.directory,
+              },
+              extendEnv: true,
+              stdin: "ignore",
+              shell: windows,
+            }),
+          )
+          .pipe(Effect.flatMap(AppProcess.requireSuccess))
       }
       return result
     })

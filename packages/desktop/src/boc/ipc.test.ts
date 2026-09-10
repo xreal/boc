@@ -47,10 +47,6 @@ test("merges BOC RPCs into the desktop RPC group", () => {
   const tags = [
     ...jiraTags,
     ...deploymentTags,
-    "BocWorktreesGetDefault",
-    "BocWorktreesSetDefault",
-    "BocWorktreesGetProject",
-    "BocWorktreesSetProject",
   ]
   expect([...BocDesktopRpcs.requests.keys()]).toEqual(tags)
   for (const tag of tags) {

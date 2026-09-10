@@ -3,11 +3,6 @@ import { Select } from "@opencode/ui/select"
 import { createEffect, createMemo, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { BocEnvironmentProjectSetting } from "@/boc/environments/settings"
-import {
-  BocRiftCleanupSetting,
-  BocWorktreeDefaultSetting,
-  BocWorktreeProjectSetting,
-} from "@/boc/worktrees/settings"
 import { useLanguage } from "@/runtime/i18n/language"
 import { ServerConnection } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
@@ -71,20 +66,6 @@ export function BocSettings(props: { directory?: string }) {
 
       <div class="settings-tab-body flex flex-col gap-8">
         <div class="settings-section">
-          <h3 class="settings-section-title">{t("boc.settings.checkoutDefaults")}</h3>
-          <SettingsList>
-            <BocWorktreeDefaultSetting />
-          </SettingsList>
-        </div>
-
-        <div class="settings-section">
-          <h3 class="settings-section-title">{t("boc.settings.storage")}</h3>
-          <SettingsList>
-            <BocRiftCleanupSetting />
-          </SettingsList>
-        </div>
-
-        <div class="settings-section">
           <h3 class="settings-section-title">{t("boc.settings.project")}</h3>
           <SettingsList>
             <SettingsRow title={t("boc.settings.project")} description={t("boc.settings.project.description")}>
@@ -114,7 +95,6 @@ export function BocSettings(props: { directory?: string }) {
               <SettingsServerDataScope server={selected.server} directory={selected.project.worktree}>
                 <LocationProvider directory={selected.project.worktree}>
                   <div class="flex flex-col gap-5 pt-5">
-                    <BocWorktreeProjectSetting project={selected.project} server={selected.server} />
                     <BocEnvironmentProjectSetting project={selected.project} server={selected.server} />
                   </div>
                 </LocationProvider>

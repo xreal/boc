@@ -4,7 +4,7 @@ import { createRequire } from "node:module"
 import { parseArgs } from "node:util"
 import { downloadCliToResources, windowsify } from "../../../desktop/scripts/utils"
 import { desktopDirectory } from "./paths"
-import { prepareBocIcons, prepareBocRift } from "./resources"
+import { prepareBocIcons } from "./resources"
 
 export function developmentOptions(args: string[]) {
   const parsed = parseArgs({
@@ -48,7 +48,7 @@ export function developmentEnvironment(download: string | undefined, version: st
 
 export async function prepareBocDevelopment(options: ReturnType<typeof developmentOptions>) {
   const environment = developmentEnvironment(options.download, `2.0.0-local-${Date.now()}`)
-  await Promise.all([$`bun run install-electron`.cwd(desktopDirectory), prepareBocIcons(true), prepareBocRift()])
+  await Promise.all([$`bun run install-electron`.cwd(desktopDirectory), prepareBocIcons(true)])
   if (options.download) {
     await downloadCliToResources(
       options.download,
