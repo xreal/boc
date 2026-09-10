@@ -18,7 +18,7 @@ export function Choice(props: {
         <Select
           options={props.options}
           current={props.options.find((option) => option.value === props.value)}
-          value={(option) => option.value}
+          value={(option) => encodeURIComponent(option.value)}
           label={(option) => option.label}
           aria-label={props.label}
           disabled={props.disabled}
