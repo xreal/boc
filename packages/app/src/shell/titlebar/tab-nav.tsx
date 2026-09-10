@@ -361,6 +361,7 @@ export function TabNavItem(props: {
           <Menu.Item disabled={!props.session || rename.isPending} onSelect={() => setMenu("rename", true)}>
             {language.t("common.rename")}
           </Menu.Item>
+          <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
           <Show when={menu.open}>
             <BocEnvironmentTabMenu
               server={servers.list.find((item) => ServerConnection.key(item) === props.server)}
@@ -369,7 +370,6 @@ export function TabNavItem(props: {
               returnFocus={() => tabRoot.querySelector<HTMLElement>("[data-titlebar-tab-link]")?.focus()}
             />
           </Show>
-          <Menu.Item onSelect={props.onClose}>{language.t("common.closeTab")}</Menu.Item>
         </Menu.Context.Content>
       </Menu.Context.Portal>
     </Menu.Context>

@@ -44,6 +44,8 @@ story("opens the session menu group and exposes the checkout path", async ({ mou
   const component = await mount("boc-development-environments--context-menu")
   await component.getByRole("button", { name: "Session menu" }).click()
   await expect(page.getByRole("menuitem", { name: "Copy checkout path" })).toBeEnabled()
+  await expect(page.getByRole("menuitem", { name: "View environment output" })).not.toBeVisible()
+  await page.getByRole("menuitem", { name: "Development environment", exact: true }).click()
   await page.getByRole("menuitem", { name: "View environment output" }).click()
   await expect(page.getByRole("dialog")).toContainText("Application responded successfully")
 })

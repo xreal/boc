@@ -163,6 +163,8 @@ export function EnvironmentControl(props: {
             <Menu.Group>
               <Menu.GroupLabel>{t("boc.environments.title")}</Menu.GroupLabel>
               <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
+              <Menu.Separator />
+              <EnvironmentCheckoutItems t={t} actions={actions} />
             </Menu.Group>
           </Menu.Content>
         </Menu.Portal>
@@ -206,12 +208,23 @@ export function EnvironmentContextMenu(props: {
   return (
     <>
       <Menu.Separator />
-      <Menu.Group>
-        <Menu.GroupLabel>{t("boc.environments.title")}</Menu.GroupLabel>
-        <Show when={props.settingsReady()} fallback={<Menu.Item disabled>{t("boc.environments.checking")}</Menu.Item>}>
-          <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
-        </Show>
-      </Menu.Group>
+      <Menu.Sub>
+        <Menu.SubTrigger>
+          <Icon name="workspace-isolated" size="small" />
+          {t("boc.environments.title")}
+        </Menu.SubTrigger>
+        <Menu.Portal>
+          <Menu.SubContent class="min-w-56">
+            <Show
+              when={props.settingsReady()}
+              fallback={<Menu.Item disabled>{t("boc.environments.checking")}</Menu.Item>}
+            >
+              <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
+            </Show>
+          </Menu.SubContent>
+        </Menu.Portal>
+      </Menu.Sub>
+      <EnvironmentCheckoutItems t={t} actions={actions} />
       <EnvironmentAnnouncement t={t} resource={props.resource} />
     </>
   )
@@ -333,7 +346,13 @@ function EnvironmentMenuItems(props: {
           {props.t("boc.environments.configure")}
         </Menu.Item>
       </Show>
-      <Menu.Separator />
+    </>
+  )
+}
+
+function EnvironmentCheckoutItems(props: { t: BocTranslator; actions: EnvironmentActions }) {
+  return (
+    <>
       <Menu.Item onSelect={() => void props.actions.copyPath()}>
         <Icon name="outline-copy" size="small" />
         {props.t("boc.environments.copyPath")}
