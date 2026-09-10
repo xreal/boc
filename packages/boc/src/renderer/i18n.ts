@@ -8,7 +8,7 @@ export const bocEnglish = {
   "boc.title": "Boc",
   "boc.settings.title": "Boc",
   "boc.settings.description": "Configure Boc development environment behavior.",
-  "boc.settings.project": "Project settings",
+  "boc.settings.project": "Project",
   "boc.settings.project.description": "Choose a server and project to configure its environment behavior.",
   "boc.settings.project.select": "Select a project",
   "boc.settings.project.empty": "No project is selected.",

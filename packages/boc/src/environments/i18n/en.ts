@@ -83,7 +83,7 @@ export const environmentsEnglish = {
   "boc.environments.settings.enabled.description":
     "Show setup and lifecycle actions for registered linked Git worktrees.",
   "boc.environments.settings.domain": "Storefront domain",
-  "boc.environments.settings.domain.description": "Optional. Leave empty to use devenv's configured default domain.",
+  "boc.environments.settings.domain.description": "Leave empty to use the devenv default.",
   "boc.environments.settings.domain.placeholder": "Use devenv default",
   "boc.environments.settings.domain.invalid": "Enter a hostname without a protocol, path, spaces, or port.",
   "boc.environments.settings.shared.title": "Shared local services",

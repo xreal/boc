@@ -1,8 +1,6 @@
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Badge } from "@opencode/ui/badge"
 import { Button } from "@opencode/ui/button"
-import { Field } from "@opencode/ui/field"
-import { Icon } from "@opencode/ui/icon"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { createEffect, Show } from "solid-js"
@@ -12,6 +10,8 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { useServerSDK } from "@/runtime/server/client"
 import { ServerConnection } from "@/runtime/server/registry"
 import type { LocalProject } from "@/shell/state/layout"
+import { SettingsList } from "@/settings/list"
+import { SettingsRow } from "@/settings/row"
 import { validEnvironmentDomain } from "./model"
 import { useEnvironmentProjectSettings } from "./settings-store"
 
@@ -55,61 +55,64 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
 
   return (
     <Show when={props.project.id && props.project.id !== "global" && supported()}>
-      <section class="mt-5 flex w-full flex-col gap-4 border-t border-v2-border-border-base pt-5">
-        <div class="flex flex-col gap-1">
-          <div class="flex items-center gap-2 text-13-medium leading-text-compact text-v2-text-text-base">
-            {t("boc.environments.settings.title")}
-            <Badge>{t("boc.environments.settings.experimental")}</Badge>
-          </div>
-          <p class="m-0 max-w-[620px] text-12-regular leading-text-base text-v2-text-text-muted">
-            {t("boc.environments.settings.description")}
-          </p>
-        </div>
+      <section class="settings-section">
+        <h3 class="settings-section-title flex flex-wrap items-center gap-2">
+          {t("boc.environments.settings.title")}
+          <Badge>{t("boc.environments.settings.experimental")}</Badge>
+        </h3>
 
-        <Switch
-          checked={draft.enabled}
-          disabled={!draft.loaded}
-          description={t("boc.environments.settings.enabled.description")}
-          onChange={toggleEnabled}
-        >
-          {t("boc.environments.settings.enabled")}
-        </Switch>
-
-        <Field>
-          <Field.Label>{t("boc.environments.settings.domain")}</Field.Label>
-          <Field.Prefix>{t("boc.environments.settings.domain.description")}</Field.Prefix>
-          <TextInput
-            appearance="large"
-            class="!w-full"
-            value={draft.domain}
-            disabled={!draft.loaded || !draft.enabled}
-            invalid={!valid()}
-            aria-invalid={!valid()}
-            aria-describedby="boc-environment-domain-help"
-            placeholder={t("boc.environments.settings.domain.placeholder")}
-            spellcheck={false}
-            onInput={(event) => setDraft({ domain: event.currentTarget.value, saved: false })}
-          />
-          <div
-            id="boc-environment-domain-help"
-            class="min-h-4 text-11-regular leading-text-compact text-v2-state-fg-danger"
-            role={!valid() ? "alert" : undefined}
+        <SettingsList>
+          <SettingsRow
+            title={t("boc.environments.settings.enabled")}
+            description={t("boc.environments.settings.enabled.description")}
           >
-            {valid() ? "" : t("boc.environments.settings.domain.invalid")}
-          </div>
-        </Field>
+            <Switch
+              checked={draft.enabled}
+              disabled={!draft.loaded}
+              hideLabel
+              onChange={toggleEnabled}
+            >
+              {t("boc.environments.settings.enabled")}
+            </Switch>
+          </SettingsRow>
 
-        <div class="flex items-start gap-2 rounded-md bg-v2-background-bg-base px-3 py-2">
-          <Icon name="info" size="small" class="mt-0.5 shrink-0 text-v2-icon-icon-muted" />
-          <div class="flex min-w-0 flex-col gap-0.5">
-            <span class="text-12-medium leading-text-compact text-v2-text-text-base">
-              {t("boc.environments.settings.shared.title")}
-            </span>
-            <span class="text-12-regular leading-text-base text-v2-text-text-muted">
-              {t("boc.environments.settings.shared.description")}
-            </span>
-          </div>
-        </div>
+          <SettingsRow
+            title={<label for="boc-environment-domain">{t("boc.environments.settings.domain")}</label>}
+            description={t("boc.environments.settings.domain.description")}
+          >
+            <div class="flex w-full flex-col gap-2 sm:w-56">
+              <TextInput
+                id="boc-environment-domain"
+                dir="ltr"
+                class="!w-full"
+                value={draft.domain}
+                disabled={!draft.loaded || !draft.enabled}
+                invalid={!valid()}
+                aria-invalid={!valid()}
+                aria-describedby={!valid() ? "boc-environment-domain-help" : undefined}
+                placeholder={t("boc.environments.settings.domain.placeholder")}
+                spellcheck={false}
+                onInput={(event) => setDraft({ domain: event.currentTarget.value, saved: false })}
+              />
+              <Show when={!valid()}>
+                <div
+                  id="boc-environment-domain-help"
+                  class="text-11-regular leading-text-compact text-v2-state-fg-danger"
+                  role="alert"
+                >
+                  {t("boc.environments.settings.domain.invalid")}
+                </div>
+              </Show>
+            </div>
+          </SettingsRow>
+        </SettingsList>
+
+        <details class="text-12-regular leading-text-base text-v2-text-text-muted">
+          <summary class="cursor-pointer hover:text-v2-text-text-base">
+            {t("boc.environments.settings.shared.title")}
+          </summary>
+          <p class="m-0 pt-2">{t("boc.environments.settings.shared.description")}</p>
+        </details>
 
         <div class="flex min-h-8 items-center justify-between gap-3">
           <span class="text-11-regular leading-text-compact text-v2-text-text-muted" role="status" aria-live="polite">

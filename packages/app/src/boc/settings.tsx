@@ -47,7 +47,11 @@ export function BocSettings(props: { directory?: string }) {
     if (state.server === serverKey && state.directory === props.directory) return
     const directory = props.directory
     const contextual = directory ? projects().find((project) => sameDirectory(project.worktree, directory)) : undefined
-    setState({ server: serverKey, directory: props.directory, project: contextual ? pathKey(contextual.worktree) : undefined })
+    setState({
+      server: serverKey,
+      directory: props.directory,
+      project: contextual ? pathKey(contextual.worktree) : undefined,
+    })
   })
 
   return (
@@ -64,7 +68,7 @@ export function BocSettings(props: { directory?: string }) {
         </div>
       </div>
 
-      <div class="settings-tab-body flex flex-col gap-8">
+      <div class="settings-tab-body">
         <div class="settings-section">
           <h3 class="settings-section-title">{t("boc.settings.project")}</h3>
           <SettingsList>
@@ -81,27 +85,25 @@ export function BocSettings(props: { directory?: string }) {
               />
             </SettingsRow>
           </SettingsList>
-
-          <Show
-            when={selection()}
-            keyed
-            fallback={
-              <p class="m-0 pt-4 text-12-regular leading-text-base text-v2-text-text-muted">
-                {t("boc.settings.project.empty")}
-              </p>
-            }
-          >
-            {(selected) => (
-              <SettingsServerDataScope server={selected.server} directory={selected.project.worktree}>
-                <LocationProvider directory={selected.project.worktree}>
-                  <div class="flex flex-col gap-5 pt-5">
-                    <BocEnvironmentProjectSetting project={selected.project} server={selected.server} />
-                  </div>
-                </LocationProvider>
-              </SettingsServerDataScope>
-            )}
-          </Show>
         </div>
+
+        <Show
+          when={selection()}
+          keyed
+          fallback={
+            <p class="m-0 pt-4 text-12-regular leading-text-base text-v2-text-text-muted">
+              {t("boc.settings.project.empty")}
+            </p>
+          }
+        >
+          {(selected) => (
+            <SettingsServerDataScope server={selected.server} directory={selected.project.worktree}>
+              <LocationProvider directory={selected.project.worktree}>
+                <BocEnvironmentProjectSetting project={selected.project} server={selected.server} />
+              </LocationProvider>
+            </SettingsServerDataScope>
+          )}
+        </Show>
       </div>
     </>
   )

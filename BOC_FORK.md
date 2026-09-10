@@ -27,6 +27,8 @@ This is the operational map of Boc's deliberate differences from `upstream/beta`
 
 Development-environment controls use grouped menus, content-sized labeled split buttons, semantic success/warning/danger cards, and a bounded LTR monospace log with terminal control sequences removed for display. Checkout-path copying is available in both menus; macOS desktop additionally opens that checkout in Terminal through the existing platform API.
 
+Boc settings reuse the upstream settings sections, lists and rows for project selection and development-environment controls. The domain input sits alongside its label, and shared-service details use an expandable note below the controls.
+
 Project Controls supplies producer metadata in its native state response: exact agent/MCP configuration files, skill/instruction paths, and registering plugin identity. Origins distinguish System, Global, Project, and Plugin (registered capabilities without a filesystem scope). MCP tools inherit their server's source when available. Icons remain immediately before names. Ctrl+F/Cmd+F focuses and selects the shared V2 TextInput, yielding to dialogs. The new route is `/boc/controls`; old `/boc/bergflow` links, the local selection preference key, and existing English i18n keys remain compatible.
 
 The native `boc.project-controls` built-in activates only in the Boc channel, after configuration producers. Its RPC identity is `boc.controls.v1`. Project policy and mutation serialization are process-global services; inventory and scoped subscriptions belong to each Location. Desktop is the supported management UI. There is no CLI/TUI control screen or installation workflow.
