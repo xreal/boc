@@ -14,16 +14,15 @@ import path from "node:path"
 import type { ProcessHost, ProcessObservation } from "./process"
 import {
   checkReadiness,
+  createStackAssignment,
   inspectContainers,
   inspectStack,
   preflight,
   resolveDevenv,
   runCommand,
-  supportsGuardedRemoval,
   type CommandRunner,
   type ContainerInspection,
   type DevenvInstallation,
-  type StackAssignment,
 } from "./devenv"
 import { createEnvironmentStore, type EnvironmentRecord, type EnvironmentRun } from "./store"
 
@@ -101,8 +100,8 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (!checkout.available) return unavailable(projectID, directory, record, checkout.reason)
     const devenv = await installation()
     if (!devenv) return unavailable(projectID, checkout.checkout.directory, record, "devenv-unavailable")
-    const stack = await inspectStack(devenv, checkout.checkout.directory)
     const ownership = await owns(record, checkout.checkout)
+    const stack = inspectStack(devenv, checkout.checkout.directory, record?.assignment)
     if (record && !ownership) {
       return unavailable(
         projectID,
@@ -113,45 +112,22 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       )
     }
     if (record?.latestRun?.status === "running" && !active.has(key(projectID, checkout.checkout.directory))) {
-      await reconcile(record, checkout.checkout, devenv)
+      await reconcile(record, devenv)
     }
     const latestRecord = await store.read(projectID, checkout.checkout.directory)
-    const assignment = stack.status === "configured" ? stack.assignment : undefined
     if (
       latestRecord?.assignment &&
-      !assignment &&
-      stack.status === "unconfigured" &&
       latestRecord.latestRun?.action === "remove" &&
-      latestRecord.latestRun.phase === 1 &&
-      latestRecord.latestRun.status !== "running"
+      latestRecord.latestRun.status !== "running" &&
+      latestRecord.latestRun.exitCode === 0 &&
+      (await completeRemoval(latestRecord, devenv))
     ) {
-      const containers = await inspectContainers(devenv, latestRecord.assignment, command)
-      if (containers.owned && containers.total === 0) {
-        const reconciled = {
-          ...latestRecord,
-          assignment: undefined,
-          http: { status: "unknown" as const },
-          latestRun:
-            latestRecord.latestRun.status === "failed" && latestRecord.latestRun.exitCode === 0
-              ? { ...latestRecord.latestRun, status: "succeeded" as const }
-              : latestRecord.latestRun,
-        }
-        await store.write(reconciled)
-        return state(
-          projectID,
-          checkout.checkout.directory,
-          { available: true },
-          { status: "unconfigured" },
-          containers,
-          reconciled,
-        )
-      }
+      latestRecord.latestRun.status = "succeeded"
+      latestRecord.latestRun.endedAt ??= Date.now()
+      await store.write(latestRecord)
     }
-    if (latestRecord?.assignment && (!assignment || !sameAssignment(latestRecord.assignment, assignment))) {
-      return unavailable(projectID, checkout.checkout.directory, latestRecord, "checkout-ownership-mismatch", {
-        status: "invalid",
-      })
-    }
+    const latestStack = inspectStack(devenv, checkout.checkout.directory, latestRecord?.assignment)
+    const assignment = latestStack.status === "configured" ? latestStack.assignment : undefined
     const containers = assignment
       ? await inspectContainers(devenv, assignment, command)
       : { status: "absent" as const, total: 0, running: 0, owned: true }
@@ -159,7 +135,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       projectID,
       checkout.checkout.directory,
       { available: true },
-      stackState(stack),
+      stackState(latestStack),
       containers,
       latestRecord,
     )
@@ -184,11 +160,19 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       if (!checkout.available) return rejected("not-available", before)
       const devenv = await installation()
       if (!devenv) return rejected("not-available", before)
-      const currentStack = await inspectStack(devenv, checkout.checkout.directory)
+      const existingRecord = await store.read(input.projectID, checkout.checkout.directory)
+      const currentStack = inspectStack(devenv, checkout.checkout.directory, existingRecord?.assignment)
       if (input.action !== "setup" && currentStack.status !== "configured") {
         return rejected("not-configured", before)
       }
-      if (input.action === "remove" && !(await supportsGuardedRemoval(devenv, before.directory, command))) {
+      const domain = input.domain?.trim() || undefined
+      const stack =
+        input.action === "setup"
+          ? createStackAssignment(devenv, checkout.checkout.directory, domain)
+          : currentStack.status === "configured"
+            ? currentStack.assignment
+            : undefined
+      if (!stack) {
         return rejected("not-available", {
           ...before,
           availability: { available: false, reason: "devenv-preflight-failed" },
@@ -203,30 +187,21 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
           availability: { available: false, reason: "devenv-preflight-failed" },
         })
       }
-      const claimed = await claim(
-        input.projectID,
-        await store.read(input.projectID, checkout.checkout.directory),
-        checkout.checkout,
-        currentStack,
-      )
+      const claimed = await claim(input.projectID, existingRecord, checkout.checkout)
       if (!claimed) {
         return rejected("not-available", {
           ...before,
           availability: { available: false, reason: "checkout-ownership-mismatch" },
         })
       }
-      const stack = currentStack.status === "configured" ? currentStack.assignment : undefined
-      if (stack) {
-        const containers = await inspectContainers(devenv, stack, command)
-        if (!containers.owned) {
-          return rejected("not-available", {
-            ...before,
-            stack: { status: "invalid" },
-            containers: publicContainers(containers),
-          })
-        }
+      const containers = await inspectContainers(devenv, stack, command)
+      if (!containers.owned) {
+        return rejected("not-available", {
+          ...before,
+          stack: { status: "invalid" },
+          containers: publicContainers(containers),
+        })
       }
-      if (input.action === "remove" && !stack) return rejected("not-configured", before)
       const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve() }
       active.set(environmentKey, operation)
       const record: EnvironmentRecord = {
@@ -241,11 +216,10 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
           truncated: false,
           sessionID: input.sessionID,
           outputOffset: 0,
-          phase: 0,
         },
       }
       await store.write(record)
-      operation.completion = execute(record, checkout.checkout, devenv, operation, input.domain).finally(() =>
+      operation.completion = execute(record, checkout.checkout, devenv, operation, domain).finally(() =>
         release(operation, record),
       )
       void operation.completion
@@ -279,7 +253,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
 
   return { inspect, run, cancel }
 
-  async function reconcile(record: EnvironmentRecord, checkout: Checkout, devenv: DevenvInstallation) {
+  async function reconcile(record: EnvironmentRecord, devenv: DevenvInstallation) {
     const latest = record.latestRun
     if (!latest?.ptyID) {
       await store.write({
@@ -297,7 +271,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     }
     const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve() }
     active.set(environmentKey, operation)
-    operation.completion = continueExecution(record, checkout, devenv, operation, latest.ptyID).finally(() =>
+    operation.completion = continueExecution(record, devenv, operation, latest.ptyID).finally(() =>
       release(operation, record),
     )
     void operation.completion
@@ -314,7 +288,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (!latest) return
     try {
       if (operation.cancelled || latest.status === "cancelled") return
-      const spec = commandFor(devenv, checkout.directory, latest.action, latest.phase, record.assignment, domain)
+      const spec = commandFor(devenv, checkout.directory, latest.action, domain)
       append(latest, `$ ${[spec.command, ...spec.args].join(" ")}\n`)
       const process = await options.process.create({
         groupID: environmentGroup(record.projectID, record.directory),
@@ -326,23 +300,30 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       latest.ptyID = process.id
       await store.write(record)
       if (operation.cancelled) await options.process.terminate(process.id).catch(() => undefined)
-      await continueExecution(record, checkout, devenv, operation, process.id, domain)
+      await continueExecution(record, devenv, operation, process.id)
     } catch (error) {
       append(latest, `\n${error instanceof Error ? error.message : String(error)}\n`)
+      const process = latest.ptyID ? await options.process.get(latest.ptyID).catch(() => undefined) : undefined
+      latest.exitCode ??= process?.exitCode
+      if (latest.action === "remove" && latest.exitCode === 0 && (await completeRemoval(record, devenv))) {
+        latest.status = "succeeded"
+        latest.exitCode ??= 0
+        latest.endedAt = Date.now()
+        await store.write(record)
+        return
+      }
       latest.status = operation.cancelled ? "cancelled" : "failed"
       latest.endedAt = Date.now()
-      await refresh(record, devenv)
+      refresh(record)
       await store.write(record)
     }
   }
 
   async function continueExecution(
     record: EnvironmentRecord,
-    checkout: Checkout,
     devenv: DevenvInstallation,
     operation: ActiveOperation,
     ptyID: string,
-    domain?: string,
   ) {
     const latest = record.latestRun
     if (!latest) return
@@ -363,7 +344,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       latest.status = "cancelled"
       latest.exitCode = 130
       latest.endedAt = Date.now()
-      await refresh(record, devenv)
+      refresh(record)
       await store.write(record)
       return
     }
@@ -376,23 +357,12 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     if (result.exitCode !== 0) {
       latest.status = "failed"
       latest.endedAt = Date.now()
-      await refresh(record, devenv)
+      refresh(record)
       await store.write(record)
       return
     }
-    if (latest.action === "remove" && latest.phase === 0) {
-      const stack = await inspectStack(devenv, checkout.directory)
-      if (!record.assignment || stack.status !== "configured" || !sameAssignment(record.assignment, stack.assignment)) {
-        throw new Error("The environment assignment changed after devenv down.")
-      }
-      const containers = await inspectContainers(devenv, stack.assignment, command)
-      if (!containers.owned || containers.total !== 0)
-        throw new Error("The environment containers were not safely removed.")
-      latest.phase = 1
-      latest.ptyID = undefined
-      await store.write(record)
-      await execute(record, checkout, devenv, operation, domain)
-      return
+    if (latest.action === "remove" && !(await completeRemoval(record, devenv))) {
+      throw new Error("The environment containers were not safely removed.")
     }
     if (latest.action === "setup" || latest.action === "start") {
       const ready = await waitForReadiness(
@@ -405,7 +375,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
         latest.status = "cancelled"
         latest.exitCode = 130
         latest.endedAt = Date.now()
-        await refresh(record, devenv)
+        refresh(record)
         await store.write(record)
         return
       }
@@ -413,14 +383,14 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
         latest.status = "failed"
         latest.endedAt = Date.now()
         append(latest, "\nHTTP readiness could not be verified for this environment.\n")
-        await refresh(record, devenv)
+        refresh(record)
         await store.write(record)
         return
       }
     }
     latest.status = "succeeded"
     latest.endedAt = Date.now()
-    await refresh(record, devenv)
+    refresh(record)
     await store.write(record)
   }
 
@@ -432,7 +402,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
   ) {
     for (let attempt = 0; attempt < attempts; attempt++) {
       if (operation.cancelled) return false
-      const stack = await inspectStack(devenv, record.directory)
+      const stack = inspectStack(devenv, record.directory, record.assignment)
       if (stack.status !== "configured") return false
       const checked = await checkReadiness(devenv, stack.assignment, command)
       if (checked.ready) {
@@ -446,21 +416,24 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     return false
   }
 
-  async function refresh(record: EnvironmentRecord, devenv: DevenvInstallation) {
-    const stack = await inspectStack(devenv, record.directory)
-    record.assignment = stack.status === "configured" ? stack.assignment : undefined
+  function refresh(record: EnvironmentRecord) {
     if (record.latestRun?.action === "stop" || record.latestRun?.action === "remove")
       record.http = { status: "unknown" }
   }
 
-  async function claim(
-    projectID: string,
-    record: EnvironmentRecord | undefined,
-    checkout: Checkout,
-    stack: Awaited<ReturnType<typeof inspectStack>>,
-  ) {
+  async function completeRemoval(record: EnvironmentRecord, devenv: DevenvInstallation) {
+    const stack = inspectStack(devenv, record.directory, record.assignment)
+    if (stack.status !== "configured") return false
+    const containers = await inspectContainers(devenv, stack.assignment, command)
+    if (!containers.owned || containers.total !== 0) return false
+    record.assignment = undefined
+    record.http = { status: "unknown" }
+    return true
+  }
+
+  async function claim(projectID: string, record: EnvironmentRecord | undefined, checkout: Checkout) {
     if (record && (await owns(record, checkout))) return record
-    if (record && stack.status === "configured") return
+    if (record) return
     const marker = await readOwner(checkout.gitDirectory)
     if (marker && (marker.projectID !== projectID || marker.directory !== checkout.directory)) return
     const owner = {
@@ -485,33 +458,11 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
   }
 }
 
-function commandFor(
-  devenv: DevenvInstallation,
-  directory: string,
-  action: Action,
-  phase: number,
-  assignment?: StackAssignment,
-  domain?: string,
-) {
+function commandFor(devenv: DevenvInstallation, directory: string, action: Action, domain?: string) {
   if (action === "setup") {
-    return { command: devenv.setup, args: [directory, ...(domain ? ["--domain", domain] : [])] }
+    return { command: devenv.up, args: [directory, ...(domain ? ["--domain", domain] : [])] }
   }
-  if (action === "remove") {
-    if (!assignment) throw new Error("The environment assignment is unavailable for removal.")
-    const expected = [
-      "--expect",
-      assignment.stackID,
-      assignment.composeProject,
-      assignment.infrastructureProject,
-      assignment.host,
-      assignment.sourceDirectory,
-    ]
-    if (phase === 0) return { command: devenv.executable, args: ["down", ...expected] }
-    return {
-      command: devenv.executable,
-      args: ["stack", "clear", ...expected],
-    }
-  }
+  if (action === "remove") return { command: devenv.down, args: [directory] }
   return { command: devenv.executable, args: [action] }
 }
 
@@ -640,15 +591,4 @@ async function writeOwner(gitDirectory: string, projectID: string, directory: st
   const temporary = `${destination}.${randomUUID()}.tmp`
   await Bun.write(temporary, `${JSON.stringify({ version: 1, projectID, directory, token }, undefined, 2)}\n`)
   await fs.rename(temporary, destination)
-}
-
-function sameAssignment(left: StackAssignment, right: StackAssignment) {
-  return (
-    left.stackID === right.stackID &&
-    left.composeProject === right.composeProject &&
-    left.infrastructureProject === right.infrastructureProject &&
-    left.host === right.host &&
-    left.sourceDirectory === right.sourceDirectory &&
-    left.configFile === right.configFile
-  )
 }

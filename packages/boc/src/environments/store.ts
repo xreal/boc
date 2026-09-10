@@ -15,7 +15,6 @@ const StoredRun = Schema.Struct({
   sessionID: Schema.String,
   ptyID: Schema.optional(Schema.String),
   outputOffset: Schema.Number,
-  phase: Schema.Number,
 })
 
 const Record = Schema.Struct({
@@ -35,7 +34,6 @@ const Record = Schema.Struct({
       host: Schema.String,
       url: Schema.String,
       sourceDirectory: Schema.String,
-      configFile: Schema.String,
     }),
   ),
   http: Schema.optional(
@@ -60,7 +58,6 @@ export type EnvironmentRun = {
   sessionID: string
   ptyID?: string
   outputOffset: number
-  phase: number
 }
 
 export type EnvironmentRecord = {
@@ -76,7 +73,6 @@ export type EnvironmentRecord = {
     host: string
     url: string
     sourceDirectory: string
-    configFile: string
   }
   http?:
     | { status: "unknown" }

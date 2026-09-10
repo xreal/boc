@@ -30,8 +30,8 @@ export const environmentsEnglish = {
   "boc.environments.operationRejected.confirmation-required": "Confirm removal before continuing.",
   "boc.environments.status.unavailable": "Environment status is unavailable",
   "boc.environments.status.unconfigured": "Environment is not set up",
-  "boc.environments.status.configured": "Stack assignment is configured",
-  "boc.environments.status.invalid": "Environment assignment needs attention",
+  "boc.environments.status.configured": "Lane stack is configured",
+  "boc.environments.status.invalid": "Lane stack ownership needs attention",
   "boc.environments.status.running": "Environment is running",
   "boc.environments.status.stopped": "Environment is stopped",
   "boc.environments.status.partial": "Some environment containers are running",
@@ -68,16 +68,16 @@ export const environmentsEnglish = {
   "boc.environments.details.unavailable.checkout-not-isolated":
     "The main checkout does not use a separate development environment.",
   "boc.environments.details.unavailable.checkout-ownership-mismatch":
-    "The checkout or stack assignment no longer matches its recorded owner.",
+    "The checkout or Lane stack no longer matches its recorded owner.",
   "boc.environments.details.unavailable.devenv-unavailable": "The active devenv installation could not be found.",
   "boc.environments.details.unavailable.devenv-preflight-failed":
     "devenv is not ready for a non-interactive environment action.",
   "boc.environments.remove.title": "Remove development environment?",
   "boc.environments.remove.description":
-    "This removes only this checkout's app containers and stack assignment. Checkout files and shared services remain.",
+    "This removes only this checkout's app containers. Checkout files and shared services remain.",
   "boc.environments.remove.confirm": "Remove environment",
   "boc.environments.settings.title": "Development environment",
-  "boc.environments.settings.description": "Enable the fixed devenv workflow for isolated checkouts in this project.",
+  "boc.environments.settings.description": "Enable the Lane devenv workflow for isolated checkouts in this project.",
   "boc.environments.settings.experimental": "Experimental",
   "boc.environments.settings.enabled": "Enable development environments",
   "boc.environments.settings.enabled.description":

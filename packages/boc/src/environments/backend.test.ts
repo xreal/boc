@@ -32,10 +32,7 @@ describe("development environments", () => {
     expect((await setup(backend, "project-b", fixture.checkouts[1])).accepted).toBe(true)
     await eventually(() => expect(fixture.process.commands).toHaveLength(2))
 
-    await Promise.all([
-      fixture.writeStack(fixture.checkouts[0], "project-a"),
-      fixture.writeStack(fixture.checkouts[1], "project-b"),
-    ])
+    fixture.createContainers()
     fixture.process.exit(fixture.process.commands[0].id, 0)
     fixture.process.exit(fixture.process.commands[1].id, 0)
 
@@ -83,7 +80,7 @@ describe("development environments", () => {
 
     const replacement = fixture.backend(fixture.registered)
     expect((await replacement.inspect("project", fixture.checkout)).latestRun?.status).toBe("running")
-    await fixture.writeStack(fixture.checkout, "project")
+    fixture.createContainers()
     fixture.process.output(fixture.process.commands[0].id, "after handoff\n")
     fixture.process.exit(fixture.process.commands[0].id, 0)
 
@@ -95,11 +92,44 @@ describe("development environments", () => {
     })
   })
 
+  test("runs worktree-up with the selected domain and derived Lane identity", async () => {
+    const fixture = await environmentFixture()
+    const backend = fixture.backend(fixture.registered)
+
+    expect(
+      (
+        await backend.run({
+          projectID: "project",
+          directory: fixture.checkout,
+          sessionID: "session",
+          action: "setup",
+          domain: " bergfreunde.at ",
+        })
+      ).accepted,
+    ).toBe(true)
+    await eventually(() => expect(fixture.process.commands).toHaveLength(1))
+    expect(fixture.process.commands[0].input).toMatchObject({
+      command: path.join(fixture.root, "devenv", "scripts", "worktree-up.sh"),
+      args: [fixture.checkout, "--domain", "bergfreunde.at"],
+    })
+    fixture.createContainers()
+    fixture.process.exit(fixture.process.commands[0].id, 0)
+
+    await eventually(async () => {
+      expect((await backend.inspect("project", fixture.checkout)).stack).toMatchObject({
+        status: "configured",
+        stackID: "project",
+        composeProject: "devenv-project",
+        infrastructureProject: "devenv",
+        url: "https://project.bergfreunde.at.localhost/",
+      })
+    })
+  })
+
   test("requires confirmation and verified ownership before remove", async () => {
     const fixture = await environmentFixture()
-    await fixture.writeStack(fixture.checkout, "project")
-    fixture.containers.present = true
     const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
 
     const unconfirmed = await backend.run({
       projectID: "project",
@@ -108,20 +138,20 @@ describe("development environments", () => {
       action: "remove",
     })
     expect(unconfirmed).toMatchObject({ accepted: false, reason: "confirmation-required" })
-    expect(fixture.process.commands).toHaveLength(0)
+    expect(fixture.process.commands).toHaveLength(1)
 
-    fixture.capabilities.guardedRemoval = false
-    const unsupported = await backend.run({
+    fixture.containers.owned = false
+    const unowned = await backend.run({
       projectID: "project",
       directory: fixture.checkout,
       sessionID: "session",
       action: "remove",
       confirmation: "remove-environment",
     })
-    expect(unsupported).toMatchObject({ accepted: false, reason: "not-available" })
-    expect(fixture.process.commands).toHaveLength(0)
+    expect(unowned).toMatchObject({ accepted: false, reason: "not-available" })
+    expect(fixture.process.commands).toHaveLength(1)
 
-    fixture.capabilities.guardedRemoval = true
+    fixture.containers.owned = true
     const accepted = await backend.run({
       projectID: "project",
       directory: fixture.checkout,
@@ -130,31 +160,12 @@ describe("development environments", () => {
       confirmation: "remove-environment",
     })
     expect(accepted.accepted).toBe(true)
-    await eventually(() => expect(fixture.process.commands).toHaveLength(1))
-    expect(fixture.process.commands[0].input.args).toEqual([
-      "down",
-      "--expect",
-      "project",
-      "devenv-project",
-      "devenv",
-      "project.bergfreunde.de.localhost",
-      fixture.checkout,
-    ])
-    fixture.containers.present = false
-    fixture.process.exit(fixture.process.commands[0].id, 0)
-
     await eventually(() => expect(fixture.process.commands).toHaveLength(2))
-    expect(fixture.process.commands[1].input.args).toEqual([
-      "stack",
-      "clear",
-      "--expect",
-      "project",
-      "devenv-project",
-      "devenv",
-      "project.bergfreunde.de.localhost",
-      fixture.checkout,
-    ])
-    await fs.rm(fixture.stackFile(fixture.checkout))
+    expect(fixture.process.commands[1].input).toMatchObject({
+      command: path.join(fixture.root, "devenv", "scripts", "worktree-down.sh"),
+      args: [fixture.checkout],
+    })
+    fixture.containers.present = false
     fixture.process.exit(fixture.process.commands[1].id, 0)
 
     await eventually(async () => {
@@ -167,12 +178,11 @@ describe("development environments", () => {
     expect(fixture.process.commands.flatMap((item) => item.input.args)).not.toContain("reset")
   })
 
-  test("reconciles a fast successful stack clear after its PTY closes before attachment", async () => {
+  test("reconciles a fast successful worktree-down after its PTY closes before attachment", async () => {
     const fixture = await environmentFixture()
-    const stackFile = await fixture.writeStack(fixture.checkout, "project")
-    fixture.containers.present = true
-    fixture.process.closeBeforeObservation = (input) => input.args[0] === "stack"
     const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
+    fixture.process.closeBeforeObservation = (input) => input.args[0] === fixture.checkout
 
     expect(
       (
@@ -185,14 +195,12 @@ describe("development environments", () => {
         })
       ).accepted,
     ).toBe(true)
-    await eventually(() => expect(fixture.process.commands).toHaveLength(1))
-    fixture.containers.present = false
-    fixture.process.exit(fixture.process.commands[0].id, 0)
+    await eventually(() => expect(fixture.process.commands).toHaveLength(2))
     await eventually(async () => {
       expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("failed")
     })
 
-    await fs.rm(stackFile)
+    fixture.containers.present = false
     const reconciled = await backend.inspect("project", fixture.checkout)
     expect(reconciled.availability).toEqual({ available: true })
     expect(reconciled.latestRun?.status).toBe("succeeded")
@@ -202,10 +210,9 @@ describe("development environments", () => {
 
   test("runs start and stop as distinct fixed devenv actions", async () => {
     const fixture = await environmentFixture()
-    await fixture.writeStack(fixture.checkout, "project")
-    fixture.containers.present = true
-    fixture.containers.running = false
     const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
+    fixture.containers.running = false
 
     expect(
       (
@@ -217,9 +224,9 @@ describe("development environments", () => {
         })
       ).accepted,
     ).toBe(true)
-    await eventually(() => expect(fixture.process.commands[0].input.args).toEqual(["start"]))
+    await eventually(() => expect(fixture.process.commands[1].input.args).toEqual(["start"]))
     fixture.containers.running = true
-    fixture.process.exit(fixture.process.commands[0].id, 0)
+    fixture.process.exit(fixture.process.commands[1].id, 0)
     await eventually(async () => {
       const state = await backend.inspect("project", fixture.checkout)
       expect(state.latestRun?.status).toBe("succeeded")
@@ -237,9 +244,9 @@ describe("development environments", () => {
         })
       ).accepted,
     ).toBe(true)
-    await eventually(() => expect(fixture.process.commands[1].input.args).toEqual(["stop"]))
+    await eventually(() => expect(fixture.process.commands[2].input.args).toEqual(["stop"]))
     fixture.containers.running = false
-    fixture.process.exit(fixture.process.commands[1].id, 0)
+    fixture.process.exit(fixture.process.commands[2].id, 0)
     await eventually(async () => {
       const state = await backend.inspect("project", fixture.checkout)
       expect(state.latestRun?.status).toBe("succeeded")
@@ -248,38 +255,21 @@ describe("development environments", () => {
     })
   })
 
-  test("does not clear a replacement stack assignment after devenv down", async () => {
+  test("does not remove containers outside the convention-owned Compose stack", async () => {
     const fixture = await environmentFixture()
-    const stackFile = await fixture.writeStack(fixture.checkout, "project")
-    fixture.containers.present = true
     const backend = fixture.backend(fixture.registered)
+    await configure(fixture, backend)
+    fixture.containers.owned = false
 
     expect(
-      (
-        await backend.run({
-          projectID: "project",
-          directory: fixture.checkout,
-          sessionID: "session",
-          action: "remove",
-          confirmation: "remove-environment",
-        })
-      ).accepted,
-    ).toBe(true)
-    await eventually(() => expect(fixture.process.commands).toHaveLength(1))
-
-    fixture.containers.present = false
-    await Bun.write(
-      stackFile,
-      (await Bun.file(stackFile).text()).replace(
-        "INFRASTRUCTURE_PROJECT_NAME=devenv",
-        "INFRASTRUCTURE_PROJECT_NAME=replacement",
-      ),
-    )
-    fixture.process.exit(fixture.process.commands[0].id, 0)
-
-    await eventually(async () => {
-      expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("failed")
-    })
+      await backend.run({
+        projectID: "project",
+        directory: fixture.checkout,
+        sessionID: "session",
+        action: "remove",
+        confirmation: "remove-environment",
+      }),
+    ).toMatchObject({ accepted: false, reason: "not-available" })
     expect(fixture.process.commands).toHaveLength(1)
   })
 
@@ -288,7 +278,7 @@ describe("development environments", () => {
     const backend = fixture.backend(fixture.registered)
     expect((await setup(backend, "project", fixture.checkout)).accepted).toBe(true)
     await eventually(() => expect(fixture.process.commands).toHaveLength(1))
-    await fixture.writeStack(fixture.checkout, "project")
+    fixture.createContainers()
     fixture.process.exit(fixture.process.commands[0].id, 1)
     await eventually(async () =>
       expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("failed"),
@@ -313,12 +303,25 @@ async function setup(backend: EnvironmentBackend, projectID: string, directory: 
   return backend.run({ projectID, directory, sessionID: "session", action: "setup" })
 }
 
+async function configure(fixture: Awaited<ReturnType<typeof environmentFixture>>, backend: EnvironmentBackend) {
+  expect((await setup(backend, "project", fixture.checkout)).accepted).toBe(true)
+  await eventually(() => expect(fixture.process.commands.length).toBeGreaterThan(0))
+  fixture.createContainers()
+  const command = fixture.process.commands.at(-1)!
+  fixture.process.exit(command.id, 0)
+  await eventually(async () => {
+    expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("succeeded")
+  })
+}
+
 async function environmentFixture(count = 1) {
   const root = await fs.realpath(await fs.mkdtemp(path.join(os.tmpdir(), "boc-environment-")))
   cleanup.push(root)
   const devenvRoot = path.join(root, "devenv")
   const stateDirectory = path.join(root, "state")
-  const checkouts = Array.from({ length: count }, (_, index) => path.join(root, `checkout-${index}`))
+  const checkouts = Array.from({ length: count }, (_, index) =>
+    path.join(devenvRoot, "src", ".lane", "trees", count === 1 ? "project" : `project-${index === 0 ? "a" : "b"}`),
+  )
   const gitDirectories = new Map(checkouts.map((directory, index) => [directory, path.join(root, `git-${index}`)]))
   await Promise.all([
     fs.mkdir(path.join(devenvRoot, "src", "common", "config"), { recursive: true }),
@@ -338,30 +341,28 @@ async function environmentFixture(count = 1) {
   ])
   const installation: DevenvInstallation = {
     executable: path.join(devenvRoot, "devenv.sh"),
-    setup: path.join(devenvRoot, "scripts", "worktree-setup.sh"),
+    up: path.join(devenvRoot, "scripts", "worktree-up.sh"),
+    down: path.join(devenvRoot, "scripts", "worktree-down.sh"),
     root: devenvRoot,
     environment: { PATH: process.env.PATH ?? "" },
   }
   const processHost = new FakeProcessHost()
-  const containers = { present: false, running: true }
-  const capabilities = { guardedRemoval: true }
+  const containers = { present: false, running: true, owned: true }
   const command = async (input: Command): Promise<CommandResult> => {
     if (input.executable === "curl") {
       const stackID = new URL(input.args.at(-1)!).hostname.split(".")[0]
       return { exitCode: 0, stdout: `HTTP/2 200\r\nx-devenv-worktree: ${stackID}\r\n\r\n`, stderr: "" }
     }
     if (input.args[0] === "network") return { exitCode: 0, stdout: "[]", stderr: "" }
-    if (input.args[0] === "stack" && input.args[1] === "capabilities") {
-      return capabilities.guardedRemoval
-        ? { exitCode: 0, stdout: "guarded-removal-v1\n", stderr: "" }
-        : { exitCode: 0, stdout: "", stderr: "" }
+    if (input.args[0] === "ps") {
+      const project = input.args.at(-1)?.split("=").at(-1)
+      return { exitCode: 0, stdout: containers.present ? `${project}-container\n` : "", stderr: "" }
     }
-    if (input.args[0] === "ps") return { exitCode: 0, stdout: containers.present ? "container-1\n" : "", stderr: "" }
     if (input.args[0] === "inspect") {
-      const project = input.args.find((value) => value.startsWith("container")) ? "project" : "project"
+      const project = input.args.at(-1)?.replace(/-container$/, "")
       const labels = {
-        "com.docker.compose.project": "devenv-project",
-        "com.docker.compose.project.working_dir": devenvRoot,
+        "com.docker.compose.project": project,
+        "com.docker.compose.project.working_dir": containers.owned ? devenvRoot : path.join(root, "another-devenv"),
         "com.docker.compose.project.config_files": `${path.join(devenvRoot, "docker-compose.yml")},${path.join(devenvRoot, "docker-compose.worktree.yml")}`,
       }
       return { exitCode: 0, stdout: `${JSON.stringify(labels)}\t${containers.running}\n`, stderr: "" }
@@ -384,27 +385,8 @@ async function environmentFixture(count = 1) {
       readinessAttempts: 2,
       readinessDelayMs: 1,
     })
-  const stackID = (directory: string) => `project-${checkouts.indexOf(directory)}`
-  const stackFile = (directory: string) => path.join(devenvRoot, ".devenv", "worktrees", `${stackID(directory)}.env`)
-  const writeStack = async (directory: string, projectID: string) => {
-    const id = projectID === "project" ? "project" : projectID
-    const file = path.join(devenvRoot, ".devenv", "worktrees", `${id}.env`)
-    await fs.mkdir(path.dirname(file), { recursive: true })
-    await Bun.write(
-      file,
-      [
-        `STACK_ID=${id}`,
-        "STACK_DOMAIN=bergfreunde.de",
-        `COMPOSE_PROJECT_NAME=devenv-${id}`,
-        "DEVENV_SHARED_INFRASTRUCTURE=true",
-        "INFRASTRUCTURE_PROJECT_NAME=devenv",
-        `STACK_HOST=${id}.bergfreunde.de.localhost`,
-        `SHOP_CONTAINER_NAME=devenv-${id}-shop`,
-        `DEVENV_SRC_PATH=${directory.replaceAll(" ", "\\ ")}`,
-        "",
-      ].join("\n"),
-    )
-    return file
+  const createContainers = () => {
+    containers.present = true
   }
   return {
     root,
@@ -412,12 +394,9 @@ async function environmentFixture(count = 1) {
     checkouts,
     process: processHost,
     containers,
-    capabilities,
     registered,
     backend,
-    writeStack,
-    stackFile: (directory: string) =>
-      path.join(devenvRoot, ".devenv", "worktrees", `${checkouts.length === 1 ? "project" : stackID(directory)}.env`),
+    createContainers,
   }
 }
 

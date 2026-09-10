@@ -23,7 +23,6 @@ export type StackAssignment = {
   readonly host: string
   readonly url: string
   readonly sourceDirectory: string
-  readonly configFile: string
 }
 
 export type ContainerInspection = {
@@ -36,21 +35,12 @@ export type ContainerInspection = {
 export type DevenvInstallation = {
   readonly executable: string
   readonly root: string
-  readonly setup: string
+  readonly up: string
+  readonly down: string
   readonly environment: Readonly<Record<string, string>>
 }
 
-const STACK_KEYS = new Set([
-  "STACK_ID",
-  "STACK_BRANCH",
-  "STACK_DOMAIN",
-  "COMPOSE_PROJECT_NAME",
-  "DEVENV_SHARED_INFRASTRUCTURE",
-  "INFRASTRUCTURE_PROJECT_NAME",
-  "STACK_HOST",
-  "SHOP_CONTAINER_NAME",
-  "DEVENV_SRC_PATH",
-])
+const DEFAULT_DOMAIN = "bergfreunde.de"
 
 export async function resolveDevenv(
   environment: NodeJS.ProcessEnv = process.env,
@@ -61,55 +51,56 @@ export async function resolveDevenv(
   const resolved = await fs.realpath(executable).catch(() => undefined)
   if (!resolved) return
   const root = path.dirname(resolved)
-  const setup = path.join(root, "scripts", "worktree-setup.sh")
-  if (!(await isExecutable(resolved)) || !(await isExecutable(setup))) return
+  const up = path.join(root, "scripts", "worktree-up.sh")
+  const down = path.join(root, "scripts", "worktree-down.sh")
+  if (!(await isExecutable(resolved)) || !(await isExecutable(up)) || !(await isExecutable(down))) return
   return {
     executable,
     root,
-    setup,
+    up,
+    down,
     environment: processEnvironment(environment, resolved, root),
   }
 }
 
-export async function inspectStack(
+export function inspectStack(
   installation: DevenvInstallation,
   directory: string,
-): Promise<{ status: "unconfigured" } | { status: "invalid" } | { status: "configured"; assignment: StackAssignment }> {
-  const configDirectory = path.join(installation.root, ".devenv", "worktrees")
-  const files = await fs.readdir(configDirectory).catch((error: NodeJS.ErrnoException) => {
-    if (error.code === "ENOENT") return []
-    throw error
-  })
-  const domains = new Set(
-    (await fs.readFile(path.join(installation.root, "config", "storefront-domains.txt"), "utf8").catch(() => ""))
-      .split(/\r?\n/)
-      .map((value) => value.trim())
-      .filter((value) => value && !value.startsWith("#")),
-  )
-  const configurations = await Promise.all(
-    files
-      .filter((name) => name.endsWith(".env"))
-      .map(async (name) => {
-        const configFile = path.join(configDirectory, name)
-        const configuredSources = await readAssignmentValues(configFile, "DEVENV_SRC_PATH").catch(() => [])
-        const sourceDirectories = await Promise.all(
-          configuredSources.flatMap((value) =>
-            value === undefined ? [] : [fs.realpath(value).catch(() => path.resolve(value))],
-          ),
-        )
-        if (!sourceDirectories.includes(directory)) return
-        if (configuredSources.length !== 1 || sourceDirectories.length !== 1) return false
-        const sourceDirectory = sourceDirectories[0]
-        const values = await readAssignments(configFile, STACK_KEYS, true).catch(() => undefined)
-        if (!values) return false
-        return assignment(installation.root, configFile, values, sourceDirectory, domains)
-      }),
-  )
-  if (configurations.some((value) => value === false)) return { status: "invalid" }
-  const matches = configurations.filter((value): value is StackAssignment => value !== undefined && value !== false)
-  if (matches.length === 0) return { status: "unconfigured" }
-  if (matches.length !== 1) return { status: "invalid" }
-  return { status: "configured", assignment: matches[0] }
+  configured?: StackAssignment,
+): { status: "unconfigured" } | { status: "invalid" } | { status: "configured"; assignment: StackAssignment } {
+  if (!configured) return { status: "unconfigured" }
+  const domain = assignmentDomain(configured)
+  const expected = domain ? createStackAssignment(installation, directory, domain) : undefined
+  if (!expected || !sameAssignment(configured, expected)) return { status: "invalid" }
+  return { status: "configured", assignment: expected }
+}
+
+export function createStackAssignment(
+  installation: DevenvInstallation,
+  directory: string,
+  domain = DEFAULT_DOMAIN,
+): StackAssignment | undefined {
+  const laneTrees = path.join(installation.root, "src", ".lane", "trees")
+  const laneName = path.relative(laneTrees, directory)
+  if (!laneName || laneName.startsWith(`..${path.sep}`) || path.isAbsolute(laneName) || laneName.includes(path.sep))
+    return
+  const stackID = laneName
+    .toLowerCase()
+    .replaceAll("_", "-")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+  if (!stackID || stackID.length > 48 || !validDomain(domain)) return
+  const infrastructureProject =
+    installation.environment.DEVENV_INFRASTRUCTURE_PROJECT || path.basename(installation.root)
+  const host = `${stackID}.${domain}.localhost`
+  return {
+    stackID,
+    composeProject: `devenv-${stackID}`,
+    infrastructureProject,
+    host,
+    url: `https://${host}/`,
+    sourceDirectory: directory,
+  }
 }
 
 export async function inspectContainers(
@@ -196,34 +187,12 @@ export async function preflight(
     if (!(await isFile(path.join(installation.root, "src", "shop", "source", ".env")))) return false
     if (!(await secretsArePrepared(path.join(installation.root, "secrets")))) return false
   }
-  const configured: Record<string, string> = await readAssignments(
-    path.join(installation.root, "dev.env"),
-    new Set(["DEVENV_WORKTREE_INFRA_NETWORK", "DEVENV_WORKTREE_INGRESS_NETWORK"]),
-  ).catch(() => ({}))
-  const networks = [
-    configured.DEVENV_WORKTREE_INFRA_NETWORK ?? "devenv-worktree-infra",
-    configured.DEVENV_WORKTREE_INGRESS_NETWORK ?? "devenv-worktree-ingress",
-  ]
   const result = await run({
     executable: "docker",
-    args: ["network", "inspect", ...networks],
+    args: ["network", "inspect", "devenv-worktree-infra", "devenv-worktree-ingress"],
     env: installation.environment,
   }).catch(() => undefined)
   return result?.exitCode === 0
-}
-
-export async function supportsGuardedRemoval(
-  installation: DevenvInstallation,
-  directory: string,
-  run: CommandRunner = runCommand,
-) {
-  const result = await run({
-    executable: installation.executable,
-    args: ["stack", "capabilities"],
-    cwd: directory,
-    env: installation.environment,
-  }).catch(() => undefined)
-  return result?.exitCode === 0 && result.stdout.trim() === "guarded-removal-v1"
 }
 
 export const runCommand: CommandRunner = async (command) => {
@@ -279,86 +248,6 @@ async function secretsArePrepared(directory: string) {
   ).every(Boolean)
 }
 
-async function readAssignments(file: string, keys: ReadonlySet<string>, strict = false) {
-  const result: Record<string, string> = {}
-  for (const raw of (await fs.readFile(file, "utf8")).split(/\r?\n/)) {
-    const line = raw.trim()
-    if (!line || line.startsWith("#")) continue
-    const match = line.match(/^([A-Z][A-Z0-9_]*)=(.*)$/)
-    if (!match) throw new Error(`Invalid assignment in ${file}`)
-    const value = decodeShellWord(match[2])
-    if (!keys.has(match[1])) {
-      if (strict) throw new Error(`Unexpected assignment in ${file}`)
-      continue
-    }
-    if (result[match[1]] !== undefined) throw new Error(`Duplicate assignment in ${file}`)
-    result[match[1]] = value
-  }
-  return result
-}
-
-async function readAssignmentValues(file: string, key: string) {
-  return (await fs.readFile(file, "utf8"))
-    .split(/\r?\n/)
-    .map((raw) => raw.trim().match(/^([A-Z][A-Z0-9_]*)=(.*)$/))
-    .filter((match) => match?.[1] === key)
-    .map((match) => {
-      if (!match) return
-      try {
-        return decodeShellWord(match[2])
-      } catch {
-        return
-      }
-    })
-}
-
-function decodeShellWord(value: string) {
-  if (/["'`$]/.test(value)) throw new Error("Unsupported shell quoting in generated devenv data")
-  let result = ""
-  for (let index = 0; index < value.length; index++) {
-    if (value[index] !== "\\") {
-      result += value[index]
-      continue
-    }
-    index++
-    if (index >= value.length) throw new Error("Invalid escape in generated devenv data")
-    result += value[index]
-  }
-  return result
-}
-
-function assignment(
-  root: string,
-  configFile: string,
-  values: Record<string, string>,
-  sourceDirectory: string,
-  domains: ReadonlySet<string>,
-) {
-  const stackID = values.STACK_ID
-  const domain = values.STACK_DOMAIN
-  if (!stackID || !/^[a-z0-9](?:[a-z0-9-]{0,46}[a-z0-9])?$/.test(stackID)) return false
-  if (!domain || !domains.has(domain) || !values.INFRASTRUCTURE_PROJECT_NAME) return false
-  const composeProject = `devenv-${stackID}`
-  const host = `${stackID}.${domain}.localhost`
-  if (
-    values.COMPOSE_PROJECT_NAME !== composeProject ||
-    values.DEVENV_SHARED_INFRASTRUCTURE !== "true" ||
-    values.STACK_HOST !== host ||
-    values.SHOP_CONTAINER_NAME !== `${composeProject}-shop` ||
-    configFile !== path.join(root, ".devenv", "worktrees", `${stackID}.env`)
-  )
-    return false
-  return {
-    stackID,
-    composeProject,
-    infrastructureProject: values.INFRASTRUCTURE_PROJECT_NAME,
-    host,
-    url: `https://${host}/`,
-    sourceDirectory,
-    configFile,
-  } satisfies StackAssignment
-}
-
 function processEnvironment(environment: NodeJS.ProcessEnv, executable: string, root: string) {
   const keys = [
     "PATH",
@@ -375,6 +264,7 @@ function processEnvironment(environment: NodeJS.ProcessEnv, executable: string, 
     "XDG_CONFIG_HOME",
     "XDG_DATA_HOME",
     "XDG_RUNTIME_DIR",
+    "DEVENV_INFRASTRUCTURE_PROJECT",
   ]
   return {
     ...Object.fromEntries(keys.flatMap((key) => (environment[key] ? [[key, environment[key]]] : []))),
@@ -382,6 +272,31 @@ function processEnvironment(environment: NodeJS.ProcessEnv, executable: string, 
     DEVENV_BASE_DIRECTORY: root,
     TERM: "xterm-256color",
   }
+}
+
+function assignmentDomain(assignment: StackAssignment) {
+  const prefix = `${assignment.stackID}.`
+  const suffix = ".localhost"
+  if (!assignment.host.startsWith(prefix) || !assignment.host.endsWith(suffix)) return
+  return assignment.host.slice(prefix.length, -suffix.length)
+}
+
+function validDomain(domain: string) {
+  if (!domain || domain.length > 253 || !/^[a-zA-Z0-9.-]+$/.test(domain)) return false
+  return domain
+    .split(".")
+    .every((label) => label.length > 0 && label.length <= 63 && !label.startsWith("-") && !label.endsWith("-"))
+}
+
+function sameAssignment(left: StackAssignment, right: StackAssignment) {
+  return (
+    left.stackID === right.stackID &&
+    left.composeProject === right.composeProject &&
+    left.infrastructureProject === right.infrastructureProject &&
+    left.host === right.host &&
+    left.url === right.url &&
+    left.sourceDirectory === right.sourceDirectory
+  )
 }
 
 function parseLabels(value: string) {

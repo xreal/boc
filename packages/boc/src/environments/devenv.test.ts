@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { inspectStack, preflight, resolveDevenv } from "./devenv"
+import { createStackAssignment, inspectStack, preflight, resolveDevenv, type DevenvInstallation } from "./devenv"
 
 const cleanup: string[] = []
 
@@ -11,67 +11,62 @@ afterEach(async () => {
 })
 
 describe("devenv adapter", () => {
-  test("resolves the active executable entry and derives its fixed setup adapter", async () => {
+  test("resolves the active executable and Lane lifecycle scripts", async () => {
     const root = await temporary("devenv-resolution-")
     const bin = path.join(root, "bin")
     const installation = path.join(root, "installation")
     await Promise.all([fs.mkdir(bin), fs.mkdir(path.join(installation, "scripts"), { recursive: true })])
     await Promise.all([
       executable(path.join(installation, "devenv.sh")),
-      executable(path.join(installation, "scripts", "worktree-setup.sh")),
+      executable(path.join(installation, "scripts", "worktree-up.sh")),
+      executable(path.join(installation, "scripts", "worktree-down.sh")),
     ])
     await fs.symlink(path.join(installation, "devenv.sh"), path.join(bin, "devenv"))
 
-    const resolved = await resolveDevenv({ PATH: bin, HOME: root })
+    const resolved = await resolveDevenv({ PATH: bin, HOME: root, DEVENV_INFRASTRUCTURE_PROJECT: "shared" })
 
     expect(resolved).toMatchObject({
       executable: path.join(bin, "devenv"),
       root: installation,
-      setup: path.join(installation, "scripts", "worktree-setup.sh"),
+      up: path.join(installation, "scripts", "worktree-up.sh"),
+      down: path.join(installation, "scripts", "worktree-down.sh"),
     })
-    expect(resolved?.environment.DEVENV_BIN).toBe(path.join(installation, "devenv.sh"))
+    expect(resolved?.environment).toMatchObject({
+      DEVENV_BIN: path.join(installation, "devenv.sh"),
+      DEVENV_INFRASTRUCTURE_PROJECT: "shared",
+    })
   })
 
-  test("accepts only a complete generated stack contract for the canonical checkout", async () => {
+  test("derives and validates the convention-owned Lane stack", async () => {
     const root = await temporary("devenv-contract-")
-    const checkout = path.join(root, "checkout with space")
-    const config = path.join(root, ".devenv", "worktrees", "pc-123-a1b2.env")
-    await Promise.all([
-      fs.mkdir(checkout),
-      fs.mkdir(path.dirname(config), { recursive: true }),
-      fs.mkdir(path.join(root, "config"), { recursive: true }),
-    ])
-    await Bun.write(path.join(root, "config", "storefront-domains.txt"), "bergfreunde.de\n")
-    await Bun.write(config, stackContract(checkout))
-    const installation = { executable: "devenv", setup: "setup", root, environment: {} }
+    const checkout = path.join(root, "src", ".lane", "trees", "PC_123-feature")
+    await fs.mkdir(checkout, { recursive: true })
+    const installation = fixtureInstallation(root)
 
-    expect(await inspectStack(installation, checkout)).toMatchObject({
-      status: "configured",
-      assignment: {
-        stackID: "pc-123-a1b2",
-        composeProject: "devenv-pc-123-a1b2",
-        host: "pc-123-a1b2.bergfreunde.de.localhost",
-        sourceDirectory: checkout,
-      },
+    const assignment = createStackAssignment(installation, checkout, "bergfreunde.de")
+
+    expect(assignment).toBeDefined()
+    if (!assignment) throw new Error("Expected a Lane stack assignment")
+    expect(assignment).toEqual({
+      stackID: "pc-123-feature",
+      composeProject: "devenv-pc-123-feature",
+      infrastructureProject: path.basename(root),
+      host: "pc-123-feature.bergfreunde.de.localhost",
+      url: "https://pc-123-feature.bergfreunde.de.localhost/",
+      sourceDirectory: checkout,
     })
-
-    await Bun.write(config, stackContract(checkout).replace("STACK_HOST=pc-123-a1b2", "STACK_HOST=another-stack"))
-    expect(await inspectStack(installation, checkout)).toEqual({ status: "invalid" })
-
-    await Bun.write(config, stackContract(checkout))
-    await Bun.write(path.join(path.dirname(config), "unrelated.env"), "this is not a generated assignment\n")
-    expect(await inspectStack(installation, checkout)).toMatchObject({ status: "configured" })
-
-    await Bun.write(config, `${stackContract(checkout)}this is not a generated assignment\n`)
-    expect(await inspectStack(installation, checkout)).toEqual({ status: "invalid" })
-
-    await Bun.write(config, `${stackContract(checkout)}DEVENV_SRC_PATH=${checkout}\n`)
-    expect(await inspectStack(installation, checkout)).toEqual({ status: "invalid" })
+    expect(inspectStack(installation, checkout)).toEqual({ status: "unconfigured" })
+    expect(inspectStack(installation, checkout, assignment)).toEqual({ status: "configured", assignment })
+    expect(inspectStack(installation, checkout, { ...assignment, composeProject: "devenv-other" })).toEqual({
+      status: "invalid",
+    })
+    expect(createStackAssignment(installation, path.join(root, "another-checkout"))).toBeUndefined()
+    expect(createStackAssignment(installation, checkout, "https://bergfreunde.de")).toBeUndefined()
   })
 
-  test("uses the active devenv network defaults during setup preflight", async () => {
+  test("uses the Lane network contract during setup preflight", async () => {
     const root = await temporary("devenv-preflight-")
-    const checkout = path.join(root, "checkout")
+    const checkout = path.join(root, "src", ".lane", "trees", "checkout")
     await Promise.all([
       fs.mkdir(path.join(checkout, "shop"), { recursive: true }),
       fs.mkdir(path.join(root, "src", "common", "config"), { recursive: true }),
@@ -79,33 +74,26 @@ describe("devenv adapter", () => {
       fs.mkdir(path.join(root, "secrets"), { recursive: true }),
     ])
     await Bun.write(path.join(root, "src", "shop", "source", ".env"), "TEST=1\n")
-    const installation = { executable: "devenv", setup: "setup", root, environment: {} }
     const commands: ReadonlyArray<string>[] = []
 
     expect(
-      await preflight(installation, checkout, "setup", async (command) => {
+      await preflight(fixtureInstallation(root), checkout, "setup", async (command) => {
         commands.push(command.args)
         return { exitCode: 0, stdout: "", stderr: "" }
       }),
     ).toBe(true)
-    expect(commands).toEqual([
-      ["network", "inspect", "devenv-worktree-infra", "devenv-worktree-ingress"],
-    ])
+    expect(commands).toEqual([["network", "inspect", "devenv-worktree-infra", "devenv-worktree-ingress"]])
   })
 })
 
-function stackContract(directory: string) {
-  return [
-    "STACK_ID=pc-123-a1b2",
-    "STACK_DOMAIN=bergfreunde.de",
-    "COMPOSE_PROJECT_NAME=devenv-pc-123-a1b2",
-    "DEVENV_SHARED_INFRASTRUCTURE=true",
-    "INFRASTRUCTURE_PROJECT_NAME=devenv",
-    "STACK_HOST=pc-123-a1b2.bergfreunde.de.localhost",
-    "SHOP_CONTAINER_NAME=devenv-pc-123-a1b2-shop",
-    `DEVENV_SRC_PATH=${directory.replaceAll(" ", "\\ ")}`,
-    "",
-  ].join("\n")
+function fixtureInstallation(root: string): DevenvInstallation {
+  return {
+    executable: path.join(root, "devenv.sh"),
+    up: path.join(root, "scripts", "worktree-up.sh"),
+    down: path.join(root, "scripts", "worktree-down.sh"),
+    root,
+    environment: {},
+  }
 }
 
 async function temporary(prefix: string) {

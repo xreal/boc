@@ -54,3 +54,14 @@ git config --local --add lane.exclude .lane
 ```
 
 Add further `lane.exclude` entries for ignored files that must not be copied.
+
+## Devenv lifecycle
+
+Boc's development-environment controls use Devenv's convention-based Lane lifecycle:
+
+- `scripts/worktree-up.sh <lane-worktree-path> [--domain <domain>]`
+- `scripts/worktree-down.sh <lane-worktree-path>`
+
+Both executable scripts must exist in the active Devenv installation's `scripts` directory. Boc derives the stack identity from the authoritative Lane path, verifies the checkout owner and Docker Compose labels, and stores only its own operation/output state. It does not use `.devenv/worktrees` assignment files or `devenv stack` commands.
+
+Leave the project's **Worktree startup script** empty when using Boc's environment controls. Create the Lane first, then use **Set up environment** so Boc can own the lifecycle and show its live output.

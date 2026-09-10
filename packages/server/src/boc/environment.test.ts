@@ -95,25 +95,36 @@ it.live("serves environment RPC and accepts registered Lane linked worktrees", (
 it.live("retains environment PTY output and mutation locks after Location disposal, then cancels through RPC", () =>
   Effect.gen(function* () {
     const tmp = yield* tmpdirScoped("boc-environment-rpc-")
-    yield* Effect.promise(() => initRepo(tmp.path))
-    const linked = path.join(tmp.path, "linked")
+    const source = path.join(tmp.path, "src")
     yield* Effect.promise(async () => {
-      await $`git worktree add --detach ${linked}`.cwd(tmp.path).quiet()
+      await fs.mkdir(source)
+      await initRepo(source)
+      await Promise.all([
+        fs.mkdir(path.join(source, "shop", "source"), { recursive: true }),
+        fs.mkdir(path.join(source, "common", "config"), { recursive: true }),
+      ])
+      await fs.writeFile(path.join(source, "shop", "source", ".env"), "fixture")
+      await fs.writeFile(path.join(source, "shop", "fixture"), "fixture")
+      await $`git add shop/fixture`.cwd(source).quiet()
+      await $`git commit -m fixture`.cwd(source).quiet()
+      await fs.mkdir(path.join(source, ".lane", "trees"), { recursive: true })
+      await fs.appendFile(path.join(source, ".git", "info", "exclude"), ".lane/\n")
+    })
+    const linked = path.join(source, ".lane", "trees", "rpc-test")
+    yield* Effect.promise(async () => {
+      await $`git worktree add --detach ${linked}`.cwd(source).quiet()
       await Promise.all(
-        ["shop", "scripts", "src/common/config", "src/shop/source", "secrets", "bin"].map((name) =>
-          fs.mkdir(path.join(tmp.path, name), { recursive: true }),
-        ),
+        ["scripts", "secrets", "bin"].map((name) => fs.mkdir(path.join(tmp.path, name), { recursive: true })),
       )
-      await fs.mkdir(path.join(linked, "shop"))
-      await fs.writeFile(path.join(tmp.path, "src/shop/source/.env"), "fixture")
       await fs.writeFile(path.join(tmp.path, "bin/docker"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
       await fs.writeFile(
-        path.join(tmp.path, "scripts/worktree-setup.sh"),
+        path.join(tmp.path, "scripts/worktree-up.sh"),
         "#!/bin/sh\necho fixture-operation-started\nexec sleep 60\n",
         { mode: 0o755 },
       )
+      await fs.writeFile(path.join(tmp.path, "scripts/worktree-down.sh"), "#!/bin/sh\nexit 0\n", { mode: 0o755 })
     })
-    const boc = yield* backend(tmp.path, "boc")
+    const boc = yield* backend(source, "boc", tmp.path)
     const options = { location: { directory: linked } }
     const project = (yield* Effect.promise(() => boc.api.location.get(options))).project
     const rpc = boc.api.rpc(BocEnvironmentRpc.Rpc)
@@ -150,7 +161,7 @@ it.live("retains environment PTY output and mutation locks after Location dispos
   }),
 )
 
-const backend = Effect.fnUntraced(function* (directory: string, channel?: string) {
+const backend = Effect.fnUntraced(function* (directory: string, channel?: string, installationRoot = directory) {
   const context = yield* Layer.build(
     createRoutes(
       {
@@ -173,10 +184,11 @@ const backend = Effect.fnUntraced(function* (directory: string, channel?: string
         BocEnvironments.node.replace(
           BocEnvironments.configured({
             installation: async () => ({
-              executable: path.join(directory, "devenv"),
-              root: directory,
-              setup: path.join(directory, "scripts", "worktree-setup.sh"),
-              environment: { PATH: `${path.join(directory, "bin")}${path.delimiter}${process.env.PATH ?? ""}` },
+              executable: path.join(installationRoot, "devenv"),
+              root: installationRoot,
+              up: path.join(installationRoot, "scripts", "worktree-up.sh"),
+              down: path.join(installationRoot, "scripts", "worktree-down.sh"),
+              environment: { PATH: `${path.join(installationRoot, "bin")}${path.delimiter}${process.env.PATH ?? ""}` },
             }),
           }),
         ),

@@ -7,7 +7,7 @@ const now = Date.UTC(2026, 8, 6, 9, 30)
 const base: BocEnvironment.State = {
   backend: "local",
   projectID: Project.ID.make("project_fixture"),
-  directory: AbsolutePath.make("/workspace/checkouts/BOC-204-environments"),
+  directory: AbsolutePath.make("/workspace/src/.lane/trees/BOC-204-environments"),
   availability: { available: true },
   stack: { status: "unconfigured" },
   containers: { status: "absent", total: 0, running: 0 },
@@ -16,11 +16,11 @@ const base: BocEnvironment.State = {
 
 const configured = {
   status: "configured" as const,
-  stackID: "boc-204-environments-a4d2",
-  composeProject: "devenv-worktree-boc-204-environments-a4d2",
+  stackID: "boc-204-environments",
+  composeProject: "devenv-boc-204-environments",
   infrastructureProject: "devenv",
-  host: "boc-204-environments-a4d2.shop.localhost",
-  url: "https://boc-204-environments-a4d2.shop.localhost",
+  host: "boc-204-environments.bergfreunde.de.localhost",
+  url: "https://boc-204-environments.bergfreunde.de.localhost/",
   sourceDirectory: base.directory,
 }
 
@@ -33,7 +33,7 @@ export const environmentFixtures = {
       action: "setup",
       status: "running",
       startedAt: now - 32_000,
-      log: "$ worktree-setup /workspace/checkouts/BOC-204-environments\nRestoring Composer dependencies…\nBuilding frontend assets…\n",
+      log: "$ worktree-up /workspace/src/.lane/trees/BOC-204-environments\nRestoring Composer dependencies…\nBuilding frontend assets…\n",
       truncated: false,
     },
   },
@@ -46,7 +46,7 @@ export const environmentFixtures = {
       startedAt: now - 78_000,
       endedAt: now - 8_000,
       exitCode: 1,
-      log: "$ worktree-setup /workspace/checkouts/BOC-204-environments\nFrontend build failed.\n",
+      log: "$ worktree-up /workspace/src/.lane/trees/BOC-204-environments\nFrontend build failed.\n",
       truncated: false,
     },
   },
@@ -61,7 +61,7 @@ export const environmentFixtures = {
       startedAt: now - 45_000,
       endedAt: now - 4_000,
       exitCode: 130,
-      log: "$ worktree-setup /workspace/checkouts/BOC-204-environments\nSetup cancelled. Existing resources were left in place.\n",
+      log: "$ worktree-up /workspace/src/.lane/trees/BOC-204-environments\nSetup cancelled. Existing resources were left in place.\n",
       truncated: false,
     },
   },
