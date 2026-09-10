@@ -1,0 +1,3 @@
+[data-slot="boc-project-tab"][data-worktree] [data-slot="project-avatar-surface"] {
+  box-shadow: inset 0 0 0 1px var(--v2-icon-icon-accent);
+}

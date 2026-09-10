@@ -4,16 +4,24 @@ import { Schema } from "effect"
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
+import { Menu } from "@opencode/ui/menu"
+import { useDialog } from "@opencode/ui/context/dialog"
+import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, serverName } from "@/runtime/server/registry"
 import { useLanguage } from "@/runtime/i18n/language"
-import { displayName, projectForSession } from "@/shell/layout/helpers"
+import { usePlatform } from "@/runtime/platform/platform"
+import { type LocalProject } from "@/shell/state/layout"
+import { displayName, errorMessage, projectForSession } from "@/shell/layout/helpers"
+import { showToast } from "@/shell/notifications/toast"
 import { tabKey, useTabs, type Tab } from "@/shell/tabs/tabs"
-import { isProjectDirectory } from "@/workspaces/paths"
+import { isProjectDirectory, isWorkspaceDirectory } from "@/workspaces/paths"
 import { pathKey } from "@/workspaces/path-key"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { adjacentTabKey } from "@/shell/titlebar/tab-order"
+import { fileManagerApp } from "@/home/projects/file-manager"
+import "./project-tabs.css"
 
 const preferences = Persistence.struct({
   order: Persistence.array(Schema.String),
@@ -25,6 +33,9 @@ type ProjectGroup = {
   name: string
   path: string
   server: ServerConnection.Key
+  connection?: ServerConnection.Any
+  project?: LocalProject
+  worktree: boolean
   serverLabel?: string
 }
 
@@ -36,6 +47,8 @@ export function createBocProjectTabs(input: {
   const global = useGlobal()
   const tabs = useTabs()
   const language = useLanguage()
+  const platform = usePlatform()
+  const dialog = useDialog()
   const [state, setState] = persisted(Persist.window("boc.project-tabs"), preferences, { order: [], collapsed: {} })
   const projects = createMemo(() => {
     if (!input.enabled()) return new Map<string, ProjectGroup>()
@@ -62,6 +75,9 @@ export function createBocProjectTabs(input: {
             name: path ? displayName(project ?? { worktree: path }) : language.t("session.tab.session"),
             path: path ?? "",
             server: tab.server,
+            connection: conn,
+            project,
+            worktree: !!directory && isWorkspaceDirectory(project, directory),
             serverLabel: servers.length > 1 && conn ? serverName(conn) : undefined,
           },
         ]
@@ -96,6 +112,88 @@ export function createBocProjectTabs(input: {
     ),
   )
 
+  const projectDirectories = (project: LocalProject) => [project.worktree, ...(project.sandboxes ?? [])]
+  const canRevealProject = (group: ProjectGroup) =>
+    !!group.project &&
+    !!group.connection &&
+    platform.platform === "desktop" &&
+    !!platform.openPath &&
+    ServerConnection.local(group.connection)
+
+  const importSession = (group: ProjectGroup) => {
+    const server = group.connection
+    const project = group.project
+    if (!platform.openAttachmentPickerDialog || !server || !project) return
+
+    void platform
+      .openAttachmentPickerDialog(
+        {
+          title: language.t("command.session.import"),
+          accept: ["application/json"],
+          extensions: ["json"],
+        },
+        async (file) => {
+          const data = await Schema.decodeUnknownPromise(Schema.fromJsonString(SessionTransfer.Data))(await file.text())
+          const ctx = global.ensureServerCtx(server)
+          // The generated client preserves the transfer envelope as a narrower input type.
+          // SessionTransfer.Data is the canonical runtime schema for this payload.
+          // oxlint-disable-next-line typescript-eslint/no-unsafe-type-assertion
+          const imported = await ctx.sdk.api.session.import({
+            ...Schema.encodeSync(SessionTransfer.Data)(data),
+            location: { directory: project.worktree },
+          } as Parameters<typeof ctx.sdk.api.session.import>[0])
+          void ctx.data.session.message.sync(imported.id).catch(() => undefined)
+          const tab = tabs.addSessionTab({ server: ServerConnection.key(server), sessionId: imported.id })
+          tabs.select(tab)
+          ctx.data.session.remember(imported)
+          ctx.projects.open(project.worktree)
+          ctx.projects.touch(project.worktree)
+        },
+      )
+      .catch((cause: unknown) => {
+        showToast({
+          title: language.t("common.requestFailed"),
+          description: errorMessage(cause, language.t("common.requestFailed")),
+        })
+      })
+  }
+
+  const editProject = (group: ProjectGroup) => {
+    const server = group.connection
+    const project = group.project
+    if (!server || !project) return
+    void import("@/settings/workspaces/project-dialog").then(({ DialogEditProject }) => {
+      void dialog.show(() => <DialogEditProject server={server} project={project} />)
+    })
+  }
+
+  const revealProject = (group: ProjectGroup) => {
+    if (!group.project || !group.connection || !platform.openPath || !canRevealProject(group)) return
+    platform.openPath(group.project.worktree).catch((cause: unknown) =>
+      showToast({
+        title: language.t("common.requestFailed"),
+        description: errorMessage(cause, language.t("common.requestFailed")),
+      }),
+    )
+  }
+
+  const unseenCount = (group: ProjectGroup) => {
+    if (!group.connection || !group.project) return 0
+    const notification = global.ensureServerCtx(group.connection).notification
+    return projectDirectories(group.project).reduce(
+      (total, directory) => total + notification.project.unseenCount(directory),
+      0,
+    )
+  }
+
+  const clearNotifications = (group: ProjectGroup) => {
+    if (!group.connection || !group.project) return
+    const notification = global.ensureServerCtx(group.connection).notification
+    projectDirectories(group.project)
+      .filter((directory) => notification.project.unseenCount(directory) > 0)
+      .forEach((directory) => notification.project.markViewed(directory))
+  }
+
   return {
     ordered,
     projects,
@@ -117,6 +215,18 @@ export function createBocProjectTabs(input: {
       if (!project.path) return
       setState("collapsed", project.key, false)
       void tabs.newDraft({ server: project.server, directory: project.path })
+    },
+    canImportSession: (project: ProjectGroup) =>
+      !!platform.openAttachmentPickerDialog && !!project.connection && !!project.project,
+    importSession,
+    editProject,
+    canRevealProject,
+    revealProject,
+    unseenCount,
+    clearNotifications,
+    closeProject: (project: ProjectGroup) => {
+      if (!project.connection || !project.path) return
+      global.ensureServerCtx(project.connection).projects.close(project.path)
     },
     adjacent: (visible: string[], current: string | undefined, offset: -1 | 1) => {
       if (!input.enabled() || !current || visible.includes(current)) return adjacentTabKey(visible, current, offset)
@@ -142,6 +252,7 @@ export function BocProjectTabList(props: {
     source: undefined as string | undefined,
     target: undefined as { key: string; after: boolean; top: number } | undefined,
   })
+  const [menu, setMenu] = createStore({ open: undefined as string | undefined })
   const clearDrag = () => setDrag({ source: undefined, target: undefined })
 
   function dropTarget(event: DragEvent) {
@@ -246,6 +357,14 @@ export function BocProjectTabList(props: {
                       <span class="max-w-20 truncate text-[11px] text-v2-text-text-faint">{project().serverLabel}</span>
                     </Show>
                   </button>
+                  <Show when={project().project && project().connection}>
+                    <BocProjectMenu
+                      group={project()}
+                      groups={props.groups}
+                      open={menu.open === project().key}
+                      onOpenChange={(open) => setMenu("open", open ? project().key : undefined)}
+                    />
+                  </Show>
                   <IconButton
                     data-action="boc-project-new-session"
                     variant="ghost-muted"
@@ -261,6 +380,8 @@ export function BocProjectTabList(props: {
               )}
             </Show>
             <div
+              data-slot={props.enabled ? "boc-project-tab" : undefined}
+              data-worktree={props.enabled && props.groups.projects().get(tabKey(tab))?.worktree ? "" : undefined}
               hidden={props.enabled && !props.groups.visible(tab)}
               classList={{ contents: !props.enabled, "min-w-0 shrink-0 ps-5 empty:hidden": props.enabled }}
             >
@@ -278,6 +399,64 @@ export function BocProjectTabList(props: {
           />
         )}
       </Show>
+    </div>
+  )
+}
+
+function BocProjectMenu(props: {
+  group: ProjectGroup
+  groups: ReturnType<typeof createBocProjectTabs>
+  open: boolean
+  onOpenChange: (open: boolean) => void
+}) {
+  const language = useLanguage()
+  const platform = usePlatform()
+  return (
+    <div
+      class="shrink-0 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 data-[menu=true]:opacity-100"
+      data-menu={props.open}
+    >
+      <Menu gutter={6} modal={false} placement="bottom-end" open={props.open} onOpenChange={props.onOpenChange}>
+        <Menu.Trigger
+          as={IconButton}
+          data-action="boc-project-menu"
+          variant="ghost-muted"
+          size="small"
+          icon={<Icon name="outline-dots" />}
+          aria-label={language.t("common.moreOptions")}
+          title={language.t("common.moreOptions")}
+        />
+        <Menu.Portal>
+          <Menu.Content>
+            <Menu.Item onSelect={() => props.groups.newSession(props.group)}>
+              {language.t("command.session.new")}
+            </Menu.Item>
+            <Show when={props.groups.canImportSession(props.group)}>
+              <Menu.Item onSelect={() => props.groups.importSession(props.group)}>
+                {language.t("command.session.import")}
+              </Menu.Item>
+            </Show>
+            <Menu.Item onSelect={() => props.groups.editProject(props.group)}>
+              {language.t("dialog.project.edit.title")}
+            </Menu.Item>
+            <Show when={props.groups.canRevealProject(props.group)}>
+              <Menu.Item onSelect={() => props.groups.revealProject(props.group)}>
+                {language.t(
+                  fileManagerApp(platform.platform === "desktop" ? (platform.os ?? "unknown") : "unknown").actionLabel,
+                )}
+              </Menu.Item>
+            </Show>
+            <Menu.Item
+              disabled={props.groups.unseenCount(props.group) === 0}
+              onSelect={() => props.groups.clearNotifications(props.group)}
+            >
+              {language.t("sidebar.project.clearNotifications")}
+            </Menu.Item>
+            <Menu.Separator />
+            <Menu.Item onSelect={() => props.groups.closeProject(props.group)}>{language.t("common.close")}</Menu.Item>
+          </Menu.Content>
+        </Menu.Portal>
+      </Menu>
     </div>
   )
 }
