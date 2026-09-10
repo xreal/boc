@@ -204,10 +204,45 @@ export function EnvironmentContextMenu(props: {
     domain: props.domain,
     returnFocus: props.returnFocus,
   })
+  const containers = () => {
+    if (
+      props.resource.state.failed ||
+      props.resource.state.loading ||
+      props.resource.state.refreshing ||
+      !props.resource.state.environment?.availability.available
+    )
+      return "unknown"
+    return props.resource.state.environment?.containers.status ?? "unknown"
+  }
+  const tone = () => {
+    if (containers() === "running") return "success"
+    if (containers() === "stopped" || containers() === "absent") return "danger"
+    return "warning"
+  }
+  const status = () => {
+    if (props.resource.state.loading || props.resource.state.refreshing) return t("boc.environments.checking")
+    if (props.resource.state.failed) return t("boc.environments.stale")
+    if (!props.resource.state.environment?.availability.available) return t("boc.environments.status.unavailable")
+    return t(`boc.environments.status.${containers()}`)
+  }
 
   return (
     <>
       <Menu.Separator />
+      <Show
+        when={
+          props.settingsReady() && props.enabled() && props.resource.state.environment?.stack.status === "configured"
+        }
+      >
+        <Menu.Item onSelect={actions.open} title={status()} aria-description={status()}>
+          <Icon
+            name={tone() === "success" ? "circle-check" : tone() === "danger" ? "stop" : "info"}
+            size="small"
+            style={{ color: `var(--v2-state-fg-${tone()})` }}
+          />
+          {t("boc.environments.open")}
+        </Menu.Item>
+      </Show>
       <Menu.Sub>
         <Menu.SubTrigger>
           <Icon name="workspace-isolated" size="small" />
@@ -219,7 +254,13 @@ export function EnvironmentContextMenu(props: {
               when={props.settingsReady()}
               fallback={<Menu.Item disabled>{t("boc.environments.checking")}</Menu.Item>}
             >
-              <EnvironmentMenuItems t={t} enabled={props.enabled()} resource={props.resource} actions={actions} />
+              <EnvironmentMenuItems
+                t={t}
+                enabled={props.enabled()}
+                resource={props.resource}
+                actions={actions}
+                hideOpen
+              />
             </Show>
           </Menu.SubContent>
         </Menu.Portal>
@@ -237,6 +278,7 @@ function EnvironmentMenuItems(props: {
   enabled: boolean
   resource: EnvironmentResource
   actions: EnvironmentActions
+  hideOpen?: boolean
 }) {
   const environment = () => props.resource.state.environment
   const running = () => environment()?.latestRun?.status === "running"
@@ -313,10 +355,12 @@ function EnvironmentMenuItems(props: {
           </Show>
           <Show when={configured()}>
             <Menu.Separator />
-            <Menu.Item onSelect={props.actions.open}>
-              <Icon name="arrow-up-right" size="small" />
-              {props.t("boc.environments.open")}
-            </Menu.Item>
+            <Show when={!props.hideOpen}>
+              <Menu.Item onSelect={props.actions.open}>
+                <Icon name="arrow-up-right" size="small" />
+                {props.t("boc.environments.open")}
+              </Menu.Item>
+            </Show>
             <Menu.Item onSelect={() => void props.actions.copy()}>
               <Icon name="outline-copy" size="small" />
               {props.t("boc.environments.copyUrl")}
