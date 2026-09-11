@@ -210,10 +210,10 @@ export function SourceEditor(props: {
               />
             </label>
           </Show>
-          <label class="controls-editor-field">
+          <label class="controls-editor-field controls-editor-markdown-field">
             <span>{props.t("boc.controls.editor.markdown")}</span>
             <textarea
-              class="controls-editor-code"
+              class="controls-editor-code controls-editor-markdown"
               dir="auto"
               spellcheck={false}
               value={view.content}

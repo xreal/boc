@@ -96,6 +96,14 @@
     font-family: var(--font-family-mono, monospace);
     tab-size: 2;
   }
+  .controls-editor-markdown-field {
+    flex: 1;
+    min-block-size: 0;
+  }
+  .controls-editor-markdown {
+    flex: 1;
+    min-block-size: 0;
+  }
   .controls-editor-create {
     display: flex;
     align-items: end;

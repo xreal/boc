@@ -82,9 +82,11 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
     const global = yield* Global.Service
     const fs = yield* FSUtil.Service
     const globalConfig = `${global.config}/opencode.jsonc`
+    const legacyGlobalSkill = path.join(global.home, ".opencode", "skills", "legacy-global", "SKILL.md")
     const globalContent =
       '// global configuration\n{\n  "mcp": {\n    "servers": {\n      "remote": {\n        "type": "remote",\n        "url": "https://example.test/mcp",\n        "headers": { "Authorization": "Bearer {env:MCP_TOKEN}" },\n        "oauth": { "client_id": "client" }\n      }\n    }\n  }\n}\n'
     yield* fs.writeWithDirs(globalConfig, globalContent)
+    yield* fs.writeWithDirs(legacyGlobalSkill, "---\nname: Legacy global\n---\nLegacy skill\n")
     const removableSkill = `${location.project.directory}/.opencode/skill/removable/SKILL.md`
     yield* fs.writeWithDirs(removableSkill, "---\nname: Removable\n---\nTemporary skill\n")
     yield* discovery.transform((editor) => {
@@ -144,6 +146,15 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
                 description: "",
                 location: AbsolutePath.make(removableSkill),
                 content: "Temporary skill",
+              }),
+            )
+            yield* ctx.skill.transform((editor) =>
+              editor.add({
+                id: Skill.ID.make("legacy-global"),
+                name: Skill.Name.make("Legacy global"),
+                description: "",
+                location: AbsolutePath.make(legacyGlobalSkill),
+                content: "Legacy skill",
               }),
             )
             yield* ctx.mcp.transform((editor) => {
@@ -233,6 +244,15 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
       false,
     )
     expect(instruction.items.find((item) => item.source === `${global.config}/AGENTS.md`)?.mutable).toBe(false)
+    const legacy = yield* client.getSource({ kind: "skill", id: "legacy-global" })
+    expect(legacy.scope).toBe("global")
+    const savedLegacy = yield* client.saveSource({
+      kind: "skill",
+      id: "legacy-global",
+      expectedRevision: legacy.revision,
+      content: "---\nname: Legacy global\n---\nUpdated legacy skill\n",
+    })
+    expect(savedLegacy.content).toContain("Updated legacy skill")
     const removable = yield* client.getSource({ kind: "skill", id: "removable" })
     yield* client.deleteSource({ kind: "skill", id: "removable", expectedRevision: removable.revision })
     expect(yield* fs.existsSafe(removable.path)).toBe(false)

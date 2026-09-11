@@ -64,12 +64,7 @@ export const Definition = define({
         ? path.join(global.config, "opencode.jsonc")
         : path.join(ctx.location.directory, ".opencode", "opencode.jsonc")
     const sourceScope = (filepath: string) => {
-      if (
-        [global.config, path.join(global.home, ".agents"), path.join(global.home, ".claude")].some((root) =>
-          FSUtil.contains(root, filepath),
-        )
-      )
-        return "global" as const
+      if (globalSourceRoots(global).some((root) => FSUtil.contains(root, filepath))) return "global" as const
       if ([ctx.location.project.canonical, ctx.location.directory].some((root) => FSUtil.contains(root, filepath)))
         return "project" as const
       return
@@ -752,14 +747,19 @@ function fileOrigin(
   directory: string,
 ): typeof BocControls.Origin.Type {
   if (FSUtil.contains("/builtin", file)) return "system"
-  if (
-    [global.config, path.join(global.home, ".agents"), path.join(global.home, ".claude")].some((root) =>
-      FSUtil.contains(root, file),
-    )
-  )
-    return "global"
+  if (globalSourceRoots(global).some((root) => FSUtil.contains(root, file))) return "global"
   if ([canonical, directory].some((root) => FSUtil.contains(root, file))) return "project"
   return "global"
+}
+
+function globalSourceRoots(global: Global.Interface) {
+  // ~/.opencode is a legacy global source that is still discovered through the home-directory ancestor walk.
+  return [
+    global.config,
+    path.join(global.home, ".agents"),
+    path.join(global.home, ".claude"),
+    path.join(global.home, ".opencode"),
+  ]
 }
 
 function pluginOrigin(source: Plugin.Source | undefined): typeof BocControls.Origin.Type {

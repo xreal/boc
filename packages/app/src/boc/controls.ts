@@ -40,7 +40,11 @@ export function createBocControls(): ControlsHost {
           globalDirectories: [
             ctx.sync.data.path.config,
             ...(ctx.sync.data.path.home
-              ? [`${ctx.sync.data.path.home}/.agents`, `${ctx.sync.data.path.home}/.claude`]
+              ? [
+                  `${ctx.sync.data.path.home}/.agents`,
+                  `${ctx.sync.data.path.home}/.claude`,
+                  `${ctx.sync.data.path.home}/.opencode`,
+                ]
               : []),
           ].filter(Boolean),
           projects: [...projects.values()].map((project) => ({
