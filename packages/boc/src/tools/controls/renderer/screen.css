@@ -208,18 +208,17 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      min-block-size: 56px;
-      padding: 9px 12px;
+      min-block-size: 48px;
+      padding: 8px 14px;
       list-style: none;
       border: 1px solid var(--v2-border-border-muted);
       border-radius: 8px;
-      background: var(--v2-background-bg-layer-01);
       cursor: pointer;
       &::-webkit-details-marker {
         display: none;
       }
       &:hover {
-        background: var(--v2-background-bg-layer-02);
+        background: var(--v2-background-bg-layer-01);
       }
     }
     .controls-system-icon {
@@ -227,16 +226,13 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
-      inline-size: 30px;
-      block-size: 30px;
-      border-radius: 6px;
       color: var(--v2-icon-icon-muted);
-      background: var(--v2-background-bg-layer-02);
     }
     .controls-system-copy {
       display: flex;
       flex: 1;
-      flex-direction: column;
+      align-items: center;
+      gap: 10px;
       min-inline-size: 0;
     }
     .controls-system-title {
@@ -246,18 +242,12 @@
       color: var(--v2-text-text-base);
     }
     .controls-system-count {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      min-inline-size: 22px;
-      block-size: 20px;
-      padding-inline: 6px;
-      border-radius: 10px;
       color: var(--v2-text-text-muted);
-      background: var(--v2-background-bg-layer-03);
       font-variant-numeric: tabular-nums;
     }
     .controls-system-hint {
+      flex: 1;
+      min-inline-size: 0;
       overflow: hidden;
       color: var(--v2-text-text-muted);
       text-overflow: ellipsis;
