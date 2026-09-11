@@ -229,13 +229,13 @@ export function SourceEditor(props: {
             <p class="controls-editor-error">{props.t(`boc.controls.editor.${view.error || "error"}`)}</p>
           </Show>
           <Show when={view.saved}>
-            <p>{props.t("boc.controls.editor.sourceSaved")}</p>
+            <p class="controls-editor-success">{props.t("boc.controls.editor.sourceSaved")}</p>
           </Show>
           <Show when={view.closing && dirty()}>
             <p>{props.t("boc.controls.editor.unsaved")}</p>
           </Show>
           <Show when={view.deleting}>
-            <p>{props.t("boc.controls.editor.deleteHint")}</p>
+            <p class="controls-editor-danger">{props.t("boc.controls.editor.deleteHint")}</p>
           </Show>
           <Show when={alreadyAvailable()}>
             <p>{props.t("boc.controls.editor.alreadyAvailable")}</p>
@@ -244,14 +244,14 @@ export function SourceEditor(props: {
         <div class="controls-editor-buttons">
           <Show when={props.canDelete && view.source}>
             <Button
-              variant="ghost"
+              variant={view.deleting ? "danger" : "ghost"}
               disabled={view.saving || dirty()}
               onClick={() => {
                 if (view.deleting) {
                   void remove()
                   return
                 }
-                setView("deleting", true)
+                setView({ deleting: true, saved: false })
               }}
             >
               {props.t(view.deleting ? "boc.controls.editor.confirmDelete" : "boc.controls.editor.delete")}

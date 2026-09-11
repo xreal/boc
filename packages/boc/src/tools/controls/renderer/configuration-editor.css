@@ -130,6 +130,12 @@
   .controls-editor-error {
     color: var(--v2-state-fg-danger);
   }
+  .controls-editor-danger {
+    color: var(--v2-state-fg-danger);
+  }
+  .controls-editor-success {
+    color: var(--v2-state-fg-success);
+  }
   .controls-editor-storage {
     color: var(--v2-text-text-muted);
     font-size: 12px;

@@ -639,7 +639,7 @@ export function ConfigurationEditor(props: {
             <p class="controls-editor-error">{props.t("boc.controls.editor.invalid")}</p>
           </Show>
           <Show when={view.saved}>
-            <p>{props.t("boc.controls.editor.saved")}</p>
+            <p class="controls-editor-success">{props.t("boc.controls.editor.saved")}</p>
           </Show>
           <Show when={view.closing && dirty()}>
             <p>{props.t("boc.controls.editor.unsaved")}</p>

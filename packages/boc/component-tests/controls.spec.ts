@@ -159,6 +159,17 @@ story("edits and creates native Markdown sources", async ({ mount, page }) => {
   await markdown.fill("---\nname: review\ndescription: Review changes\n---\n\nReview the staged diff.\n")
   await editor.getByRole("button", { name: "Save changes" }).click()
   await expect(editor.getByText("File saved. Future instruction and skill loads use the updated source.")).toBeVisible()
+  await expect(editor.locator(".controls-editor-success")).toBeVisible()
+  await editor.getByRole("button", { name: "Remove file…", exact: true }).click()
+  await expect(editor.getByRole("button", { name: "Delete file", exact: true })).toHaveAttribute(
+    "data-variant",
+    "danger",
+  )
+  await expect(editor.getByText("File saved. Future instruction and skill loads use the updated source.")).toHaveCount(
+    0,
+  )
+  await expect(editor.locator(".controls-editor-danger")).toBeVisible()
+  await editor.getByRole("button", { name: "Keep file", exact: true }).click()
   await editor.getByRole("button", { name: "Close", exact: true }).click()
   await component.getByRole("button", { name: "Add…", exact: true }).click()
   const configuration = page.getByRole("dialog")
