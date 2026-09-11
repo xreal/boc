@@ -58,7 +58,8 @@ export function createBocControls(): ControlsHost {
       }),
     initial: async () => {
       await ready.promise
-      return saved.selection
+      if (!saved.selection) return
+      return { ...saved.selection, directory: saved.selection.project }
     },
     remember: (selection) => setSaved("selection", selection),
     async models(selection, scope) {
@@ -132,11 +133,9 @@ export function createBocControls(): ControlsHost {
         setSaved("selection", {
           server: current.server,
           project: project.worktree,
-          directory: session.location.directory,
+          directory: project.worktree,
         })
-        navigate(
-          `/boc/controls?${new URLSearchParams({ server: current.server, project: project.worktree, directory: session.location.directory })}`,
-        )
+        navigate(`/boc/controls?${new URLSearchParams({ server: current.server, project: project.worktree })}`)
       } catch {
         showToast({ title: t("boc.bergflow.contextFailed"), variant: "error" })
       }

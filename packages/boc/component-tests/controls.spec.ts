@@ -216,13 +216,13 @@ story("keeps a draft after closing a definition selected from the dropdown", asy
   await expect(definition).toContainText("draft-agent")
 })
 
-story("keeps the project selector and worktree usable without overflow in narrow RTL", async ({ mount, page }) => {
+story("keeps the project selector usable without overflow in narrow RTL", async ({ mount, page }) => {
   await page.setViewportSize({ width: 375, height: 850 })
   const component = await mount("boc-controls--rtl")
   await expect(component.getByRole("heading", { name: "Project setup", exact: true })).toHaveCSS("direction", "rtl")
   await expect(component.getByLabel("Server", { exact: true })).toHaveCount(0)
   await expect(component.getByRole("group", { name: "Project" })).toBeVisible()
-  await expect(component.getByRole("group", { name: "Worktree" })).toBeVisible()
+  await expect(component.getByRole("group", { name: "Worktree" })).toHaveCount(0)
   await expect(component.getByRole("combobox", { name: "Project" })).toHaveCount(0)
   await component
     .locator("article")

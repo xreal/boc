@@ -82,11 +82,12 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
 
   const select = (selection: ControlsSelection) => {
     if (view.pending) return false
+    const project = { ...selection, directory: selection.project }
     autoSelect = false
     epoch++
     reading?.abort()
-    setView({ selection, snapshot: undefined, error: undefined, rowError: undefined, stale: false })
-    host.remember(selection)
+    setView({ selection: project, snapshot: undefined, error: undefined, rowError: undefined, stale: false })
+    host.remember(project)
     return true
   }
 

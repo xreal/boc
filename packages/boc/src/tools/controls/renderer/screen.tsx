@@ -61,11 +61,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
   const query = new URLSearchParams(props.host.location().search)
   const server = query.get("server")
   const project = query.get("project")
-  const directory = query.get("directory")
-  const control = createProjectControls(
-    host,
-    server && project && directory ? { server, project, directory } : undefined,
-  )
+  const control = createProjectControls(host, server && project ? { server, project, directory: project } : undefined)
   const view = control.view
   let searchInput: HTMLInputElement | undefined
   onMount(() => {
@@ -193,27 +189,6 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                   }}
                 />
               </div>
-              <Show when={locations().length > 1}>
-                <div class="controls-project-select text-12-medium">
-                  {t("boc.bergflow.worktree")}
-                  <Choice
-                    label={t("boc.bergflow.worktree")}
-                    value={view.selection?.directory ?? ""}
-                    disabled={!!view.pending}
-                    options={locations().map((directory) => ({
-                      value: directory,
-                      label:
-                        directory === view.selection?.project
-                          ? t("boc.controls.mainCheckout")
-                          : (directory.split(/[\\/]/).filter(Boolean).at(-1) ?? directory),
-                    }))}
-                    onChange={(directory) => {
-                      const selected = view.selection
-                      if (selected) control.select({ ...selected, directory })
-                    }}
-                  />
-                </div>
-              </Show>
             </div>
             <Show when={view.selection}>
               <div class="flex flex-col gap-1 text-12-regular text-v2-text-text-muted">

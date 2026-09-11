@@ -91,6 +91,25 @@ test("discards a delayed response after an explicit context switch", async () =>
   }
 })
 
+test("uses the main checkout for every project selection", async () => {
+  const directories: string[] = []
+  const fixtureState = fixture(
+    async (directory) => {
+      directories.push(directory)
+      return snapshot(directory)
+    },
+    async () => snapshot("/project"),
+  )
+  try {
+    fixtureState.control.select({ server: "remote", project: "/project", directory: "/project/worktree" })
+    await flush()
+    expect(fixtureState.control.view.selection?.directory).toBe("/project")
+    expect(directories).toEqual(["/project"])
+  } finally {
+    fixtureState.dispose()
+  }
+})
+
 test("locks context during mutation and never retries it after reconnect", async () => {
   let writes = 0
   let complete: (state: ControlState) => void = () => {}
