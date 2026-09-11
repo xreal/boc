@@ -296,13 +296,28 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                           </Show>
                           <Show when={systemItems().length}>
                             <details class="controls-system" open={!!filters.search}>
-                              <summary>
-                                {t(kind === "tool" ? "boc.controls.systemTools" : "boc.controls.systemAgents")}
+                              <summary class="controls-system-summary">
+                                <span class="controls-system-icon" aria-hidden="true">
+                                  <Icon name={categoryIcons[kind]} />
+                                </span>
+                                <span class="controls-system-copy">
+                                  <span class="controls-system-title text-13-medium">
+                                    <span>
+                                      {t(kind === "tool" ? "boc.controls.systemTools" : "boc.controls.systemAgents")}
+                                    </span>
+                                    <span class="controls-system-count text-11-medium">{systemItems().length}</span>
+                                  </span>
+                                  <span class="controls-system-hint text-12-regular">
+                                    {t(
+                                      kind === "tool"
+                                        ? "boc.controls.systemToolsHint"
+                                        : "boc.controls.systemAgentsHint",
+                                    )}
+                                  </span>
+                                </span>
+                                <Icon name="chevron-down" size="small" class="controls-system-chevron" />
                               </summary>
-                              <p>
-                                {t(kind === "tool" ? "boc.controls.systemToolsHint" : "boc.controls.systemAgentsHint")}
-                              </p>
-                              <div class="controls-cards">
+                              <div class="controls-system-content controls-cards">
                                 <TableHeader kind={kind} t={t} />
                                 <For each={systemItems()}>{row}</For>
                               </div>
