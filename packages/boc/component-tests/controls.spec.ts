@@ -25,6 +25,24 @@ story("shows Project setup and focuses search with Ctrl/Cmd+F", async ({ mount, 
   await expect(input).toHaveCSS("outline-offset", "0px")
 })
 
+story("collapses system tools until they are searched", async ({ mount, page }) => {
+  const component = await mount("boc-controls--default")
+  const search = component.getByRole("textbox", { name: "Search capabilities" })
+
+  await expect(component.getByRole("heading", { name: "Deploy preview", exact: true })).toBeVisible()
+  await expect(component.getByRole("heading", { name: "Read", exact: true })).toHaveCount(0)
+  await expect(component.getByText("System tools", { exact: true })).toBeVisible()
+
+  await search.fill("Read")
+  await expect(component.getByRole("heading", { name: "Read", exact: true })).toBeVisible()
+  await expect(component.getByText("System tools", { exact: true })).toBeVisible()
+  await expect(component.getByRole("img", { name: "System · bundled with OpenCode" })).toBeVisible()
+
+  await search.fill("Deploy preview")
+  await expect(component.getByRole("heading", { name: "Deploy preview", exact: true })).toBeVisible()
+  await expect(component.getByRole("heading", { name: "Read", exact: true })).toHaveCount(0)
+})
+
 story("switches projects through the shared Select without page errors", async ({ mount, page }) => {
   const errors: Error[] = []
   page.on("pageerror", (error) => errors.push(error))

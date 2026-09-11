@@ -27,6 +27,27 @@ const categoryIcons = {
 const originIcons = { system: "server", global: "settings-gear", project: "folder", plugin: "sliders" } as const
 const internalAgent = (item: ControlItem) =>
   item.kind === "agent" && ["compaction", "title", "summary"].includes(item.id)
+// OpenCode's built-in tools are registered through its plugin API and can therefore arrive with Plugin provenance.
+const systemToolIDs = new Set([
+  "edit",
+  "glob",
+  "grep",
+  "patch",
+  "question",
+  "read",
+  "shell",
+  "skill",
+  "subagent",
+  "webfetch",
+  "websearch",
+  "write",
+])
+const isSystemTool = (item: ControlItem) =>
+  item.kind === "tool" &&
+  (item.origin === "system" ||
+    systemToolIDs.has(item.id) ||
+    item.id.startsWith("browser_") ||
+    item.id.startsWith("opencode_"))
 
 export default function ProjectControlsScreen(props: BocScreenProps) {
   const t = createBocTranslator(props.host.locale)
@@ -73,12 +94,16 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
   const locations = () => [
     ...new Set([...(projectInfo()?.locations ?? []), ...(view.selection ? [view.selection.directory] : [])]),
   ]
-  const origin = (item: ControlItem) =>
-    item.origin ??
-    controlOrigin(item.source, {
-      project: [view.snapshot?.info.project.canonical ?? "", ...locations()],
-      global: serverInfo()?.globalDirectories ?? [],
-    })
+  const origin = (item: ControlItem) => {
+    if (isSystemTool(item)) return "system" as const
+    return (
+      item.origin ??
+      controlOrigin(item.source, {
+        project: [view.snapshot?.info.project.canonical ?? "", ...locations()],
+        global: serverInfo()?.globalDirectories ?? [],
+      })
+    )
+  }
   const filtered = createMemo(() => {
     const query = filters.search.trim().toLocaleLowerCase()
     return (
@@ -261,6 +286,9 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                 <For each={kinds}>
                   {(kind) => {
                     const items = () => filtered().filter((item) => item.kind === kind && item.present)
+                    const system = (item: ControlItem) => internalAgent(item) || isSystemTool(item)
+                    const customItems = () => items().filter((item) => !system(item))
+                    const systemItems = () => items().filter(system)
                     const row = (item: ControlItem & { key: string }) => (
                       <ControlRow
                         item={item}
@@ -285,19 +313,23 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                             {t(`boc.bergflow.${kind}`)}{" "}
                             <span class="controls-count text-12-regular text-v2-text-text-muted">{items().length}</span>
                           </h2>
-                          <Show when={items().some((item) => !internalAgent(item))}>
+                          <Show when={customItems().length}>
                             <div class="controls-cards">
                               <TableHeader kind={kind} t={t} />
-                              <For each={items().filter((item) => !internalAgent(item))}>{row}</For>
+                              <For each={customItems()}>{row}</For>
                             </div>
                           </Show>
-                          <Show when={items().some(internalAgent)}>
+                          <Show when={systemItems().length}>
                             <details class="controls-system" open={!!filters.search}>
-                              <summary>{t("boc.controls.systemAgents")}</summary>
-                              <p>{t("boc.controls.systemAgentsHint")}</p>
+                              <summary>
+                                {t(kind === "tool" ? "boc.controls.systemTools" : "boc.controls.systemAgents")}
+                              </summary>
+                              <p>
+                                {t(kind === "tool" ? "boc.controls.systemToolsHint" : "boc.controls.systemAgentsHint")}
+                              </p>
                               <div class="controls-cards">
                                 <TableHeader kind={kind} t={t} />
-                                <For each={items().filter(internalAgent)}>{row}</For>
+                                <For each={systemItems()}>{row}</For>
                               </div>
                             </details>
                           </Show>

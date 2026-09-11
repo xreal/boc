@@ -100,6 +100,8 @@ export const controlsEnglish = {
   "boc.controls.globalDefaults": "Global defaults",
   "boc.controls.systemAgents": "System agents",
   "boc.controls.systemAgentsHint": "Used internally for compaction, titles and summaries.",
+  "boc.controls.systemTools": "System tools",
+  "boc.controls.systemToolsHint": "Built into OpenCode and available to agents by default.",
   "boc.controls.mainCheckout": "Main checkout",
   "boc.controls.signIn": "Sign in",
   "boc.controls.connect": "Reconnect",
