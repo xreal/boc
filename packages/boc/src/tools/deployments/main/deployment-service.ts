@@ -36,6 +36,7 @@ import { deploymentCommandFailure } from "./command-failure"
 import { readDeploymentOperation } from "./operation-tracker"
 import type { CacheRunSnapshot } from "./cache-runner"
 import {
+  DEPLOYMENT_BRANCH_QUERY_MIN_LENGTH,
   DEPLOYMENT_WORKFLOW_CACHE_MS,
   dispatchGithubWorkflow,
   githubReadiness,
@@ -59,6 +60,9 @@ import {
 
 export const DEPLOYMENT_FLEET_CACHE_MS = 30_000
 export const DEPLOYMENT_PREPARED_PLAN_TTL_MS = 5 * 60 * 1000
+export const DEPLOYMENT_BRANCH_CACHE_MS = 30_000
+
+const DEPLOYMENT_PREFLIGHT_CACHE_LIMIT = 50
 
 export type DeploymentRuntime = {
   store: DeploymentStore
@@ -93,6 +97,13 @@ type FleetFlight = {
   promise: Promise<FreshFleet>
 }
 
+type PreflightFlight<Value> = {
+  generation: number
+  controller: AbortController
+  readers: Set<symbol>
+  promise: Promise<Value>
+}
+
 type StoredPreparedPlan = {
   public: DeploymentPreparedPlan
   bound: ReadonlyArray<{
@@ -111,9 +122,13 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   let generation = 0
   let cache: FleetSnapshot | undefined
   let flight: FleetFlight | undefined
-  let workflowCache:
-    | { generation: number; fetchedAt: number; ref?: string; targets: readonly GithubWorkflowTarget[] }
-    | undefined
+  const branchCache = new Map<string, { generation: number; fetchedAt: number; branches: string[] }>()
+  const branchFlights = new Map<string, PreflightFlight<Awaited<ReturnType<typeof listGithubBranches>>>>()
+  const workflowCache = new Map<
+    string,
+    { generation: number; fetchedAt: number; targets: readonly GithubWorkflowTarget[] }
+  >()
+  const workflowFlights = new Map<string, PreflightFlight<Awaited<ReturnType<typeof listGithubWorkflowTargets>>>>()
   const prepared = new Map<string, StoredPreparedPlan>()
   const preparing = new Map<AllowedDevEnvironment, symbol>()
   const dispatching = new Set<AllowedDevEnvironment>()
@@ -334,7 +349,12 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const invalidate = () => {
     generation += 1
     cache = undefined
-    workflowCache = undefined
+    branchCache.clear()
+    branchFlights.forEach((current) => current.controller.abort())
+    branchFlights.clear()
+    workflowCache.clear()
+    workflowFlights.forEach((current) => current.controller.abort())
+    workflowFlights.clear()
     invalidatePrepared()
     flight?.controller.abort()
     flight = undefined
@@ -347,19 +367,38 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   }
 
   const loadWorkflowTargets = async (refresh: boolean, ref?: string, signal?: AbortSignal) => {
-    if (
-      !refresh &&
-      workflowCache &&
-      workflowCache.generation === generation &&
-      workflowCache.ref === ref &&
-      now() - workflowCache.fetchedAt < DEPLOYMENT_WORKFLOW_CACHE_MS
-    ) {
-      return { ok: true as const, targets: workflowCache.targets }
+    if (signal?.aborted) return deploymentFailure("cancelled", { capability: "github_workflow_dispatch" })
+    const normalizedRef = ref?.trim()
+    const key = normalizedRef ?? ""
+    const cached = workflowCache.get(key)
+    if (!refresh && cached?.generation === generation && now() - cached.fetchedAt < DEPLOYMENT_WORKFLOW_CACHE_MS) {
+      return { ok: true as const, targets: cached.targets }
     }
-    const result = await listGithubWorkflowTargets(github, ref, signal)
-    if (!result.ok) return result
-    workflowCache = { generation, fetchedAt: now(), ref, targets: result.targets }
-    return result
+    const existing = workflowFlights.get(key)
+    if (existing?.generation === generation && !existing.controller.signal.aborted) {
+      return joinPreflightFlight(existing, signal, () =>
+        deploymentFailure("cancelled", { capability: "github_workflow_dispatch" }),
+      )
+    }
+    const targetGeneration = generation
+    const controller = new AbortController()
+    const promise = listGithubWorkflowTargets(github, normalizedRef, controller.signal)
+      .then((result) => {
+        if (generation !== targetGeneration || controller.signal.aborted) {
+          return deploymentFailure("cancelled", { capability: "github_workflow_dispatch" })
+        }
+        if (result.ok)
+          remember(workflowCache, key, { generation: targetGeneration, fetchedAt: now(), targets: result.targets })
+        return result
+      })
+      .finally(() => {
+        if (workflowFlights.get(key)?.promise === promise) workflowFlights.delete(key)
+      })
+    const current = { generation: targetGeneration, controller, readers: new Set<symbol>(), promise }
+    workflowFlights.set(key, current)
+    return joinPreflightFlight(current, signal, () =>
+      deploymentFailure("cancelled", { capability: "github_workflow_dispatch" }),
+    )
   }
 
   const preparePlan = async (
@@ -374,102 +413,108 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       })
     }
     const request = Symbol()
+    const targetGeneration = generation
     preparing.set(draft.environment, request)
     for (const [preflightId, stored] of prepared) {
       if (stored.public.environment === draft.environment) prepared.delete(preflightId)
     }
 
-    const githubFailure = await requireGithub(signal)
-    if (githubFailure) return githubFailure
+    try {
+      const settings = readDeploymentSettings(runtime.store)
+      if (kind === "redeploy") {
+        const expectedBranch = draft.expectedBranch?.trim()
+        if (draft.ref.trim() !== expectedBranch) {
+          return deploymentFailure("invalid-input", {
+            capability: "github_workflow_dispatch",
+            context: { field: "ref" },
+          })
+        }
+        const current = await verifyRedeployTarget(settings, draft.environment, expectedBranch, signal)
+        if (!current.ok) return current
+      } else {
+        const target = await verifyArgoDevTarget(argo, settings, signal)
+        if (!target.ok) return target.failure
+      }
 
-    const settings = readDeploymentSettings(runtime.store)
-    if (kind === "redeploy") {
-      if (draft.ref !== draft.expectedBranch) {
-        return deploymentFailure("invalid-input", {
+      const ref = await validateGithubRef(github, draft.ref, signal)
+      if (!ref.ok) return ref
+
+      if (conflictingMutation(draft.environment)) {
+        return deploymentFailure("conflict", {
           capability: "github_workflow_dispatch",
-          context: { field: "ref" },
+          context: { environment: draft.environment },
         })
       }
-      const current = await verifyRedeployTarget(settings, draft.environment, draft.expectedBranch, signal)
-      if (!current.ok) return current
-    } else {
-      const target = await verifyArgoDevTarget(argo, settings, signal)
-      if (!target.ok) return target.failure
-    }
 
-    const ref = await validateGithubRef(github, draft.ref, signal)
-    if (!ref.ok) return ref
-
-    if (conflictingMutation(draft.environment)) {
-      return deploymentFailure("conflict", {
-        capability: "github_workflow_dispatch",
-        context: { environment: draft.environment },
+      const listed = await loadWorkflowTargets(false, ref.ref, signal)
+      if (!listed.ok) return listed
+      const selected = draft.workflows.map((selection) => {
+        const targetWorkflow = listed.targets.find((workflow) => workflow.target.filename === selection.filename)
+        return { selection, targetWorkflow }
       })
-    }
+      const missing = selected.find((item) => !item.targetWorkflow)
+      if (missing) {
+        return deploymentFailure("not-found", {
+          capability: "github_workflow_dispatch",
+          context: { workflow: missing.selection.filename },
+        })
+      }
 
-    const listed = await loadWorkflowTargets(true, ref.ref, signal)
-    if (!listed.ok) return listed
-    const selected = draft.workflows.map((selection) => {
-      const targetWorkflow = listed.targets.find((workflow) => workflow.target.filename === selection.filename)
-      return { selection, targetWorkflow }
-    })
-    const missing = selected.find((item) => !item.targetWorkflow)
-    if (missing) {
-      return deploymentFailure("not-found", {
-        capability: "github_workflow_dispatch",
-        context: { workflow: missing.selection.filename },
+      const normalized = selected.map((item) => {
+        const workflow = item.targetWorkflow!
+        const requiredUnsupported = workflow.issues.filter((issue) => issue.reason === "unsupported")
+        const inputs = normalizeDeploymentWorkflowInputs(
+          workflow.target.inputs,
+          kind === "reset" ? resetDeploymentWorkflowInputs(workflow.target.inputs) : item.selection.inputs,
+        )
+        const bound = Object.fromEntries(
+          Object.entries(workflow.boundInputs).map(([name, source]) => [
+            name,
+            source === "environment" ? draft.environment : ref.ref,
+          ]),
+        )
+        return { workflow, requiredUnsupported, inputs, bound }
       })
-    }
+      const blocked = normalized.find((item) => item.requiredUnsupported.length > 0 || item.inputs.issues.length > 0)
+      if (blocked) {
+        return deploymentFailure("invalid-input", {
+          capability: "github_workflow_dispatch",
+          context: { workflow: blocked.workflow.target.filename },
+        })
+      }
 
-    const normalized = selected.map((item) => {
-      const workflow = item.targetWorkflow!
-      const requiredUnsupported = workflow.issues.filter((issue) => issue.reason === "unsupported")
-      const inputs = normalizeDeploymentWorkflowInputs(workflow.target.inputs, item.selection.inputs)
-      const bound = Object.fromEntries(
-        Object.entries(workflow.boundInputs).map(([name, source]) => [
-          name,
-          source === "environment" ? draft.environment : ref.ref,
-        ]),
-      )
-      return { workflow, requiredUnsupported, inputs, bound }
-    })
-    const blocked = normalized.find((item) => item.requiredUnsupported.length > 0 || item.inputs.issues.length > 0)
-    if (blocked) {
-      return deploymentFailure("invalid-input", {
-        capability: "github_workflow_dispatch",
-        context: { workflow: blocked.workflow.target.filename },
+      if (signal?.aborted || generation !== targetGeneration || preparing.get(draft.environment) !== request) {
+        return deploymentFailure("cancelled", { capability: "github_workflow_dispatch" })
+      }
+      const warnings = isReservedDevEnvironment(draft.environment) ? (["unsafe-target"] as const) : []
+      const preflightId = createId()
+      const expiresAt = now() + DEPLOYMENT_PREPARED_PLAN_TTL_MS
+      const plan: DeploymentPreparedPlan = {
+        preflightId,
+        expiresAt: new Date(expiresAt).toISOString(),
+        kind,
+        environment: draft.environment,
+        ref: ref.ref,
+        workflows: normalized.map((item) => ({
+          filename: item.workflow.target.filename,
+          name: item.workflow.target.name,
+          inputs: item.inputs.values,
+        })),
+        warnings: [...warnings],
+      }
+      prepared.set(preflightId, {
+        public: plan,
+        expiresAt,
+        bound: normalized.map((item) => ({
+          filename: item.workflow.target.filename,
+          inputs: { ...item.inputs.values, ...item.bound },
+        })),
+        ...(kind === "redeploy" ? { expectedBranch: draft.expectedBranch?.trim() } : {}),
       })
+      return { ok: true, plan }
+    } finally {
+      if (preparing.get(draft.environment) === request) preparing.delete(draft.environment)
     }
-
-    if (preparing.get(draft.environment) !== request) {
-      return deploymentFailure("cancelled", { capability: "github_workflow_dispatch" })
-    }
-    const warnings = isReservedDevEnvironment(draft.environment) ? (["unsafe-target"] as const) : []
-    const preflightId = createId()
-    const expiresAt = now() + DEPLOYMENT_PREPARED_PLAN_TTL_MS
-    const plan: DeploymentPreparedPlan = {
-      preflightId,
-      expiresAt: new Date(expiresAt).toISOString(),
-      kind,
-      environment: draft.environment,
-      ref: ref.ref,
-      workflows: normalized.map((item) => ({
-        filename: item.workflow.target.filename,
-        name: item.workflow.target.name,
-        inputs: item.inputs.values,
-      })),
-      warnings: [...warnings],
-    }
-    prepared.set(preflightId, {
-      public: plan,
-      expiresAt,
-      bound: normalized.map((item) => ({
-        filename: item.workflow.target.filename,
-        inputs: { ...item.inputs.values, ...item.bound },
-      })),
-      ...(kind === "redeploy" ? { expectedBranch: draft.expectedBranch } : {}),
-    })
-    return { ok: true, plan }
   }
 
   const dispatchPlan = async (
@@ -638,14 +683,41 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
     },
     listOperations: () => ({ ok: true as const, operations: operations() }),
     async listBranches(input: { query: string }, signal?: AbortSignal) {
-      const githubFailure = await requireGithub(signal)
-      if (githubFailure) return githubFailure
-      return listGithubBranches(github, input.query, signal)
+      if (signal?.aborted) return deploymentFailure("cancelled", { capability: "github_repo_access" })
+      const query = input.query.trim()
+      if (query.length < DEPLOYMENT_BRANCH_QUERY_MIN_LENGTH) return { ok: true as const, branches: [] }
+      const cached = branchCache.get(query)
+      if (cached?.generation === generation && now() - cached.fetchedAt < DEPLOYMENT_BRANCH_CACHE_MS) {
+        return { ok: true as const, branches: cached.branches }
+      }
+      const existing = branchFlights.get(query)
+      if (existing?.generation === generation && !existing.controller.signal.aborted) {
+        return joinPreflightFlight(existing, signal, () =>
+          deploymentFailure("cancelled", { capability: "github_repo_access" }),
+        )
+      }
+      const targetGeneration = generation
+      const controller = new AbortController()
+      const promise = listGithubBranches(github, query, controller.signal)
+        .then((result) => {
+          if (generation !== targetGeneration || controller.signal.aborted) {
+            return deploymentFailure("cancelled", { capability: "github_repo_access" })
+          }
+          if (result.ok)
+            remember(branchCache, query, { generation: targetGeneration, fetchedAt: now(), branches: result.branches })
+          return result
+        })
+        .finally(() => {
+          if (branchFlights.get(query)?.promise === promise) branchFlights.delete(query)
+        })
+      const current = { generation: targetGeneration, controller, readers: new Set<symbol>(), promise }
+      branchFlights.set(query, current)
+      return joinPreflightFlight(current, signal, () =>
+        deploymentFailure("cancelled", { capability: "github_repo_access" }),
+      )
     },
-    async listWorkflowTargets(input: { refresh: boolean }, signal?: AbortSignal) {
-      const githubFailure = await requireGithub(signal)
-      if (githubFailure) return githubFailure
-      const listed = await loadWorkflowTargets(input.refresh, undefined, signal)
+    async listWorkflowTargets(input: { refresh: boolean; ref?: string }, signal?: AbortSignal) {
+      const listed = await loadWorkflowTargets(input.refresh, input.ref?.trim(), signal)
       if (!listed.ok) return listed
       return { ok: true as const, targets: listed.targets.map((item) => item.target) }
     },
@@ -656,17 +728,6 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       return dispatchPlan(input.preflightId, kind === "redeploy" ? "redeploy" : "deploy")
     },
     async prepareReset(input: { environment: AllowedDevEnvironment }, signal?: AbortSignal) {
-      const githubFailure = await requireGithub(signal)
-      if (githubFailure) return githubFailure
-      const listed = await loadWorkflowTargets(true, RESET_DEPLOYMENT_REF, signal)
-      if (!listed.ok) return listed
-      const shop = listed.targets.find((item) => item.target.filename === PREFERRED_DEPLOYMENT_WORKFLOW)
-      if (!shop) {
-        return deploymentFailure("not-found", {
-          capability: "github_workflow_dispatch",
-          context: { workflow: PREFERRED_DEPLOYMENT_WORKFLOW },
-        })
-      }
       return preparePlan(
         "reset",
         {
@@ -674,8 +735,8 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
           ref: RESET_DEPLOYMENT_REF,
           workflows: [
             {
-              filename: shop.target.filename,
-              inputs: resetDeploymentWorkflowInputs(shop.target.inputs),
+              filename: PREFERRED_DEPLOYMENT_WORKFLOW,
+              inputs: {},
             },
           ],
         },
@@ -877,4 +938,43 @@ function withoutCapability(status: DeploymentCapabilityStatus) {
     ...(status.failure ? { failure: status.failure } : {}),
     ...(status.context ? { context: status.context } : {}),
   }
+}
+
+function remember<Key, Value>(cache: Map<Key, Value>, key: Key, value: Value) {
+  cache.delete(key)
+  cache.set(key, value)
+  if (cache.size <= DEPLOYMENT_PREFLIGHT_CACHE_LIMIT) return
+  cache.delete(cache.keys().next().value!)
+}
+
+function joinPreflightFlight<Value>(
+  flight: PreflightFlight<Value>,
+  signal: AbortSignal | undefined,
+  cancelled: () => Value,
+) {
+  const reader = Symbol()
+  flight.readers.add(reader)
+  if (!signal) return flight.promise.finally(() => flight.readers.delete(reader))
+  if (signal.aborted) {
+    flight.readers.delete(reader)
+    if (!flight.readers.size) flight.controller.abort()
+    return Promise.resolve(cancelled())
+  }
+
+  return new Promise<Value>((resolve, reject) => {
+    const finish = (result: Value) => {
+      signal.removeEventListener("abort", cancel)
+      if (!flight.readers.delete(reader)) return
+      resolve(result)
+    }
+    const cancel = () => {
+      finish(cancelled())
+      if (!flight.readers.size) flight.controller.abort()
+    }
+    signal.addEventListener("abort", cancel, { once: true })
+    void flight.promise.then(finish, (error) => {
+      signal.removeEventListener("abort", cancel)
+      if (flight.readers.delete(reader)) reject(error)
+    })
+  })
 }

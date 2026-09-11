@@ -124,6 +124,7 @@ const DeploymentBranchesResult = Schema.Union([
 const DeploymentWorkflowReadInput = Schema.Struct({
   requestId: DeploymentRequestId,
   refresh: Schema.Boolean,
+  ref: Schema.optionalKey(DeploymentRef),
 })
 
 const DeploymentWorkflowTargetsResult = Schema.Union([
@@ -143,6 +144,7 @@ export const DeploymentWorkflowSelection = Schema.Struct({
 export type DeploymentWorkflowSelection = typeof DeploymentWorkflowSelection.Type
 
 export const DeploymentDraft = Schema.Struct({
+  requestId: Schema.optionalKey(DeploymentRequestId),
   environment: AllowedDevEnvironment,
   ref: DeploymentRef,
   workflows: Schema.Array(DeploymentWorkflowSelection).check(Schema.isMinLength(1), Schema.isMaxLength(32)),
@@ -183,7 +185,14 @@ const DeploymentOperationResult = Schema.Union([
   DeploymentFailure,
 ])
 
-const DeploymentEnvironmentInput = Schema.Struct({ environment: AllowedDevEnvironment })
+const DeploymentEnvironmentInput = Schema.Struct({
+  environment: AllowedDevEnvironment,
+})
+
+const DeploymentPrepareResetInput = Schema.Struct({
+  environment: AllowedDevEnvironment,
+  requestId: Schema.optionalKey(DeploymentRequestId),
+})
 
 export const DeploymentRedeployInput = Schema.Struct({
   environment: AllowedDevEnvironment,
@@ -263,7 +272,7 @@ export const BocDeploymentsDispatchPrepared = Rpc.make("BocDeploymentsDispatchPr
 })
 
 export const BocDeploymentsPrepareReset = Rpc.make("BocDeploymentsPrepareReset", {
-  payload: DeploymentEnvironmentInput,
+  payload: DeploymentPrepareResetInput,
   success: DeploymentPreparedResult,
 })
 

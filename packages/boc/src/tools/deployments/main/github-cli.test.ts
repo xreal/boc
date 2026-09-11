@@ -105,14 +105,22 @@ describe("GitHub CLI boundary", () => {
 
     const exact = await validateGithubRef(
       {
-        run: scriptedRunner(
-          [],
-          [success(JSON.stringify({ data: { repository: { refs: { nodes: [{ name: "SHOP-42-extra" }] } } } }))],
-        ),
+        run: scriptedRunner([], [success(JSON.stringify({ ref: "refs/heads/SHOP-42-extra" }))]),
       },
       "SHOP-42",
     )
     expect(exact).toMatchObject({ ok: false, category: "not-found" })
+  })
+
+  test("validates an exact branch without relying on the capped suggestion search", async () => {
+    const commands: DeploymentCommand[] = []
+    const exact = await validateGithubRef(
+      { run: scriptedRunner(commands, [success(JSON.stringify({ ref: "refs/heads/SHOP-999" }))]) },
+      " SHOP-999 ",
+    )
+
+    expect(exact).toEqual({ ok: true, ref: "SHOP-999" })
+    expect(commands[0]?.args).toEqual(["api", `repos/${DEPLOYMENT_GITHUB_REPOSITORY}/git/ref/heads/SHOP-999`])
   })
 
   test("keeps only active app-*.ya?ml workflow contracts and blocks required unknown inputs", async () => {
@@ -137,6 +145,20 @@ describe("GitHub CLI boundary", () => {
     if (!listed.ok) throw new Error("expected targets")
     expect(listed.targets.map((target) => target.target.filename)).toEqual(["app-shop.yml", "app-billing.yml"])
     expect(listed.targets[1]?.issues).toEqual([{ name: "note", reason: "unsupported" }])
+  })
+
+  test("fails workflow discovery when an active workflow cannot be read", async () => {
+    const listed = await listGithubWorkflowTargets({
+      run: scriptedRunner(
+        [],
+        [
+          success(JSON.stringify([{ name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" }])),
+          { ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "temporary failure" },
+        ],
+      ),
+    })
+
+    expect(listed).toMatchObject({ ok: false, capability: "github_workflow_dispatch" })
   })
 
   test("dispatches through stdin JSON on the fixed repo and treats missing run URLs as unknown", async () => {

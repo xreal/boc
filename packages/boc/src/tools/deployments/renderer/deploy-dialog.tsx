@@ -1,36 +1,21 @@
+import { Combobox } from "@kobalte/core/combobox"
 import { Button } from "@opencode/ui/button"
 import { Checkbox } from "@opencode/ui/checkbox"
 import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
-import { Field } from "@opencode/ui/field"
+import { Icon } from "@opencode/ui/icon"
 import { Select } from "@opencode/ui/select"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { useDialog } from "@opencode/ui/context/dialog"
-import { For, Show, createEffect, onCleanup, onMount } from "solid-js"
+import { For, Show, createUniqueId, onCleanup, onMount } from "solid-js"
 import { createStore } from "solid-js/store"
-import type { BocDesktopAPI } from "../../../desktop/renderer/api"
 import { createBocTranslator } from "../../../renderer/i18n"
-import { PREFERRED_DEPLOYMENT_WORKFLOW } from "../domain/workflows"
-import type {
-  DeploymentFailure,
-  DeploymentPreparedPlan,
-  DeploymentWorkflowInputValue,
-  DeploymentWorkflowTarget,
-} from "../rpcs"
 import type { DeploymentOperationSummary } from "../domain/operations"
+import { isReservedDevEnvironment } from "../domain/environments"
 import type { DeploymentSystem } from "../domain/systems"
-import { deploySubmitDisabledReason, deploymentDraftKey } from "./deploy-draft"
+import { createDeploymentPreflight, type DeploymentDialogApi } from "./deploy-preflight"
 import { deploymentFailureMessage } from "./deployment-failure"
-
-export type DeploymentDialogApi = Pick<
-  BocDesktopAPI["deployments"],
-  | "listBranches"
-  | "listWorkflowTargets"
-  | "prepareDeployment"
-  | "dispatchPrepared"
-  | "prepareReset"
-  | "dispatchPreparedReset"
->
+import "./deploy-dialog.css"
 
 export function DeploymentDialog(props: {
   api: DeploymentDialogApi
@@ -42,431 +27,386 @@ export function DeploymentDialog(props: {
 }) {
   const dialog = useDialog()
   const t = createBocTranslator(props.locale)
-  const locked = props.kind === "reset"
-  const branchLocked = locked || props.kind === "redeploy"
-  const [form, setForm] = createStore({
-    ref: locked ? "master" : (props.initialRef ?? props.system.branch ?? ""),
-    branches: [] as string[],
-    branchStatus: "idle" as "idle" | "checking" | "valid" | "invalid" | "network",
-    workflowQuery: "",
-    targets: [] as DeploymentWorkflowTarget[],
-    selected: [] as string[],
-    inputs: {} as Record<string, DeploymentWorkflowInputValue>,
-    plan: undefined as DeploymentPreparedPlan | undefined,
-    preparing: false,
-    dispatching: false,
-    failure: undefined as DeploymentFailure | undefined,
-  })
+  const preflight = createDeploymentPreflight(props)
+  const state = preflight.state
+  const [view, setView] = createStore({ branchOpen: false, workflowQuery: "" })
+  const optionId = createUniqueId()
+  let disposed = false
 
-  const selectedTargets = () => form.targets.filter((target) => form.selected.includes(target.filename))
-  const visibleTargets = () => {
-    const query = form.workflowQuery.trim().toLowerCase()
-    if (!query) return form.targets
-    return form.targets.filter(
-      (target) => target.name.toLowerCase().includes(query) || target.filename.toLowerCase().includes(query),
+  const submitting = () => state.status === "submitting"
+  const busy = () => state.status === "checking" || (!preflight.reset && state.targetsStatus === "loading")
+  const branchFailure = () => state.failure?.context?.field === "ref"
+  const submissionUnknown = () => state.failure?.context?.field === "dispatch"
+  const branchOptions = () => [
+    ...new Set([
+      ...state.branches.filter((branch) => branch.toLowerCase().includes(state.query.trim().toLowerCase())),
+      ...(state.query.trim() ? [state.query.trim()] : []),
+    ]),
+  ]
+  const selectedTargets = () => state.targets.filter((target) => state.selected.includes(target.filename))
+  const visibleTargets = () =>
+    state.targets.filter((target) =>
+      `${target.name} ${target.filename}`.toLowerCase().includes(view.workflowQuery.trim().toLowerCase()),
     )
-  }
-  const workflowInputs = () => uniqueInputs(selectedTargets())
-  const draftKey = () =>
-    deploymentDraftKey({
-      ref: form.ref,
-      filenames: form.selected,
-      inputs: form.inputs,
-    })
-  const reason = () =>
-    deploySubmitDisabledReason({
-      dispatching: form.dispatching,
-      preparing: form.preparing,
-      ref: form.ref,
-      filenames: form.selected,
-      draftKey: draftKey(),
-      plan: form.plan,
-    })
-  const reviewing = () => reason() === "reviewing"
-  const expired = () => reason() === "expired"
-
-  const loadTargets = async () => {
-    const result = await props.api.listWorkflowTargets({
-      requestId: `workflows-${props.system.environment}`,
-      refresh: false,
-    })
-    if (!result.ok) {
-      setForm({ failure: result })
-      return
-    }
-    const selected = locked
-      ? result.targets
-          .filter((target) => target.filename === PREFERRED_DEPLOYMENT_WORKFLOW)
-          .map((target) => target.filename)
-      : result.targets.some((target) => target.filename === PREFERRED_DEPLOYMENT_WORKFLOW)
-        ? [PREFERRED_DEPLOYMENT_WORKFLOW]
-        : result.targets.slice(0, 1).map((target) => target.filename)
-    setForm({
-      targets: [...result.targets],
-      selected,
-      inputs: defaultInputs(result.targets.filter((target) => selected.includes(target.filename))),
-    })
-  }
-
-  const searchBranches = async (query: string) => {
-    const requestId = `branches-${props.system.environment}`
-    setForm("branchStatus", "checking")
-    const result = await props.api.listBranches({ requestId, query })
-    if (form.ref !== query) return
-    if (!result.ok) {
-      setForm({ branchStatus: "network", branches: [] })
-      return
-    }
-    setForm({
-      branches: [...result.branches],
-      branchStatus: result.branches.includes(query.trim()) ? "valid" : query.trim() ? "invalid" : "idle",
-    })
-  }
-
-  const prepare = async () => {
-    if (locked) {
-      setForm({ preparing: true, failure: undefined })
-      const result = await props.api.prepareReset({ environment: props.system.environment })
-      if (!result.ok) {
-        setForm({ preparing: false, failure: result, plan: undefined })
-        return
-      }
-      setForm({ preparing: false, plan: result.plan, failure: undefined })
-      return
-    }
-    if (!form.ref.trim() || form.selected.length === 0) {
-      setForm({ plan: undefined, preparing: false })
-      return
-    }
-    setForm({ preparing: true, failure: undefined })
-    const result = await props.api.prepareDeployment({
-      environment: props.system.environment,
-      ref: form.ref.trim(),
-      workflows: form.selected.map((filename) => ({ filename, inputs: form.inputs })),
-      ...(props.kind === "redeploy" ? { expectedBranch: props.system.branch } : {}),
-    })
-    if (!result.ok) {
-      setForm({ preparing: false, failure: result, plan: undefined })
-      return
-    }
-    setForm({ preparing: false, plan: result.plan, failure: undefined })
-    if (result.plan.ref === form.ref.trim()) setForm("branchStatus", "valid")
+  const changedOptions = () =>
+    selectedTargets().flatMap((target) =>
+      target.inputs.flatMap((definition) => {
+        const value = state.inputs[target.filename]?.[definition.name]
+        if (value === undefined || value === definition.default) return []
+        return [
+          t("boc.deployments.deploy.optionSummary", {
+            workflow: target.name,
+            option: definition.label,
+            value:
+              typeof value === "boolean"
+                ? t(value ? "boc.deployments.deploy.enabled" : "boc.deployments.deploy.disabled")
+                : value,
+          }),
+        ]
+      }),
+    )
+  const failureMessage = () => {
+    if (!state.failure) return ""
+    if (submissionUnknown()) return t("boc.deployments.deploy.submissionUnknown")
+    if (branchFailure() && state.failure.category === "not-found") return t("boc.deployments.deploy.branch.notFound")
+    if (
+      state.failure.category === "network" ||
+      (state.failure.category === "timeout" && state.failure.context?.field !== "preflight")
+    )
+      return t("boc.deployments.deploy.connectionFailed")
+    if (state.failure.category === "not-authenticated") return t("boc.deployments.deploy.signInRequired")
+    return deploymentFailureMessage(t, state.failure)
   }
 
   const dispatch = async () => {
-    if (form.dispatching || !form.plan || reason()) return
-    setForm({ dispatching: true, failure: undefined })
-    const result =
-      props.kind === "reset"
-        ? await props.api.dispatchPreparedReset({ preflightId: form.plan.preflightId })
-        : await props.api.dispatchPrepared({ preflightId: form.plan.preflightId })
-    if (!result.ok) {
-      setForm({ dispatching: false, failure: result })
-      if (result.category === "timeout") setForm("plan", undefined)
-      return
-    }
-    props.onQueued(result.operation)
-    dialog.close()
+    const operation = await preflight.dispatch()
+    if (!operation) return
+    props.onQueued(operation)
+    if (!disposed) dialog.close()
   }
 
-  createEffect(() => {
-    const query = form.ref.trim()
-    if (branchLocked) return
-    const handle = setTimeout(() => void searchBranches(query), 300)
-    onCleanup(() => clearTimeout(handle))
+  // The shared dialog listens on window capture. Let Escape close this picker's menu first.
+  const onKeyDown = (event: KeyboardEvent) => {
+    if (event.key !== "Escape" || !view.branchOpen) return
+    event.preventDefault()
+    event.stopImmediatePropagation()
+    setView("branchOpen", false)
+  }
+  window.addEventListener("keydown", onKeyDown, true)
+  onCleanup(() => {
+    disposed = true
+    window.removeEventListener("keydown", onKeyDown, true)
   })
-
-  createEffect(() => {
-    draftKey()
-    const handle = setTimeout(() => void prepare(), 300)
-    onCleanup(() => clearTimeout(handle))
-  })
-
-  onMount(() => {
-    void loadTargets()
-  })
+  onMount(() => void preflight.start())
 
   return (
-    <Dialog
-      size="large"
-      fit
-      class="!overflow-hidden"
-      containerClass="!h-auto !max-h-[calc(100vh-2rem)] !w-[min(44rem,calc(100vw-2rem))]"
-      data-boc-dialog="deployment-preflight"
-    >
-      <DialogHeader closeLabel={t("boc.deployments.deploy.close")} hideClose={form.dispatching}>
+    <Dialog size="large" fit class="deployment-preflight" containerClass="deployment-preflight-container">
+      <DialogHeader closeLabel={t("boc.deployments.deploy.close")}>
         <DialogTitleGroup
-          title={t(props.kind === "reset" ? "boc.deployments.deploy.resetTitle" : "boc.deployments.deploy.title", {
-            system: props.system.name,
-          })}
-          description={t("boc.deployments.deploy.description", {
-            branch: props.system.branch ?? t("boc.deployments.table.noValue"),
-            availability: t(`boc.deployments.availability.${props.system.availability}`),
-          })}
+          title={t(
+            preflight.reset
+              ? "boc.deployments.deploy.resetTitle"
+              : props.kind === "redeploy"
+                ? "boc.deployments.deploy.redeployTitle"
+                : "boc.deployments.deploy.title",
+            { system: props.system.name },
+          )}
+          description={
+            props.system.branch
+              ? t("boc.deployments.deploy.currentBranch", { branch: props.system.branch })
+              : t("boc.deployments.deploy.emptySystem")
+          }
         />
       </DialogHeader>
-      <DialogBody class="flex min-h-0 min-w-0 flex-col gap-4 overflow-x-hidden !overflow-y-auto px-4 pb-4">
-        <Show when={form.failure}>
-          <p role="alert" class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-danger">
-            {deploymentFailureMessage(t, form.failure!)}
-          </p>
-        </Show>
-
-        <Field invalid={form.branchStatus === "invalid"}>
-          <Field.Label>{t("boc.deployments.deploy.branch.label")}</Field.Label>
-          <TextInput
-            autofocus={!branchLocked}
-            class="!w-full"
-            name="deployment-ref"
-            autocomplete="off"
-            spellcheck={false}
-            disabled={branchLocked || form.dispatching}
-            placeholder={t("boc.deployments.deploy.branch.placeholder")}
-            value={form.ref}
-            onInput={(event) => setForm({ ref: event.currentTarget.value, plan: undefined })}
-          />
-          <Field.Prefix>
-            {form.branchStatus === "checking"
-              ? t("boc.deployments.deploy.branch.checking")
-              : form.branchStatus === "valid"
-                ? t("boc.deployments.deploy.branch.valid")
-                : form.branchStatus === "invalid"
-                  ? t("boc.deployments.deploy.branch.invalid")
-                  : form.branchStatus === "network"
-                    ? t("boc.deployments.deploy.branch.network")
-                    : ""}
-          </Field.Prefix>
-        </Field>
-        <Show when={!locked && form.branches.length > 0}>
-          <ul
-            class="max-h-32 overflow-auto rounded-md border border-v2-border-border-muted"
-            aria-label={t("boc.deployments.deploy.branch.suggestions")}
+      <DialogBody class="deployment-preflight-body">
+        <Show
+          when={!preflight.branchLocked}
+          fallback={
+            <div class="deployment-preflight-summary">
+              <span>{t("boc.deployments.deploy.branch.label")}</span>
+              <bdi dir="ltr">{state.ref}</bdi>
+            </div>
+          }
+        >
+          <Combobox<string>
+            class="deployment-branch"
+            options={branchOptions()}
+            value={state.ref || null}
+            onInputChange={preflight.editBranch}
+            onChange={(branch) => {
+              if (!branch) return
+              preflight.selectBranch(branch)
+              setView("branchOpen", false)
+            }}
+            open={view.branchOpen && !submitting()}
+            onOpenChange={(open) => setView("branchOpen", open)}
+            defaultFilter={() => true}
+            allowsEmptyCollection
+            noResetInputOnBlur
+            closeOnSelection
+            triggerMode="focus"
+            disabled={submitting()}
+            validationState={branchFailure() ? "invalid" : "valid"}
+            sameWidth
+            gutter={6}
+            itemComponent={(item) => (
+              <Combobox.Item item={item.item} class="deployment-branch-option">
+                <Combobox.ItemLabel>
+                  <bdi dir="ltr">
+                    {state.branches.includes(item.item.rawValue)
+                      ? item.item.rawValue
+                      : t("boc.deployments.deploy.branch.use", { branch: item.item.rawValue })}
+                  </bdi>
+                </Combobox.ItemLabel>
+                <Combobox.ItemIndicator>
+                  <Icon name="check" size="small" />
+                </Combobox.ItemIndicator>
+              </Combobox.Item>
+            )}
           >
-            <For each={form.branches}>
-              {(branch) => (
-                <li>
-                  <button
-                    type="button"
-                    class="w-full px-3 py-1.5 text-left font-mono text-[12px] leading-[var(--line-height-compact)] hover:bg-v2-background-bg-layer-01"
-                    onClick={() => setForm({ ref: branch, plan: undefined, branchStatus: "valid" })}
-                  >
-                    {branch}
-                  </button>
-                </li>
-              )}
-            </For>
-          </ul>
-        </Show>
-
-        <div class="flex flex-col gap-2">
-          <div class="flex items-center justify-between gap-2">
-            <h2 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
-              {t("boc.deployments.deploy.workflows.label")}
-            </h2>
-            <p class="text-[12px] text-v2-text-text-muted">
-              {t("boc.deployments.deploy.workflows.selected", { count: form.selected.length })}
-            </p>
-          </div>
-          <TextInput
-            class="!w-full"
-            name="deployment-workflow-search"
-            autocomplete="off"
-            disabled={locked || form.dispatching}
-            placeholder={t("boc.deployments.deploy.workflows.search")}
-            value={form.workflowQuery}
-            onInput={(event) => setForm("workflowQuery", event.currentTarget.value)}
-          />
-          <ul class="max-h-40 overflow-auto rounded-md border border-v2-border-border-muted">
-            <For each={visibleTargets()}>
-              {(target) => (
-                <li class="border-b border-v2-border-border-muted px-3 py-2 last:border-b-0">
-                  <Checkbox
-                    checked={form.selected.includes(target.filename)}
-                    disabled={locked || form.dispatching}
-                    description={target.filename}
-                    onChange={(checked) => {
-                      const selected = checked
-                        ? [...form.selected, target.filename]
-                        : form.selected.filter((filename) => filename !== target.filename)
-                      setForm({
-                        selected,
-                        plan: undefined,
-                        inputs: {
-                          ...form.inputs,
-                          ...defaultInputs(form.targets.filter((item) => selected.includes(item.filename))),
-                        },
-                      })
-                    }}
-                  >
-                    {target.name}
-                  </Checkbox>
-                </li>
-              )}
-            </For>
-          </ul>
-        </div>
-
-        <Show when={workflowInputs().length > 0}>
-          <div class="flex flex-col gap-2">
-            <h2 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
-              {t("boc.deployments.deploy.inputs.label")}
-            </h2>
-            <For each={workflowInputs()}>
-              {(input) => (
-                <Show
-                  when={input.type === "boolean"}
-                  fallback={
-                    <Field>
-                      <Field.Label>{input.label}</Field.Label>
-                      <Select
-                        class="!w-full"
-                        disabled={locked || form.dispatching}
-                        options={[...(input.options ?? [])]}
-                        current={input.options?.find((option) => option === form.inputs[input.name])}
-                        value={(option) => option}
-                        label={(option) => option}
-                        onSelect={(option) => {
-                          if (option) setForm("inputs", { ...form.inputs, [input.name]: option })
-                        }}
-                      />
-                    </Field>
-                  }
-                >
-                  <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2">
-                    <span class="text-[13px] leading-[var(--line-height-compact)]">{input.label}</span>
-                    <Switch
-                      checked={form.inputs[input.name] === true}
-                      disabled={locked || form.dispatching}
-                      aria-label={input.label}
-                      onChange={(checked) => setForm("inputs", { ...form.inputs, [input.name]: checked })}
-                    />
+            <Combobox.Label class="deployment-preflight-label">
+              {t("boc.deployments.deploy.branch.label")}
+            </Combobox.Label>
+            <Combobox.Control class="deployment-branch-control">
+              <Combobox.Input
+                as={TextInput}
+                class="deployment-branch-input"
+                autofocus
+                name="deployment-ref"
+                maxLength={255}
+                value={state.query}
+                autocomplete="off"
+                spellcheck={false}
+                dir="ltr"
+                placeholder={t("boc.deployments.deploy.branch.placeholder")}
+                invalid={branchFailure()}
+                onFocus={() => {
+                  if (!state.ref) void preflight.search()
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== "Enter" ||
+                    event.currentTarget.getAttribute("aria-activedescendant") ||
+                    !state.query.trim()
+                  )
+                    return
+                  event.preventDefault()
+                  preflight.selectBranch(state.query)
+                  setView("branchOpen", false)
+                }}
+              />
+              <Combobox.Trigger
+                class="deployment-branch-trigger"
+                aria-label={t("boc.deployments.deploy.branch.suggestions")}
+              >
+                <Icon name="chevron-down" size="small" />
+              </Combobox.Trigger>
+            </Combobox.Control>
+            <Show when={branchFailure()}>
+              <Combobox.ErrorMessage class="deployment-preflight-error">{failureMessage()}</Combobox.ErrorMessage>
+            </Show>
+            <Combobox.Portal>
+              <Combobox.Content class="deployment-branch-menu">
+                <Combobox.Listbox class="deployment-branch-list" />
+                <Show when={state.searching}>
+                  <p class="deployment-branch-notice" role="status">
+                    {t("boc.deployments.deploy.branch.checking")}
+                  </p>
+                </Show>
+                <Show when={state.searchFailure}>
+                  <div class="deployment-branch-notice">
+                    <span>{t("boc.deployments.deploy.branch.network")}</span>
+                    <Button variant="ghost" size="small" onClick={() => void preflight.search()}>
+                      {t("boc.deployments.deploy.retry")}
+                    </Button>
                   </div>
                 </Show>
-              )}
-            </For>
-          </div>
+                <Show when={!state.query.trim() && branchOptions().length === 0}>
+                  <p class="deployment-branch-notice">{t("boc.deployments.deploy.branch.searchHint")}</p>
+                </Show>
+              </Combobox.Content>
+            </Combobox.Portal>
+          </Combobox>
         </Show>
-        <Show when={form.plan?.warnings.includes("unsafe-target") && !reviewing()}>
-          <p role="status" class="text-[12px] leading-[var(--line-height-compact)] text-v2-state-fg-warning">
-            {t("boc.deployments.deploy.warning.unsafe-target")}
+
+        <Show
+          when={!preflight.reset}
+          fallback={
+            <div class="deployment-preflight-summary">
+              <span>{t("boc.deployments.deploy.workflows.label")}</span>
+              <span>
+                {state.plan?.workflows.map((workflow) => workflow.name).join(", ") ??
+                  t("boc.deployments.deploy.resetWorkflow")}
+              </span>
+              <p>{t("boc.deployments.deploy.resetSummary")}</p>
+            </div>
+          }
+        >
+          <fieldset class="deployment-preflight-workflows" disabled={submitting() || state.targetsStatus !== "ready"}>
+            <legend class="deployment-preflight-label">{t("boc.deployments.deploy.workflows.label")}</legend>
+            <Show when={state.targets.length > 6}>
+              <TextInput
+                class="!w-full"
+                aria-label={t("boc.deployments.deploy.workflows.search")}
+                placeholder={t("boc.deployments.deploy.workflows.search")}
+                value={view.workflowQuery}
+                onInput={(event) => setView("workflowQuery", event.currentTarget.value)}
+              />
+            </Show>
+            <Show
+              when={state.targets.length > 0}
+              fallback={
+                <p class="deployment-preflight-muted" role="status">
+                  {t(
+                    state.targetsStatus === "idle"
+                      ? "boc.deployments.deploy.workflows.chooseBranch"
+                      : state.targetsStatus === "loading"
+                        ? "boc.deployments.deploy.workflows.loading"
+                        : state.targetsStatus === "failed"
+                          ? "boc.deployments.deploy.workflows.failed"
+                          : "boc.deployments.deploy.workflows.empty",
+                  )}
+                </p>
+              }
+            >
+              <div class="deployment-workflow-choices">
+                <For each={visibleTargets()}>
+                  {(target) => (
+                    <Checkbox
+                      disabled={submitting() || state.targetsStatus !== "ready"}
+                      checked={state.selected.includes(target.filename)}
+                      onChange={(checked) => preflight.toggleWorkflow(target.filename, checked)}
+                    >
+                      {target.name}
+                      <Show
+                        when={state.targets.some(
+                          (other) => other.filename !== target.filename && other.name === target.name,
+                        )}
+                      >
+                        <span class="deployment-preflight-muted"> ({target.filename})</span>
+                      </Show>
+                    </Checkbox>
+                  )}
+                </For>
+                <Show when={visibleTargets().length === 0}>
+                  <p class="deployment-preflight-muted">{t("boc.deployments.deploy.workflows.noMatches")}</p>
+                </Show>
+              </div>
+            </Show>
+          </fieldset>
+
+          <Show when={selectedTargets().some((target) => target.inputs.length > 0)}>
+            <details class="deployment-preflight-options">
+              <summary>{t("boc.deployments.deploy.options")}</summary>
+              <For each={selectedTargets().filter((target) => target.inputs.length > 0)}>
+                {(target) => (
+                  <fieldset disabled={submitting() || state.targetsStatus !== "ready"}>
+                    <legend>{target.name}</legend>
+                    <For each={target.inputs}>
+                      {(definition) => {
+                        const value = () => state.inputs[target.filename]?.[definition.name] ?? definition.default
+                        const id = `${optionId}-${target.filename}-${definition.name}`
+                        return (
+                          <div class="deployment-option-row">
+                            <span id={id}>{definition.label}</span>
+                            <Show
+                              when={definition.type === "boolean"}
+                              fallback={
+                                <Select
+                                  aria-labelledby={id}
+                                  options={[...(definition.options ?? [])]}
+                                  current={definition.options?.find((option) => option === value())}
+                                  value={(option) => option}
+                                  label={(option) => option}
+                                  onSelect={(option) => {
+                                    if (option !== null) preflight.setInput(target.filename, definition.name, option)
+                                  }}
+                                  disabled={submitting() || state.targetsStatus !== "ready"}
+                                />
+                              }
+                            >
+                              <Switch
+                                aria-labelledby={id}
+                                checked={value() === true}
+                                disabled={submitting() || state.targetsStatus !== "ready"}
+                                onChange={(checked) => preflight.setInput(target.filename, definition.name, checked)}
+                              />
+                            </Show>
+                          </div>
+                        )
+                      }}
+                    </For>
+                  </fieldset>
+                )}
+              </For>
+            </details>
+            <Show when={changedOptions().length > 0}>
+              <ul class="deployment-preflight-changes">
+                <For each={changedOptions()}>{(option) => <li>{option}</li>}</For>
+              </ul>
+            </Show>
+          </Show>
+        </Show>
+
+        <Show when={isReservedDevEnvironment(props.system.environment)}>
+          <p class="deployment-preflight-warning">{t("boc.deployments.deploy.warning.unsafe-target")}</p>
+        </Show>
+        <Show when={props.kind === "deploy" && state.ref && props.system.branch && state.ref !== props.system.branch}>
+          <p class="deployment-preflight-warning">
+            {t("boc.deployments.deploy.replacesBranch", { branch: props.system.branch! })}
+          </p>
+        </Show>
+        <Show when={state.failure && !branchFailure()}>
+          <p class="deployment-preflight-error" role="alert">
+            {failureMessage()}
           </p>
         </Show>
       </DialogBody>
       <DialogFooter>
-        <p class="mr-auto max-w-[18rem] text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-          {submitReasonCopy(t, reason())}
-        </p>
-        <Button type="button" variant="outline" disabled={form.dispatching} onClick={() => dialog.close()}>
-          {t("boc.deployments.deploy.cancel")}
+        <div class="deployment-preflight-status" role="status">
+          <Show when={state.status === "expired"}>
+            <span>{t("boc.deployments.deploy.submit.expired")}</span>
+          </Show>
+          <Show when={!preflight.reset && state.targetsStatus === "ready" && !state.selected.length}>
+            <span>{t("boc.deployments.deploy.submit.workflows")}</span>
+          </Show>
+          <Show when={!preflight.validInputs()}>
+            <span>{t("boc.deployments.deploy.inputs.required")}</span>
+          </Show>
+          <Show
+            when={
+              !submissionUnknown() &&
+              (state.status === "expired" ||
+                state.status === "failed" ||
+                state.targetsStatus === "failed" ||
+                (!preflight.reset && state.targetsStatus === "ready" && state.targets.length === 0))
+            }
+          >
+            <Button
+              variant="ghost"
+              size="small"
+              onClick={() => void (preflight.reset ? preflight.prepare() : preflight.loadTargets(true))}
+            >
+              {t("boc.deployments.deploy.retry")}
+            </Button>
+          </Show>
+        </div>
+        <Button variant="outline" onClick={() => dialog.close()}>
+          {t(submitting() || submissionUnknown() ? "boc.deployments.deploy.dismiss" : "boc.deployments.deploy.cancel")}
         </Button>
-        <Button type="button" variant="neutral" disabled={reason() !== undefined} onClick={() => void dispatch()}>
-          {form.dispatching
-            ? t("boc.deployments.deploy.submit.dispatching")
-            : t(props.kind === "reset" ? "boc.deployments.deploy.submitReset" : "boc.deployments.deploy.submit", {
-                system: props.system.name,
-              })}
+        <Button variant="contrast" disabled={state.status !== "ready"} onClick={() => void dispatch()}>
+          {t(
+            submitting()
+              ? "boc.deployments.deploy.submit.dispatching"
+              : busy()
+                ? "boc.deployments.deploy.checking"
+                : preflight.reset
+                  ? "boc.deployments.deploy.submitReset"
+                  : "boc.deployments.deploy.submit",
+            { system: props.system.name },
+          )}
         </Button>
       </DialogFooter>
     </Dialog>
   )
-}
-
-function uniqueInputs(targets: readonly DeploymentWorkflowTarget[]) {
-  const seen = new Set<string>()
-  return targets.flatMap((target) =>
-    target.inputs.filter((input) => {
-      if (seen.has(input.name)) return false
-      seen.add(input.name)
-      return true
-    }),
-  )
-}
-
-function defaultInputs(targets: readonly DeploymentWorkflowTarget[]) {
-  return Object.fromEntries(
-    uniqueInputs(targets).flatMap((input) => (input.default === undefined ? [] : [[input.name, input.default]])),
-  ) as Record<string, DeploymentWorkflowInputValue>
-}
-
-function submitReasonCopy(
-  t: ReturnType<typeof createBocTranslator>,
-  reason?: ReturnType<typeof deploySubmitDisabledReason>,
-) {
-  if (reason === "dispatching") return t("boc.deployments.deploy.submit.dispatching")
-  if (reason === "expired") return t("boc.deployments.deploy.submit.expired")
-  if (reason === "ref") return t("boc.deployments.deploy.submit.ref")
-  if (reason === "workflows") return t("boc.deployments.deploy.submit.workflows")
-  return ""
-}
-
-export function createFixtureDeploymentApi(): DeploymentDialogApi {
-  let plan: DeploymentPreparedPlan | undefined
-  return {
-    listBranches: async (input) => ({
-      ok: true as const,
-      branches: [...(await import("../fixtures/github")).deploymentBranchFixtures].filter((branch) =>
-        branch.toLowerCase().includes(input.query.trim().toLowerCase()),
-      ),
-    }),
-    listWorkflowTargets: async () => ({
-      ok: true as const,
-      targets: [...(await import("../fixtures/github")).deploymentWorkflowFixtures],
-    }),
-    prepareDeployment: async (draft) => {
-      const { deploymentWorkflowFixtures } = await import("../fixtures/github")
-      plan = {
-        preflightId: "fixture-plan",
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        kind: "deploy",
-        environment: draft.environment,
-        ref: draft.ref,
-        workflows: draft.workflows.map((workflow) => ({
-          filename: workflow.filename,
-          name:
-            deploymentWorkflowFixtures.find((target) => target.filename === workflow.filename)?.name ??
-            workflow.filename,
-          inputs: workflow.inputs,
-        })),
-        warnings: [],
-      }
-      return { ok: true as const, plan }
-    },
-    prepareReset: async (input) => {
-      plan = {
-        preflightId: "fixture-reset",
-        expiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
-        kind: "reset",
-        environment: input.environment,
-        ref: "master",
-        workflows: [{ filename: "app-shop.yml", name: "Shop", inputs: { perform_tests: true, force_rebuild: false } }],
-        warnings: [],
-      }
-      return { ok: true as const, plan }
-    },
-    dispatchPrepared: async () => queuedFixture(plan),
-    dispatchPreparedReset: async () => queuedFixture(plan),
-  }
-}
-
-function queuedFixture(plan?: DeploymentPreparedPlan) {
-  if (!plan) {
-    return {
-      ok: false as const,
-      category: "not-found" as const,
-      retryable: false,
-      capability: "github_workflow_dispatch" as const,
-    }
-  }
-  return {
-    ok: true as const,
-    operation: {
-      id: "fixture-operation",
-      environment: plan.environment,
-      branch: plan.ref,
-      workflows: plan.workflows.map((workflow) => ({ filename: workflow.filename, state: "queued" as const })),
-      state: "queued" as const,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  }
 }

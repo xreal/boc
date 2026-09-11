@@ -34,6 +34,8 @@ const BRANCH_SEARCH_QUERY = `query ($owner: String!, $name: String!, $q: String!
   }
 }`
 
+const decodeExactBranch = Schema.decodeUnknownOption(Schema.fromJsonString(Schema.Struct({ ref: Schema.String })))
+
 const decodeWorkflowList = Schema.decodeUnknownOption(
   Schema.fromJsonString(
     Schema.Array(
@@ -117,6 +119,10 @@ export function githubBranchSearchArgs(query: string) {
     "-F",
     `limit=${DEPLOYMENT_BRANCH_RESULT_LIMIT}`,
   ] as const
+}
+
+export function githubExactBranchArgs(ref: string) {
+  return ["api", `repos/${DEPLOYMENT_GITHUB_REPOSITORY}/git/ref/heads/${encodeURIComponent(ref)}`] as const
 }
 
 export function dispatchWorkflowInputs(values: Readonly<Record<string, DeploymentWorkflowInputValue>>) {
@@ -261,9 +267,11 @@ export async function validateGithubRef(
   if (!trimmed || trimmed.length > 255 || trimmed.includes("..") || trimmed.startsWith("/")) {
     return deploymentFailure("invalid-input", { capability: "github_repo_access", context: { field: "ref" } })
   }
-  const listed = await searchGithubBranches(runtime, trimmed, signal)
-  if (!listed.ok) return listed
-  if (!listed.branches.includes(trimmed)) {
+  const result = await runGh(runtime, githubExactBranchArgs(trimmed), { signal })
+  if (!result.ok) return { ...deploymentCommandFailure(result, "github_repo_access"), context: { field: "ref" } }
+  const exact = Option.getOrUndefined(decodeExactBranch(result.stdout))
+  if (!exact) return deploymentFailure("malformed", { capability: "github_repo_access" })
+  if (exact.ref !== `refs/heads/${trimmed}`) {
     return deploymentFailure("not-found", { capability: "github_repo_access", context: { field: "ref" } })
   }
   return { ok: true, ref: trimmed }
@@ -286,21 +294,37 @@ export async function listGithubWorkflowTargets(
     return [{ filename, name: workflow.name }]
   })
 
+  let selectedRefVerification: ReturnType<typeof validateGithubRef> | undefined
   const parsed = await Promise.all(
     preferredDeploymentWorkflows(active).map(async (workflow) => {
       const source = await runGh(runtime, githubWorkflowViewArgs(workflow.filename, ref), { signal })
-      if (!source.ok) return undefined
-      return parseWorkflowDispatchContract({
-        filename: workflow.filename,
-        name: workflow.name,
-        source: source.stdout,
-      })
+      if (!source.ok) {
+        const failure = deploymentCommandFailure(source, "github_workflow_dispatch")
+        if (failure.category !== "not-found" || !ref) return failure
+
+        selectedRefVerification ??= validateGithubRef(runtime, ref, signal)
+        const selectedRef = await selectedRefVerification
+        if (!selectedRef.ok) return selectedRef
+        return { ok: true as const, target: undefined }
+      }
+      return {
+        ok: true as const,
+        target: parseWorkflowDispatchContract({
+          filename: workflow.filename,
+          name: workflow.name,
+          source: source.stdout,
+        }),
+      }
     }),
   )
+
+  const failed = parsed.find((result) => !result.ok)
+  if (failed && !failed.ok) return failed
 
   return {
     ok: true,
     targets: parsed
+      .map((result) => (result.ok ? result.target : undefined))
       .filter((target): target is ParsedDeploymentWorkflow => target !== undefined)
       .map((target) => ({
         ...target,

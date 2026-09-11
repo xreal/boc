@@ -3,7 +3,7 @@ export type LatestDeploymentRequest = {
   requestId: string
 }
 
-export function createLatestDeploymentRequest(input: { cancel: (requestId: string) => void }) {
+export function createLatestDeploymentRequest(input: { prefix?: string; cancel: (requestId: string) => void }) {
   let generation = 0
   let requestId: string | undefined
 
@@ -17,7 +17,7 @@ export function createLatestDeploymentRequest(input: { cancel: (requestId: strin
   return {
     begin(): LatestDeploymentRequest {
       invalidate()
-      requestId = `fleet-${Date.now().toString(36)}-${generation.toString(36)}`
+      requestId = `${input.prefix ?? "fleet"}-${Date.now().toString(36)}-${generation.toString(36)}`
       return { generation, requestId }
     },
     isCurrent(request: LatestDeploymentRequest) {

@@ -197,21 +197,26 @@ test("maps the renderer API to every typed Deployment RPC", async () => {
   await api.deployments.saveSettings(settings)
   await api.deployments.checkReadiness()
   await api.deployments.listBranches({ requestId: "branch", query: "SHOP" })
-  await api.deployments.listWorkflowTargets({ requestId: "workflow", refresh: false })
+  await api.deployments.listWorkflowTargets({ requestId: "workflow", refresh: false, ref: "SHOP-42" })
   await api.deployments.listOperations()
   await api.deployments.prepareDeployment({
+    requestId: "prepare-deploy",
     environment: "02",
     ref: "SHOP-42",
     workflows: [{ filename: "app-shop.yml", inputs: {} }],
   })
   await api.deployments.dispatchPrepared({ preflightId: "deploy" })
-  await api.deployments.prepareReset({ environment: "02" })
+  await api.deployments.prepareReset({ requestId: "prepare-reset", environment: "02" })
   await api.deployments.dispatchPreparedReset({ preflightId: "reset" })
   await api.deployments.redeployBranch({ environment: "02", expectedBranch: "SHOP-42", confirmed: true })
   await api.deployments.setAutoSync({ environment: "02", expected: "off", confirmed: true })
   await api.deployments.getCacheRun({ environment: "02" })
   await api.deployments.startCacheRun({ environment: "02" })
-  await api.deployments.resolveCacheRun({ environment: "02", startedAt: "2026-09-07T00:00:00.000Z", confirmedEnded: true })
+  await api.deployments.resolveCacheRun({
+    environment: "02",
+    startedAt: "2026-09-07T00:00:00.000Z",
+    confirmedEnded: true,
+  })
 
   expect(called.map((entry) => entry.tag)).toEqual([
     "BocDeploymentsGetWorkspace",

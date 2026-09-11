@@ -64,15 +64,17 @@ describe("deployment preflight and dispatch", () => {
         applicationLabelValue: "shop",
         notificationsEnabled: true,
       },
-      [{
-        id: "active",
-        environment: "02",
-        branch: "SHOP-42",
-        workflows: [],
-        state: "queued",
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }],
+      [
+        {
+          id: "active",
+          environment: "02",
+          branch: "SHOP-42",
+          workflows: [],
+          state: "queued",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        },
+      ],
     )
     const service = createDeploymentService({
       store,
@@ -525,6 +527,8 @@ describe("deployment preflight and dispatch", () => {
       },
     })
     if (!prepared.ok) throw new Error("expected reset plan")
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "list")).toHaveLength(1)
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "view")).toHaveLength(1)
     expect(await service.dispatchPrepared({ preflightId: prepared.plan.preflightId })).toMatchObject({
       ok: false,
       category: "invalid-input",
@@ -534,6 +538,273 @@ describe("deployment preflight and dispatch", () => {
     const run = commands.find((command) => command.args[1] === "run")
     expect(run?.args).toContain("master")
     expect(run?.args).toContain("app-shop.yml")
+  })
+
+  test("reuses the selected-ref workflow catalog during preparation", async () => {
+    const commands: DeploymentCommand[] = []
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: combinedRunner(commands, githubState()),
+    })
+
+    expect(await service.listWorkflowTargets({ refresh: false, ref: " SHOP-42 " })).toMatchObject({ ok: true })
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: " SHOP-42 ",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: true, plan: { ref: "SHOP-42" } })
+
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "list")).toHaveLength(1)
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "view")).toHaveLength(1)
+    expect(commands.some((command) => command.args[0] === "--version" || command.args[0] === "auth")).toBe(false)
+  })
+
+  test("caches branch suggestions without readiness work and skips short queries", async () => {
+    const commands: DeploymentCommand[] = []
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: combinedRunner(commands, githubState()),
+    })
+
+    expect(await service.listBranches({ query: "S" })).toEqual({ ok: true, branches: [] })
+    await service.listBranches({ query: " SHOP " })
+    await service.listBranches({ query: "SHOP" })
+
+    expect(commands.filter((command) => command.args[1] === "graphql")).toHaveLength(1)
+    expect(commands.some((command) => command.args[0] === "--version" || command.args[0] === "auth")).toBe(false)
+  })
+
+  test("does not cache a partial workflow catalog after a transient YAML read failure", async () => {
+    const commands: DeploymentCommand[] = []
+    const state = githubState({
+      workflows: [
+        { name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" },
+        { name: "Admin", path: ".github/workflows/app-admin.yml", state: "active" },
+      ],
+      yamlByFile: { "app-shop.yml": deploymentShopWorkflowYaml, "app-admin.yml": "on: workflow_dispatch\n" },
+    })
+    const runGithub = combinedRunner(commands, state)
+    let failAdmin = true
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      createId: () => "cancelled-plan",
+      run: (command) => {
+        if (
+          failAdmin &&
+          command.executable === "gh" &&
+          command.args[1] === "view" &&
+          command.args[2] === "app-admin.yml"
+        ) {
+          commands.push(command)
+          return Promise.resolve({ ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "temporary" })
+        }
+        return runGithub(command)
+      },
+    })
+
+    expect(await service.listWorkflowTargets({ refresh: false, ref: "SHOP-42" })).toMatchObject({ ok: false })
+    failAdmin = false
+    expect(await service.listWorkflowTargets({ refresh: false, ref: "SHOP-42" })).toMatchObject({
+      ok: true,
+      targets: [{ filename: "app-shop.yml" }, { filename: "app-admin.yml" }],
+    })
+    expect(commands.filter((command) => command.args[0] === "workflow" && command.args[1] === "list")).toHaveLength(2)
+  })
+
+  test("keeps workflows available on a selected branch when a newer workflow is absent", async () => {
+    const commands: DeploymentCommand[] = []
+    const runGithub = combinedRunner(
+      commands,
+      githubState({
+        workflows: [
+          { name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" },
+          { name: "Admin", path: ".github/workflows/app-admin.yml", state: "active" },
+        ],
+      }),
+    )
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: (command) => {
+        if (command.executable !== "gh" || command.args[1] !== "view" || command.args[2] !== "app-admin.yml") {
+          return runGithub(command)
+        }
+        commands.push(command)
+        return Promise.resolve({ ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "HTTP 404 Not Found" })
+      },
+    })
+
+    expect(await service.listWorkflowTargets({ refresh: false, ref: "SHOP-42" })).toMatchObject({
+      ok: true,
+      targets: [{ filename: "app-shop.yml" }],
+    })
+    expect(commands.filter((command) => command.args[1]?.includes("/git/ref/heads/SHOP-42"))).toHaveLength(1)
+    expect(
+      await service.prepareDeployment({
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: true })
+    expect(
+      await service.prepareDeployment({
+        environment: "03",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-admin.yml", inputs: {} }],
+      }),
+    ).toMatchObject({ ok: false, category: "not-found" })
+  })
+
+  test("shares branch reads while allowing one caller to cancel independently", async () => {
+    const commands: DeploymentCommand[] = []
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const run = combinedRunner(commands, githubState())
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: async (command) => {
+        if (command.args[1] === "graphql") {
+          started.resolve()
+          await release.promise
+        }
+        return run(command)
+      },
+    })
+    const controller = new AbortController()
+    const first = service.listBranches({ query: "SHOP" }, controller.signal)
+    await started.promise
+    const second = service.listBranches({ query: "SHOP" })
+    controller.abort()
+    expect(await first).toMatchObject({ ok: false, category: "cancelled" })
+    release.resolve()
+    expect(await second).toMatchObject({ ok: true })
+    expect(await service.listBranches({ query: "SHOP" })).toMatchObject({ ok: true })
+    expect(commands.filter((command) => command.args[1] === "graphql")).toHaveLength(1)
+  })
+
+  test("a new search does not join an abandoned command that is still shutting down", async () => {
+    const commands: DeploymentCommand[] = []
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const run = combinedRunner(commands, githubState())
+    let calls = 0
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: async (command) => {
+        if (command.args[1] === "graphql" && ++calls === 1) {
+          started.resolve()
+          await release.promise
+        }
+        return run(command)
+      },
+    })
+    const controller = new AbortController()
+    const first = service.listBranches({ query: "SHOP" }, controller.signal)
+    await started.promise
+    controller.abort()
+    expect(await first).toMatchObject({ ok: false, category: "cancelled" })
+    expect(await service.listBranches({ query: "SHOP" })).toMatchObject({ ok: true })
+    release.resolve()
+    expect(calls).toBe(2)
+  })
+
+  test("shared reads propagate unexpected command rejection and can be retried", async () => {
+    const run = combinedRunner([], githubState())
+    let fail = true
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: async (command) => {
+        if (fail && command.args[1] === "graphql") throw new Error("command transport failed")
+        return run(command)
+      },
+    })
+    await expect(service.listBranches({ query: "SHOP" }, new AbortController().signal)).rejects.toThrow(
+      "command transport failed",
+    )
+    fail = false
+    expect(await service.listBranches({ query: "SHOP" })).toMatchObject({ ok: true })
+  })
+
+  test("an older reset cannot replace a newer deployment while discovering workflows", async () => {
+    const started = Promise.withResolvers<void>()
+    const release = Promise.withResolvers<void>()
+    const run = combinedRunner([], githubState())
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: async (command) => {
+        if (command.args[1] === "view" && command.args.includes("master")) {
+          started.resolve()
+          await release.promise
+        }
+        return run(command)
+      },
+    })
+    const reset = service.prepareReset({ environment: "02" })
+    await started.promise
+    const deploy = await service.prepareDeployment({
+      environment: "02",
+      ref: "SHOP-42",
+      workflows: [{ filename: "app-shop.yml", inputs: {} }],
+    })
+    expect(deploy).toMatchObject({ ok: true })
+    release.resolve()
+    expect(await reset).toMatchObject({ ok: false, category: "cancelled" })
+    if (!deploy.ok) throw new Error("expected newer plan")
+    expect(await service.dispatchPrepared({ preflightId: deploy.plan.preflightId })).toMatchObject({ ok: true })
+  })
+
+  test("cancels deployment preparation and does not publish its plan", async () => {
+    const commands: DeploymentCommand[] = []
+    const runGithub = combinedRunner(commands, githubState())
+    let exactLookupStarted = false
+    let exactLookupCancelled = false
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "darwin",
+      run: (command) => {
+        if (command.executable !== "gh" || !command.args[1]?.includes("/git/ref/heads/")) return runGithub(command)
+        commands.push(command)
+        exactLookupStarted = true
+        return new Promise((resolve) => {
+          command.signal?.addEventListener(
+            "abort",
+            () => {
+              exactLookupCancelled = true
+              resolve({ ok: false, reason: "cancelled", stdout: "", stderr: "" })
+            },
+            { once: true },
+          )
+        })
+      },
+    })
+    const controller = new AbortController()
+    const preparation = service.prepareDeployment(
+      {
+        environment: "02",
+        ref: "SHOP-42",
+        workflows: [{ filename: "app-shop.yml", inputs: {} }],
+      },
+      controller.signal,
+    )
+    while (!exactLookupStarted) await Promise.resolve()
+    controller.abort()
+
+    expect(await preparation).toMatchObject({ ok: false, category: "cancelled" })
+    expect(exactLookupCancelled).toBe(true)
+    expect(await service.dispatchPrepared({ preflightId: "cancelled-plan" })).toMatchObject({
+      ok: false,
+      category: "not-found",
+    })
+    expect(service.listOperations().operations).toEqual([])
   })
 
   test("rechecks the exact Argo dev target immediately before dispatch", async () => {
@@ -648,6 +919,13 @@ function combinedRunner(commands: DeploymentCommand[], github: GithubState): Dep
     if (command.args[0] === "auth") return success("Logged in to github.com")
     if (command.args[0] === "api" && command.args[1] === `repos/bergfreunde/shop`) {
       return success(JSON.stringify({ full_name: "bergfreunde/shop" }))
+    }
+    if (command.args[0] === "api" && command.args[1]?.startsWith("repos/bergfreunde/shop/git/ref/heads/")) {
+      const ref = decodeURIComponent(command.args[1].slice("repos/bergfreunde/shop/git/ref/heads/".length))
+      if (!(github.branches ?? []).includes(ref)) {
+        return { ok: false, reason: "failed", exitCode: 1, stdout: "", stderr: "HTTP 404 Not Found" }
+      }
+      return success(JSON.stringify({ ref: `refs/heads/${ref}` }))
     }
     if (command.args[0] === "api" && command.args[1] === "graphql") {
       return success(

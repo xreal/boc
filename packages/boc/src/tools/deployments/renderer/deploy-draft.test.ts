@@ -1,77 +1,37 @@
 import { describe, expect, test } from "bun:test"
-import { deploySubmitDisabledReason, deploymentDraftKey, preparedPlanKey } from "./deploy-draft"
-import type { DeploymentPreparedPlan } from "../rpcs"
+import { deploymentDraftKey, deploymentSelections } from "./deploy-draft"
+import { deploymentWorkflowFixtures } from "../fixtures/github"
 
-const plan: DeploymentPreparedPlan = {
-  preflightId: "plan-1",
-  expiresAt: "2026-09-04T12:05:00.000Z",
-  kind: "deploy",
-  environment: "02",
-  ref: "SHOP-42",
-  workflows: [{ filename: "app-shop.yml", name: "Shop", inputs: { perform_tests: true } }],
-  warnings: [],
-}
-
-describe("deployment draft confirmation", () => {
-  test("invalidates the prepared plan when the draft changes", () => {
-    const draft = deploymentDraftKey({
-      ref: "SHOP-42",
-      filenames: ["app-shop.yml"],
-      inputs: { perform_tests: true },
-    })
-    expect(preparedPlanKey(plan)).toBe(draft)
+describe("deployment draft", () => {
+  test("compares workflows and inputs independently of their order", () => {
     expect(
       deploymentDraftKey({
-        ref: "SHOP-42",
-        filenames: ["app-shop.yml"],
-        inputs: { perform_tests: false },
+        ref: " master ",
+        workflows: [
+          { filename: "app-shop.yml", inputs: { perform_tests: true, force_rebuild: false } },
+          { filename: "app-admin.yml", inputs: { perform_tests: false } },
+        ],
       }),
-    ).not.toBe(draft)
+    ).toBe(
+      deploymentDraftKey({
+        ref: "master",
+        workflows: [
+          { filename: "app-admin.yml", inputs: { perform_tests: false } },
+          { filename: "app-shop.yml", inputs: { force_rebuild: false, perform_tests: true } },
+        ],
+      }),
+    )
   })
 
-  test("exposes an explicit reason instead of a confirmation checkbox", () => {
-    const draftKey = preparedPlanKey(plan)
-    expect(
-      deploySubmitDisabledReason({
-        dispatching: false,
-        preparing: false,
-        ref: "SHOP-42",
-        filenames: ["app-shop.yml"],
-        draftKey,
-        plan,
-        now: Date.parse("2026-09-04T12:00:00.000Z"),
-      }),
-    ).toBeUndefined()
-    expect(
-      deploySubmitDisabledReason({
-        dispatching: true,
-        preparing: false,
-        ref: "SHOP-42",
-        filenames: ["app-shop.yml"],
-        draftKey,
-        plan,
-      }),
-    ).toBe("dispatching")
-    expect(
-      deploySubmitDisabledReason({
-        dispatching: false,
-        preparing: true,
-        ref: "SHOP-42",
-        filenames: ["app-shop.yml"],
-        draftKey,
-        plan,
-      }),
-    ).toBe("reviewing")
-    expect(
-      deploySubmitDisabledReason({
-        dispatching: false,
-        preparing: false,
-        ref: "SHOP-42",
-        filenames: ["app-shop.yml"],
-        draftKey,
-        plan,
-        now: Date.parse("2026-09-04T12:05:00.000Z"),
-      }),
-    ).toBe("expired")
+  test("keeps same-named workflow inputs independent and omits deselected workflows", () => {
+    const inputs = {
+      "app-shop.yml": { perform_tests: false, force_rebuild: true },
+      "app-admin.yml": { perform_tests: true },
+    }
+    const selections = deploymentSelections(deploymentWorkflowFixtures, ["app-shop.yml", "app-admin.yml"], inputs)
+    expect(selections.map((selection) => selection.issues)).toEqual([[], []])
+    expect(selections[0].values.perform_tests).toBe(false)
+    expect(selections[1].values).toEqual({ perform_tests: true })
+    expect(deploymentSelections(deploymentWorkflowFixtures, ["app-admin.yml"], inputs)).toEqual([selections[1]])
   })
 })

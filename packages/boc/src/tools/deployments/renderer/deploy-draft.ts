@@ -1,42 +1,29 @@
-import type { DeploymentPreparedPlan, DeploymentWorkflowInputValue } from "../rpcs"
+import { normalizeDeploymentWorkflowInputs } from "../domain/workflows"
+import type { DeploymentWorkflowInputValue, DeploymentWorkflowSelection, DeploymentWorkflowTarget } from "../rpcs"
 
-export function deploymentDraftKey(input: {
-  ref: string
-  filenames: readonly string[]
-  inputs: Readonly<Record<string, DeploymentWorkflowInputValue>>
-}) {
+export function deploymentDraftKey(input: { ref: string; workflows: readonly DeploymentWorkflowSelection[] }) {
   return JSON.stringify({
     ref: input.ref.trim(),
-    filenames: [...input.filenames].toSorted(),
-    inputs: Object.fromEntries(Object.entries(input.inputs).toSorted((left, right) => left[0].localeCompare(right[0]))),
+    workflows: [...input.workflows]
+      .sort((left, right) => left.filename.localeCompare(right.filename))
+      .map((workflow) => ({
+        filename: workflow.filename,
+        inputs: Object.fromEntries(
+          Object.entries(workflow.inputs).sort(([left], [right]) => left.localeCompare(right)),
+        ),
+      })),
   })
 }
 
-export function preparedPlanKey(plan: DeploymentPreparedPlan) {
-  return deploymentDraftKey({
-    ref: plan.ref,
-    filenames: plan.workflows.map((workflow) => workflow.filename),
-    inputs: mergedPreparedInputs(plan),
-  })
-}
-
-export function mergedPreparedInputs(plan: DeploymentPreparedPlan) {
-  return Object.fromEntries(plan.workflows.flatMap((workflow) => Object.entries(workflow.inputs)))
-}
-
-export function deploySubmitDisabledReason(input: {
-  dispatching: boolean
-  preparing: boolean
-  ref: string
-  filenames: readonly string[]
-  draftKey: string
-  plan?: DeploymentPreparedPlan
-  now?: number
-}) {
-  if (input.dispatching) return "dispatching" as const
-  if (!input.ref.trim()) return "ref" as const
-  if (input.filenames.length === 0) return "workflows" as const
-  if (input.preparing || !input.plan || preparedPlanKey(input.plan) !== input.draftKey) return "reviewing" as const
-  if (Date.parse(input.plan.expiresAt) <= (input.now ?? Date.now())) return "expired" as const
-  return undefined
+export function deploymentSelections(
+  targets: readonly DeploymentWorkflowTarget[],
+  selected: readonly string[],
+  inputs: Readonly<Record<string, Record<string, DeploymentWorkflowInputValue>>>,
+) {
+  return targets
+    .filter((target) => selected.includes(target.filename))
+    .map((target) => ({
+      filename: target.filename,
+      ...normalizeDeploymentWorkflowInputs(target.inputs, inputs[target.filename] ?? {}),
+    }))
 }

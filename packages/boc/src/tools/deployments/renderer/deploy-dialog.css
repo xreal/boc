@@ -1,0 +1,200 @@
+.deployment-preflight-container {
+  width: min(34rem, calc(100vw - 2rem)) !important;
+  height: auto !important;
+  max-height: calc(100dvh - 2rem);
+}
+
+.deployment-preflight {
+  overflow: hidden !important;
+  font-size: 13px;
+  line-height: var(--line-height-compact);
+}
+
+.deployment-preflight-body {
+  gap: 20px;
+  min-height: 0;
+  padding: 4px 16px 16px;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+.deployment-preflight-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 530;
+}
+
+.deployment-branch-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.deployment-branch-control > .deployment-branch-input {
+  flex: 1 1 0%;
+  width: auto !important;
+  min-width: 0;
+}
+
+.deployment-branch-trigger {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  color: var(--v2-icon-icon-base);
+}
+
+.deployment-branch-trigger:hover {
+  background: var(--v2-background-bg-layer-02);
+}
+.deployment-branch-trigger:focus-visible,
+.deployment-preflight-options > summary:focus-visible {
+  outline: 2px solid var(--v2-border-border-focus);
+  outline-offset: 2px;
+}
+
+.deployment-branch-menu {
+  z-index: 100;
+  max-width: calc(100vw - 2rem);
+  border: 1px solid var(--v2-border-border-base);
+  border-radius: 6px;
+  background: var(--v2-background-bg-layer-01);
+  box-shadow: var(--v2-elevation-overlay);
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  line-height: var(--line-height-compact);
+  overflow: hidden;
+}
+
+.deployment-branch-list {
+  max-height: min(14rem, 35dvh);
+  overflow-y: auto;
+  padding: 4px;
+}
+.deployment-branch-option {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  overflow-wrap: anywhere;
+}
+.deployment-branch-option[data-highlighted] {
+  background: var(--v2-background-bg-layer-02);
+}
+.deployment-branch-option bdi {
+  font-family: var(--font-family-mono);
+}
+.deployment-branch-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  color: var(--v2-text-text-muted);
+}
+
+.deployment-preflight-workflows,
+.deployment-preflight-options fieldset {
+  min-width: 0;
+}
+.deployment-workflow-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  padding-block: 4px;
+}
+.deployment-preflight-workflows > [data-component="text-input-v2"] {
+  margin-bottom: 8px;
+}
+.deployment-preflight-muted {
+  color: var(--v2-text-text-muted);
+}
+.deployment-preflight-options {
+  border-top: 1px solid var(--v2-border-border-muted);
+  padding-top: 12px;
+}
+.deployment-preflight-options > summary {
+  cursor: pointer;
+  width: fit-content;
+  color: var(--v2-text-text-muted);
+}
+.deployment-preflight-options fieldset {
+  margin-top: 16px;
+}
+.deployment-preflight-options legend {
+  font-weight: 530;
+  margin-bottom: 4px;
+}
+.deployment-option-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 36px;
+}
+.deployment-option-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.deployment-option-row [data-component="select-v2"] {
+  max-width: 55%;
+}
+.deployment-preflight-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.deployment-preflight-summary > :first-child {
+  color: var(--v2-text-text-muted);
+}
+.deployment-preflight-summary > bdi {
+  font-family: var(--font-family-mono);
+  overflow-wrap: anywhere;
+}
+.deployment-preflight-summary > p {
+  width: 100%;
+  color: var(--v2-text-text-muted);
+}
+.deployment-preflight-changes {
+  color: var(--v2-text-text-muted);
+  display: grid;
+  gap: 4px;
+  overflow-wrap: anywhere;
+}
+.deployment-preflight-warning {
+  color: var(--v2-state-fg-warning);
+  overflow-wrap: anywhere;
+}
+.deployment-preflight-error {
+  color: var(--v2-state-fg-danger);
+  overflow-wrap: anywhere;
+}
+.deployment-branch .deployment-preflight-error {
+  margin-top: 8px;
+}
+.deployment-preflight-status {
+  margin-inline-end: auto;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  color: var(--v2-text-text-muted);
+  font-size: 12px;
+}
+.deployment-preflight [data-slot="dialog-footer"] {
+  align-items: center !important;
+}
+@media (max-width: 420px) {
+  .deployment-preflight [data-slot="dialog-footer"] {
+    flex-wrap: wrap;
+  }
+  .deployment-preflight-status:not(:empty) {
+    flex-basis: 100%;
+  }
+}

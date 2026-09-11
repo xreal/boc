@@ -26,9 +26,19 @@ export function createDeploymentHandlers(runtime: DeploymentHandlersRuntime) {
           reads.run(payload.requestId, (signal) => runtime.service.listWorkflowTargets(payload, signal)),
         ),
       BocDeploymentsListOperations: () => Effect.sync(() => runtime.service.listOperations()),
-      BocDeploymentsPrepareDeployment: (payload) => Effect.promise(() => runtime.service.prepareDeployment(payload)),
+      BocDeploymentsPrepareDeployment: (payload) =>
+        Effect.promise(() =>
+          payload.requestId
+            ? reads.run(payload.requestId, (signal) => runtime.service.prepareDeployment(payload, signal))
+            : runtime.service.prepareDeployment(payload),
+        ),
       BocDeploymentsDispatchPrepared: (payload) => Effect.promise(() => runtime.service.dispatchPrepared(payload)),
-      BocDeploymentsPrepareReset: (payload) => Effect.promise(() => runtime.service.prepareReset(payload)),
+      BocDeploymentsPrepareReset: (payload) =>
+        Effect.promise(() =>
+          payload.requestId
+            ? reads.run(payload.requestId, (signal) => runtime.service.prepareReset(payload, signal))
+            : runtime.service.prepareReset(payload),
+        ),
       BocDeploymentsDispatchPreparedReset: (payload) =>
         Effect.promise(() => runtime.service.dispatchPreparedReset(payload)),
       BocDeploymentsRedeployBranch: () => Effect.succeed(unavailable("github_workflow_dispatch")),

@@ -36,7 +36,7 @@ describe("deployment RPC handlers", () => {
     expect(result.unavailable).toMatchObject({
       ok: false,
       category: "missing-cli",
-      capability: "gh_cli",
+      capability: "github_repo_access",
     })
   })
 
