@@ -6,7 +6,6 @@ import type { BocTranslator } from "../../../renderer/i18n"
 import type { BocControls, ControlItem, ControlsHost, ControlsSelection } from "../host"
 import "./configuration-editor.css"
 import { EditorPanel } from "./editor-panel"
-import { Choice } from "./choice"
 
 export function SourceEditor(props: {
   host: ControlsHost
@@ -170,24 +169,7 @@ export function SourceEditor(props: {
           <p role="status">{props.t("boc.controls.editor.loading")}</p>
         </Show>
         <Show when={!view.loading && (!props.item || view.source)}>
-          <Show
-            when={view.source}
-            fallback={
-              <div class="controls-editor-field">
-                <span>{props.t("boc.controls.editor.scope")}</span>
-                <Choice
-                  label={props.t("boc.controls.editor.scope")}
-                  value={view.scope}
-                  disabled={view.saving}
-                  options={[
-                    { value: "project", label: props.t("boc.controls.editor.project") },
-                    { value: "global", label: props.t("boc.controls.globalDefaults") },
-                  ]}
-                  onChange={(scope) => setView("scope", scope as BocControls.ConfigurationScope)}
-                />
-              </div>
-            }
-          >
+          <Show when={view.source}>
             <p class="controls-editor-path">
               <bdi dir="ltr">{view.source?.path}</bdi>
             </p>

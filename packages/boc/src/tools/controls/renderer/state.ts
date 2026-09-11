@@ -21,6 +21,7 @@ type Snapshot = Omit<ControlState, "items"> & { items: Array<ControlItem & { key
 export function createProjectControls(host: ControlsHost, initial?: ControlsSelection) {
   const [view, setView] = createStore({
     initialized: false,
+    scope: "project" as BocControls.ConfigurationScope,
     selection: undefined as ControlsSelection | undefined,
     snapshot: undefined as Snapshot | undefined,
     loading: false,
@@ -45,7 +46,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
       ),
     )
 
-  const refresh = async () => {
+  const refresh = async (scope = view.scope) => {
     if (view.pending) {
       refreshAfterWrite = true
       return
@@ -66,7 +67,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
     try {
       const info = await client.info({}, options)
       if (!info.operations.includes("getState")) throw { type: "unsupported" }
-      const state = await client.getState({}, options)
+      const state = await client.getState({ scope }, options)
       if (current !== epoch || identity !== transport.identity()) return
       if (state.info.project.id !== info.project.id || state.info.location.directory !== info.location.directory)
         throw { type: "unsupported" }
@@ -90,6 +91,13 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
     host.remember(project)
     return true
   }
+  const selectScope = (scope: BocControls.ConfigurationScope) => {
+    if (view.pending || scope === view.scope) return false
+    epoch++
+    reading?.abort()
+    setView({ scope, snapshot: undefined, error: undefined, rowError: undefined, stale: false })
+    return true
+  }
 
   onMount(async () => {
     const saved = initial ?? (await host.initial())
@@ -111,6 +119,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
   })
   createEffect(() => {
     const selected = view.selection
+    const scope = view.scope
     const transport = connection()
     const status = transport?.status()
     // Re-run when the connection identity, attempt, or status changes.
@@ -133,7 +142,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
         return
       }
       if (status === "connected") {
-        void refresh()
+        void refresh(scope)
         return
       }
       setView("error", interrupted ? "unknown" : "unavailable")
@@ -173,7 +182,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
     const current = ++epoch
     reading?.abort()
     const identity = transport.identity()
-    const target = { kind: item.kind, id: item.id, expectedRevision: snapshot.revision }
+    const target = { kind: item.kind, id: item.id, expectedRevision: snapshot.revision, scope: view.scope }
     writing = new AbortController()
     const options = {
       location: { directory: selected.directory },
@@ -187,7 +196,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
       }
       const result =
         action === "connect"
-          ? await client.getState({}, options)
+          ? await client.getState({ scope: view.scope }, options)
           : action === "clear"
             ? await client.clearOverride(target, options)
             : action === "retry"
@@ -229,7 +238,7 @@ export function createProjectControls(host: ControlsHost, initial?: ControlsSele
       rowError: undefined,
     })
   }
-  return { view, select, clear, refresh, mutate }
+  return { view, select, selectScope, clear, refresh, mutate }
 }
 
 function failure(error: unknown, mutation = false): ControlError {

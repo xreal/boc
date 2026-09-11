@@ -66,14 +66,26 @@ function ControlsPreview() {
   }
   let snapshot: ControlState = {
     info: {
-      protocol: 1,
+      protocol: 2,
       version: "1",
       project: { id: "fixture", canonical: "/workspace/shop" },
       location: { directory: "/workspace/shop" },
       source: "bundled",
       scope: "project-on-server",
       categories: ["agent", "skill", "tool", "mcp", "instruction"],
-      operations: ["info", "getState", "getConfiguration", "saveConfiguration", "getSource", "saveSource", "createSource", "deleteSource", "setEnabled", "clearOverride", "retryApply"],
+      operations: [
+        "info",
+        "getState",
+        "getConfiguration",
+        "saveConfiguration",
+        "getSource",
+        "saveSource",
+        "createSource",
+        "deleteSource",
+        "setEnabled",
+        "clearOverride",
+        "retryApply",
+      ],
     },
     revision: 0,
     incomplete: [],
@@ -166,10 +178,51 @@ function ControlsPreview() {
       ...item,
     })) as ControlState["items"],
   }
+  let globalRevision = 0
+  const globalSettings = new Map<string, boolean>()
+  const globalItems = () =>
+    snapshot.items
+      .filter((item) => item.kind !== "tool" && (item.origin === "global" || item.source.startsWith("/config/")))
+      .map((item) => {
+        const enabled = globalSettings.get(`${item.kind}:${item.id}`)
+        return enabled === undefined
+          ? item
+          : { ...item, override: enabled, effective: enabled ? ("enabled" as const) : ("disabled" as const) }
+      })
+  const state = (scope: "project" | "global" = "project"): ControlState => {
+    if (scope === "global") return { ...snapshot, revision: globalRevision, items: globalItems() }
+    return {
+      ...snapshot,
+      items: snapshot.items.map((item) =>
+        globalSettings.get(`${item.kind}:${item.id}`) === false
+          ? {
+              ...item,
+              effective: "disabled" as const,
+              availability: "disabled" as const,
+              mutable: false,
+              reason: "disabled_globally" as const,
+            }
+          : item,
+      ),
+    }
+  }
   const client = {
     info: async () => snapshot.info,
-    getState: async () => structuredClone(snapshot),
-    setEnabled: async (input: { id: string; enabled: boolean; expectedRevision: number }) => {
+    getState: async (input: { scope?: "project" | "global" }) => structuredClone(state(input.scope)),
+    setEnabled: async (input: {
+      id: string
+      kind: ControlState["items"][number]["kind"]
+      enabled: boolean
+      expectedRevision: number
+      scope?: "project" | "global"
+    }) => {
+      if (input.scope === "global") {
+        if (input.expectedRevision !== globalRevision) throw { type: "conflict", revision: globalRevision }
+        if (input.enabled) globalSettings.delete(`${input.kind}:${input.id}`)
+        if (!input.enabled) globalSettings.set(`${input.kind}:${input.id}`, false)
+        globalRevision++
+        return structuredClone(state("global"))
+      }
       if (input.expectedRevision !== snapshot.revision) throw { type: "conflict", revision: snapshot.revision }
       snapshot = {
         ...snapshot,
@@ -180,14 +233,10 @@ function ControlsPreview() {
             : item,
         ),
       }
-      return structuredClone(snapshot)
+      return structuredClone(state())
     },
     getConfiguration: async (input: { scope: "project" | "global" }) => document(documents[input.scope]),
-    saveConfiguration: async (input: {
-      scope: "project" | "global"
-      content: string
-      expectedRevision: string
-    }) => {
+    saveConfiguration: async (input: { scope: "project" | "global"; content: string; expectedRevision: string }) => {
       const current = documents[input.scope]
       if (input.expectedRevision !== revision(current)) throw { type: "conflict" }
       if (input.content.includes("fixture-conflict")) throw { type: "conflict" }
@@ -199,14 +248,24 @@ function ControlsPreview() {
       if (!source) throw { type: "not_supported" }
       return sourceDocument(source)
     },
-    saveSource: async (input: { kind: "skill" | "instruction"; id: string; content: string; expectedRevision: string }) => {
+    saveSource: async (input: {
+      kind: "skill" | "instruction"
+      id: string
+      content: string
+      expectedRevision: string
+    }) => {
       const key = `${input.kind}:${input.id}`
       const current = sources[key]
       if (!current || input.expectedRevision !== sourceRevision(current)) throw { type: "conflict" }
       sources[key] = { ...current, content: input.content, revision: current.revision + 1 }
       return sourceDocument(sources[key])
     },
-    createSource: async (input: { kind: "skill" | "instruction"; scope: "project" | "global"; name: string; content: string }) => {
+    createSource: async (input: {
+      kind: "skill" | "instruction"
+      scope: "project" | "global"
+      name: string
+      content: string
+    }) => {
       const id = input.kind === "instruction" ? "AGENTS.md" : input.name
       const key = `${input.kind}:${id}`
       if (sources[key]) throw { type: "invalid_source" }
@@ -290,7 +349,10 @@ type FixtureDocument = {
   content: string
   revision: number
   instructionExists?: boolean
-  mcp?: Record<string, { type: "remote"; url: string; headers?: Record<string, string>; oauth?: { client_id: string; scope: string } }>
+  mcp?: Record<
+    string,
+    { type: "remote"; url: string; headers?: Record<string, string>; oauth?: { client_id: string; scope: string } }
+  >
 }
 type FixtureSource = {
   kind: "skill" | "instruction"

@@ -124,7 +124,7 @@ describe("Boc background service", () => {
       new Response(
         JSON.stringify({
           output: {
-            protocol: 1,
+            protocol: 2,
             version: "1",
             project: { id: "project", canonical: "/project" },
             location: { directory: "/project" },
@@ -140,6 +140,29 @@ describe("Boc background service", () => {
     expect(await inspectBocService(official, "/project", undefined, async () => responseFrom(responses))).toEqual({
       version: "1.2.3",
       boc: true,
+    })
+  })
+
+  test("rejects the previous Project Controls protocol", async () => {
+    const responses = [
+      Response.json({ version: "1.2.3" }),
+      Response.json({ output: { protocol: 2 } }),
+      Response.json({
+        output: {
+          protocol: 1,
+          version: "1",
+          project: { id: "project", canonical: "/project" },
+          location: { directory: "/project" },
+          source: "bundled",
+          scope: "project-on-server",
+          categories: ["tool"],
+          operations: ["info", "getState"],
+        },
+      }),
+    ]
+    expect(await inspectBocService(official, "/project", undefined, async () => responseFrom(responses))).toEqual({
+      version: "1.2.3",
+      boc: false,
     })
   })
 

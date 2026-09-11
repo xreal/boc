@@ -82,6 +82,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
     scope: "project" as "project" | "global",
     item: undefined as ControlItem | undefined,
     add: false,
+    category: undefined as (typeof kinds)[number] | undefined,
     source: undefined as "skill" | "instruction" | undefined,
   })
   const selectedServer = () => view.selection?.server
@@ -110,6 +111,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       ) ?? []
     )
   })
+  const categories = () => (view.scope === "global" ? kinds.filter((kind) => kind !== "tool") : kinds)
   const projects = createMemo(() =>
     host.servers().flatMap((server) =>
       server.projects.map((project) => ({
@@ -120,15 +122,17 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       })),
     ),
   )
-  const edit = (scope: "project" | "global", item?: ControlItem, add = false) =>
+  const edit = (scope: "project" | "global", item?: ControlItem, add = false, category?: (typeof kinds)[number]) =>
     setEditor({
       open: true,
       scope,
       item,
       add,
+      category,
       source: item?.kind === "skill" || item?.kind === "instruction" ? item.kind : undefined,
     })
   const disabled = () => view.stale || !!view.pending
+  const headerDisabled = () => !view.selection || !view.snapshot || view.stale
   const clearFilters = () => {
     setFilters({ search: "", category: "all" })
   }
@@ -143,24 +147,16 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
           {t("boc.bergflow.title")}
         </h1>
         <div class="controls-header-actions">
-          <Show when={view.snapshot?.info.operations.includes("getConfiguration")}>
-            <Button variant="ghost" size="small" disabled={disabled()} onClick={() => edit("global")}>
-              {t("boc.controls.globalDefaults")}
-            </Button>
-            <Button variant="outline" size="small" disabled={disabled()} onClick={() => edit("project")}>
-              {t("boc.controls.configure")}
-            </Button>
-            <Button size="small" disabled={disabled()} onClick={() => edit("project", undefined, true)}>
-              {t("boc.controls.add")}
-            </Button>
-          </Show>
+          <Button variant="outline" size="small" disabled={headerDisabled()} onClick={() => edit(view.scope)}>
+            {t("boc.controls.configure")}
+          </Button>
           <Button
             variant="outline"
             size="small"
             onClick={() => void preserveFocus(control.refresh)}
-            disabled={!view.selection || view.loading || !!view.pending}
+            disabled={!view.selection}
           >
-            {t(view.loading && view.snapshot ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
+            {t("boc.bergflow.refresh")}
           </Button>
         </div>
       </header>
@@ -168,35 +164,51 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
         <div class="mx-auto flex w-full max-w-[1100px] flex-col gap-5 p-4 sm:p-6">
           <div class="controls-context">
             <div class="controls-project-line" aria-busy={!!view.pending}>
-              <div class="controls-project-select text-12-medium">
-                {t("boc.bergflow.project")}
-                <Choice
-                  label={t("boc.bergflow.project")}
-                  value={view.selection ? JSON.stringify([view.selection.server, view.selection.project]) : ""}
-                  disabled={!!view.pending}
-                  options={projects().map((project) => ({
-                    value: project.key,
-                    label: host.servers().length > 1 ? `${project.name} · ${project.serverName}` : project.name,
-                  }))}
-                  onChange={(key) => {
-                    const project = projects().find((project) => project.key === key)
-                    if (project)
-                      control.select({
-                        server: project.server,
-                        project: project.directory,
-                        directory: project.directory,
-                      })
-                  }}
-                />
-              </div>
+              <Choice
+                inline
+                label={t("boc.controls.activationScope")}
+                value={view.scope}
+                disabled={!!view.pending}
+                options={[
+                  { value: "project", label: t("boc.controls.projectScope") },
+                  { value: "global", label: t("boc.controls.globalScope") },
+                ]}
+                onChange={(scope) => {
+                  clearFilters()
+                  control.selectScope(scope as "project" | "global")
+                }}
+              />
+              <Show
+                when={view.scope === "project"}
+                fallback={<span class="text-12-medium">{t("boc.controls.allProjects")}</span>}
+              >
+                <div class="controls-project-select text-12-medium">
+                  {t("boc.bergflow.project")}
+                  <Choice
+                    label={t("boc.bergflow.project")}
+                    value={view.selection ? JSON.stringify([view.selection.server, view.selection.project]) : ""}
+                    disabled={!!view.pending}
+                    options={projects().map((project) => ({
+                      value: project.key,
+                      label: host.servers().length > 1 ? `${project.name} · ${project.serverName}` : project.name,
+                    }))}
+                    onChange={(key) => {
+                      const project = projects().find((project) => project.key === key)
+                      if (project)
+                        control.select({
+                          server: project.server,
+                          project: project.directory,
+                          directory: project.directory,
+                        })
+                    }}
+                  />
+                </div>
+              </Show>
             </div>
-            <Show when={view.selection}>
-              <div class="flex flex-col gap-1 text-12-regular text-v2-text-text-muted">
-                <p>{serverInfo()?.name}</p>
-                <Show when={view.pending}>
-                  <p role="status">{t("boc.bergflow.contextLocked")}</p>
-                </Show>
-              </div>
+            <Show when={view.pending}>
+              <p class="sr-only" role="status">
+                {t("boc.bergflow.contextLocked")}
+              </p>
             </Show>
           </div>
           <div role="status" aria-live="polite" aria-atomic="true" class="controls-feedback text-13-regular">
@@ -231,7 +243,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                     placeholder={t("boc.bergflow.search")}
                   />
                   <div class="controls-categories" role="group" aria-label={t("boc.bergflow.filter")}>
-                    <For each={["all", ...kinds] as const}>
+                    <For each={["all", ...categories()] as const}>
                       {(kind) => (
                         <button
                           type="button"
@@ -258,7 +270,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                     {t("boc.bergflow.partial")}
                   </p>
                 </Show>
-                <For each={kinds}>
+                <For each={categories()}>
                   {(kind) => {
                     const items = () => filtered().filter((item) => item.kind === kind && item.present)
                     const system = (item: ControlItem) => internalAgent(item) || isSystemTool(item)
@@ -267,6 +279,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                     const row = (item: ControlItem & { key: string }) => (
                       <ControlRow
                         item={item}
+                        scope={view.scope}
                         origin={origin(item)}
                         t={t}
                         disabled={disabled()}
@@ -274,20 +287,38 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                         error={view.rowError?.key === item.key ? view.rowError.error : undefined}
                         operations={view.snapshot?.info.operations ?? []}
                         canConnect={!!host.connectMcp}
-                        edit={() => edit("project", item)}
+                        edit={() => edit(view.scope, item)}
                         change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
                       />
                     )
                     return (
-                      <Show when={items().length}>
+                      <Show
+                        when={
+                          items().length ||
+                          (!filters.search && (filters.category === "all" || filters.category === kind))
+                        }
+                      >
                         <section class="min-w-0">
-                          <h2 class="mb-2 flex items-center gap-2 text-14-medium">
-                            <span class="controls-category-icon" aria-hidden="true">
-                              <Icon name={categoryIcons[kind]} />
-                            </span>
-                            {t(`boc.bergflow.${kind}`)}{" "}
-                            <span class="controls-count text-12-regular text-v2-text-text-muted">{items().length}</span>
-                          </h2>
+                          <div class="controls-category-heading">
+                            <h2 class="flex items-center gap-2 text-14-medium">
+                              <span class="controls-category-icon" aria-hidden="true">
+                                <Icon name={categoryIcons[kind]} />
+                              </span>
+                              {t(`boc.bergflow.${kind}`)}{" "}
+                              <span class="controls-count text-12-regular text-v2-text-text-muted">
+                                {items().length}
+                              </span>
+                            </h2>
+                            <Button
+                              variant="outline"
+                              size="small"
+                              aria-label={t(`boc.controls.add.${kind}`)}
+                              disabled={disabled()}
+                              onClick={() => edit(view.scope, undefined, true, kind)}
+                            >
+                              {t("boc.controls.add")}
+                            </Button>
+                          </div>
                           <Show when={customItems().length}>
                             <div class="controls-cards">
                               <TableHeader kind={kind} t={t} />
@@ -335,6 +366,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                       {(item) => (
                         <ControlRow
                           item={item}
+                          scope={view.scope}
                           origin={origin(item)}
                           t={t}
                           disabled={disabled()}
@@ -361,13 +393,15 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                 </Show>
                 <details class="controls-scope-details text-12-regular text-v2-text-text-muted">
                   <summary>{t("boc.controls.scopeDetails")}</summary>
-                  <p>{t("boc.controls.scope")}</p>
-                  <p>{t("boc.bergflow.scope.instruction")}</p>
+                  <Show when={view.scope === "project"} fallback={<p>{t("boc.controls.globalScopeDetails")}</p>}>
+                    <p>{t("boc.controls.scope")}</p>
+                    <p>{t("boc.bergflow.scope.instruction")}</p>
+                  </Show>
                   <p>{t("boc.bergflow.running")}</p>
                   <p>
                     {t("boc.bergflow.version", {
                       version: view.snapshot?.info.version ?? "",
-                      protocol: view.snapshot?.info.protocol ?? 1,
+                      protocol: view.snapshot?.info.protocol ?? 2,
                     })}{" "}
                     ·{" "}
                     {t(
@@ -393,6 +427,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
               scope={editor.scope}
               item={editor.item}
               add={editor.add}
+              category={editor.category}
               t={t}
               close={() => setEditor("open", false)}
               saved={() => void control.refresh()}
@@ -443,6 +478,7 @@ function TableHeader(props: { kind: ControlItem["kind"]; t: BocTranslator }) {
 
 function ControlRow(props: {
   item: ControlItem
+  scope: "project" | "global"
   origin: ReturnType<typeof controlOrigin>
   t: BocTranslator
   disabled: boolean
@@ -457,7 +493,12 @@ function ControlRow(props: {
   const [row, setRow] = createStore({ expanded: false })
   const desired = () => props.item.override ?? props.item.defaultEnabled ?? props.item.effective === "enabled"
   const applying = () => props.pending || props.item.application === "pending"
-  const showStatus = () => applying() || props.item.application === "failed" || props.item.effective === "unknown"
+  const showStatus = () => props.item.application === "failed" || props.item.effective === "unknown"
+  const globallyDisabled = () => props.item.reason === "disabled_globally"
+  const overridesProject = () =>
+    props.scope === "project" &&
+    (props.item.kind === "agent" || props.item.kind === "mcp") &&
+    props.origin !== "project"
   return (
     <article class="controls-card" aria-busy={applying()} data-kind={props.item.kind}>
       <div class="controls-table-row">
@@ -536,25 +577,30 @@ function ControlRow(props: {
                   props.operations.includes("getSource")))
             }
           >
-            <Button variant="ghost" size="small" disabled={props.disabled} onClick={props.edit}>
-              {props.t(
-                (props.item.kind === "agent" || props.item.kind === "mcp") &&
-                  (props.origin === "global" || props.origin === "system")
-                  ? "boc.controls.customize"
-                  : "boc.controls.edit",
-              )}
-            </Button>
+            <Tooltip value={props.t(overridesProject() ? "boc.controls.overrideForProject" : "boc.controls.edit")}>
+              <Button
+                variant="ghost"
+                size="small"
+                aria-label={props.t(overridesProject() ? "boc.controls.overrideForProject" : "boc.controls.edit")}
+                disabled={props.disabled}
+                onClick={props.edit}
+              >
+                {props.t(overridesProject() ? "boc.controls.override" : "boc.controls.edit")}
+              </Button>
+            </Tooltip>
           </Show>
         </div>
         <div class="controls-cell-toggle">
           <Show
-            when={props.item.mutable && props.operations.includes("setEnabled")}
+            when={(props.item.mutable || globallyDisabled()) && props.operations.includes("setEnabled")}
             fallback={
               <Tooltip
                 value={props.t(
-                  props.item.kind === "instruction" && props.origin === "global"
-                    ? "boc.controls.alwaysIncluded"
-                    : "boc.bergflow.readOnly",
+                  globallyDisabled()
+                    ? "boc.bergflow.reason.disabled_globally"
+                    : props.item.kind === "instruction" && props.origin === "global"
+                      ? "boc.controls.alwaysIncluded"
+                      : "boc.bergflow.readOnly",
                 )}
               >
                 <span class="controls-readonly" aria-label={props.t("boc.bergflow.readOnly")}>
@@ -565,10 +611,10 @@ function ControlRow(props: {
           >
             <Switch
               hideLabel
-              checked={desired()}
-              disabled={props.disabled || applying()}
+              checked={globallyDisabled() ? false : desired()}
+              disabled={props.disabled || applying() || globallyDisabled()}
               onChange={(enabled) => props.change("set", enabled)}
-              aria-describedby={showStatus() ? statusID : undefined}
+              aria-describedby={showStatus() || globallyDisabled() ? statusID : undefined}
             >
               {props.item.name}
             </Switch>
@@ -577,13 +623,12 @@ function ControlRow(props: {
       </div>
       <Show when={showStatus()}>
         <p id={statusID} class="controls-row-feedback" role="status">
-          {props.t(
-            applying()
-              ? "boc.bergflow.applying"
-              : props.item.application === "failed"
-                ? "boc.bergflow.savedPending"
-                : "boc.bergflow.unknown",
-          )}
+          {props.t(props.item.application === "failed" ? "boc.bergflow.savedPending" : "boc.bergflow.unknown")}
+        </p>
+      </Show>
+      <Show when={globallyDisabled()}>
+        <p id={statusID} class="controls-row-note">
+          {props.t("boc.bergflow.reason.disabled_globally")}
         </p>
       </Show>
       <Show when={props.item.kind === "mcp" && ["needs_auth", "pending", "failed"].includes(props.item.availability)}>

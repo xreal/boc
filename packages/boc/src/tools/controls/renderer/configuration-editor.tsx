@@ -19,6 +19,7 @@ export function ConfigurationEditor(props: {
   scope: Scope
   item?: ControlItem
   add: boolean
+  category?: Category
   t: BocTranslator
   close: () => void
   saved: () => void
@@ -31,12 +32,12 @@ export function ConfigurationEditor(props: {
     scope: props.scope,
     document: undefined as BocControls.Configuration | undefined,
     content: "",
-    category: (props.item?.kind === "mcp" ? "mcp" : props.item?.kind === "skill" ? "skill" : "agent") as Category,
+    category: props.category ?? (props.item?.kind === "mcp" ? "mcp" : props.item?.kind === "skill" ? "skill" : "agent"),
     id: props.item?.id ?? "",
     name: "",
     loading: true,
     saving: false,
-    advanced: false,
+    advanced: !props.item && !props.add,
     code: "",
     invalidCode: false,
     error: "" as "" | "error" | "conflict" | "invalid",
@@ -50,7 +51,14 @@ export function ConfigurationEditor(props: {
     location: { directory: props.selection.directory },
     signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15_000)]),
   })
-  const dirty = () => !!view.document && (view.document.content !== view.content || view.invalidCode)
+  const addingDefinition = () =>
+    props.add &&
+    !view.saved &&
+    (view.category === "agent" || view.category === "mcp") &&
+    !!view.id.trim() &&
+    !addExists()
+  const dirty = () =>
+    !!view.document && (view.document.content !== view.content || view.invalidCode || addingDefinition())
   const parsed = createMemo(() => {
     const errors: ParseError[] = []
     const tree = parseTree(view.content, errors, { allowTrailingComma: true })
@@ -72,7 +80,7 @@ export function ConfigurationEditor(props: {
     return Array.isArray(found) && found.every((item) => typeof item === "string") ? found.join("\n") : ""
   }
   const root = () => (view.category === "mcp" ? ["mcp", "servers"] : ["agents"])
-  const definition = () => [...root(), view.id]
+  const definition = () => [...root(), view.id.trim()]
   const model = () => {
     const configured = text([...definition(), "model"])
     if (configured) return configured
@@ -125,6 +133,30 @@ export function ConfigurationEditor(props: {
     (view.category === "agent"
       ? props.agents.some((agent) => agent.id === name && (view.scope === "project" || agent.origin !== "project"))
       : ids().includes(name))
+  const addExists = () =>
+    props.add &&
+    !!view.id.trim() &&
+    (view.category === "agent"
+      ? props.agents.some((agent) => agent.id === view.id.trim())
+      : view.category === "mcp" && view.document?.mcp?.[view.id.trim()] !== undefined)
+  const contentForSave = () => {
+    if (!addingDefinition()) return view.content
+    const initial =
+      view.category === "agent"
+        ? { description: "", mode: "subagent" }
+        : { type: "remote", url: "https://", disabled: true }
+    const draft = value(definition())
+    const definitionValue = typeof draft === "object" && draft !== null && !Array.isArray(draft) ? draft : {}
+    return applyEdits(
+      view.content,
+      modify(
+        view.content,
+        definition(),
+        { ...initial, ...definitionValue },
+        { formattingOptions: { insertSpaces: true, tabSize: 2 } },
+      ),
+    )
+  }
   const existingInstruction = () => {
     const directory =
       view.scope === "project" ? props.selection.directory : view.document?.path.replace(/[/\\][^/\\]+$/, "")
@@ -188,12 +220,10 @@ export function ConfigurationEditor(props: {
     }
     setView({ saving: true, error: "" })
     try {
+      const content = contentForSave()
       const document = await connection
         .client()
-        .saveConfiguration(
-          { scope: view.scope, content: view.content, expectedRevision: view.document.revision },
-          options(),
-        )
+        .saveConfiguration({ scope: view.scope, content, expectedRevision: view.document.revision }, options())
       if (abort.signal.aborted) return
       if (identity !== connection.identity()) {
         setView("error", "error")
@@ -224,6 +254,11 @@ export function ConfigurationEditor(props: {
     }
     props.close()
   }
+  const title = () => {
+    if (props.item) return props.t("boc.controls.editor.editTitle", { name: props.item.name })
+    if (props.add) return props.t(`boc.controls.add.${view.category}`)
+    return props.t(view.scope === "global" ? "boc.controls.editor.globalTitle" : "boc.controls.editor.projectTitle")
+  }
   onMount(() => {
     void load(view.scope)
   })
@@ -235,11 +270,7 @@ export function ConfigurationEditor(props: {
     <EditorPanel close={close}>
       <header>
         <div>
-          <DialogTitle>
-            {props.item
-              ? props.t("boc.controls.editor.editTitle", { name: props.item.name })
-              : props.t(props.add ? "boc.controls.editor.add" : "boc.controls.editor.title")}
-          </DialogTitle>
+          <DialogTitle>{title()}</DialogTitle>
           <Show when={!props.add}>
             <p>
               {props.t(
@@ -247,26 +278,19 @@ export function ConfigurationEditor(props: {
               )}
             </p>
           </Show>
+          <Show when={view.document} keyed>
+            {(document) => (
+              <p class="controls-editor-path">
+                {props.t("boc.controls.editor.path")}: <bdi dir="ltr">{document.path}</bdi>
+              </p>
+            )}
+          </Show>
         </div>
         <Button variant="ghost" size="small" disabled={view.saving} onClick={close}>
           {props.t("boc.controls.editor.cancel")}
         </Button>
       </header>
       <div class="controls-editor-body">
-        <Show when={!props.item}>
-          <Field label={props.t("boc.controls.editor.scope")}>
-            <Choice
-              label={props.t("boc.controls.editor.scope")}
-              value={view.scope}
-              disabled={view.loading || view.saving || dirty()}
-              options={[
-                { value: "project", label: props.t("boc.controls.editor.project") },
-                { value: "global", label: props.t("boc.controls.globalDefaults") },
-              ]}
-              onChange={(scope) => void load(scope as Scope)}
-            />
-          </Field>
-        </Show>
         <Show when={view.loading}>
           <p role="status">{props.t("boc.controls.editor.loading")}</p>
         </Show>
@@ -276,19 +300,21 @@ export function ConfigurationEditor(props: {
           </Button>
         </Show>
         <Show when={view.document && !view.loading}>
-          <div class="controls-editor-tabs" role="group" aria-label={props.t("boc.controls.editor.title")}>
-            <Button
-              variant={view.advanced ? "ghost" : "outline"}
-              size="small"
-              onClick={() => setView("advanced", false)}
-              disabled={view.invalidCode}
-            >
-              {props.t("boc.controls.editor.form")}
-            </Button>
-            <Button variant={view.advanced ? "outline" : "ghost"} size="small" onClick={openCode}>
-              {props.t("boc.controls.editor.advanced")}
-            </Button>
-          </div>
+          <Show when={!props.add}>
+            <div class="controls-editor-tabs" role="group" aria-label={title()}>
+              <Button
+                variant={view.advanced ? "ghost" : "outline"}
+                size="small"
+                onClick={() => setView("advanced", false)}
+                disabled={view.invalidCode}
+              >
+                {props.t(props.item ? "boc.controls.editor.form" : "boc.controls.editor.commonSettings")}
+              </Button>
+              <Button variant={view.advanced ? "outline" : "ghost"} size="small" onClick={openCode}>
+                {props.t("boc.controls.editor.advanced")}
+              </Button>
+            </div>
+          </Show>
           <Show
             when={!view.advanced && parsed().valid}
             fallback={
@@ -322,7 +348,7 @@ export function ConfigurationEditor(props: {
                 />
               </Field>
             </Show>
-            <Show when={!props.item}>
+            <Show when={!props.item && !props.category}>
               <Field label={props.t("boc.controls.editor.kind")}>
                 <Choice
                   label={props.t("boc.controls.editor.kind")}
@@ -353,30 +379,42 @@ export function ConfigurationEditor(props: {
                 <div class="controls-editor-create">
                   <Field label={props.t("boc.controls.editor.name")}>
                     <input
-                      value={view.name}
+                      value={props.add ? view.id : view.name}
                       placeholder={props.t("boc.controls.editor.nameHint")}
-                      disabled={view.saving}
-                      onInput={(event) => setView("name", event.currentTarget.value)}
+                      disabled={view.saving || (props.add && view.document?.content !== view.content)}
+                      onInput={(event) => {
+                        if (props.add) {
+                          setView({ id: event.currentTarget.value, saved: false })
+                          return
+                        }
+                        setView("name", event.currentTarget.value)
+                      }}
                     />
                   </Field>
-                  <Button
-                    variant="outline"
-                    disabled={view.saving || !view.name.trim() || definitionExists(view.name.trim())}
-                    onClick={() => {
-                      const id = view.name.trim()
-                      update(
-                        [...root(), id],
-                        view.category === "agent"
-                          ? { description: "", mode: "subagent" }
-                          : { type: "remote", url: "https://", disabled: true },
-                      )
-                      setView({ id, name: "" })
-                    }}
-                  >
-                    {props.t("boc.controls.editor.create")}
-                  </Button>
+                  <Show when={!props.add}>
+                    <Button
+                      variant="outline"
+                      disabled={view.saving || !view.name.trim() || definitionExists(view.name.trim())}
+                      onClick={() => {
+                        const id = view.name.trim()
+                        update(
+                          [...root(), id],
+                          view.category === "agent"
+                            ? { description: "", mode: "subagent" }
+                            : { type: "remote", url: "https://", disabled: true },
+                        )
+                        setView({ id, name: "" })
+                      }}
+                    >
+                      {props.t("boc.controls.editor.create")}
+                    </Button>
+                  </Show>
                 </div>
-                <Show when={view.name.trim() && definitionExists(view.name.trim())}>
+                <Show
+                  when={
+                    (props.add && addExists()) || (!props.add && view.name.trim() && definitionExists(view.name.trim()))
+                  }
+                >
                   <p class="controls-editor-hint">{props.t("boc.controls.editor.alreadyAvailable")}</p>
                 </Show>
               </Show>
@@ -505,7 +543,7 @@ export function ConfigurationEditor(props: {
                     </Field>
                   </Show>
                 </Show>
-                <Show when={definitions().includes(view.id)}>
+                <Show when={!props.add && definitions().includes(view.id)}>
                   <Button
                     variant="ghost"
                     disabled={view.saving}
@@ -579,22 +617,24 @@ export function ConfigurationEditor(props: {
             </Show>
             <Show when={view.category === "tool"}>
               <p class="controls-editor-hint">{props.t("boc.controls.editor.pluginsHint")}</p>
-              <For each={node(["plugins"])?.children ?? []}>
-                {(plugin, index) => (
-                  <div class="controls-editor-create">
-                    <code dir="ltr">
-                      {plugin.type === "string" ? String(plugin.value) : text(["plugins", index(), "package"])}
-                    </code>
-                    <Button
-                      variant="ghost"
-                      disabled={view.saving}
-                      onClick={() => update(["plugins", index()], undefined)}
-                    >
-                      {props.t("boc.controls.editor.remove")}
-                    </Button>
-                  </div>
-                )}
-              </For>
+              <Show when={!props.add}>
+                <For each={node(["plugins"])?.children ?? []}>
+                  {(plugin, index) => (
+                    <div class="controls-editor-create">
+                      <code dir="ltr">
+                        {plugin.type === "string" ? String(plugin.value) : text(["plugins", index(), "package"])}
+                      </code>
+                      <Button
+                        variant="ghost"
+                        disabled={view.saving}
+                        onClick={() => update(["plugins", index()], undefined)}
+                      >
+                        {props.t("boc.controls.editor.remove")}
+                      </Button>
+                    </div>
+                  )}
+                </For>
+              </Show>
               <div class="controls-editor-create">
                 <Field label={props.t("boc.controls.editor.plugin")}>
                   <input
@@ -615,19 +655,23 @@ export function ConfigurationEditor(props: {
                   {props.t("boc.controls.add")}
                 </Button>
               </div>
-              <Button variant="outline" onClick={() => setView("advanced", true)}>
-                {props.t("boc.controls.editor.advanced")}
-              </Button>
+              <Show when={!props.add}>
+                <Button variant="outline" onClick={() => setView("advanced", true)}>
+                  {props.t("boc.controls.editor.advanced")}
+                </Button>
+              </Show>
             </Show>
           </Show>
-          <details class="controls-editor-storage">
-            <summary>{props.t("boc.controls.editor.storage")}</summary>
-            <p class="controls-editor-path">
-              <bdi dir="ltr">{view.document?.path}</bdi>
-            </p>
-            <p>{props.t("boc.controls.editor.inheritHint")}</p>
-            <p>{props.t("boc.controls.editor.nativeHint")}</p>
-          </details>
+          <Show when={!props.add}>
+            <details class="controls-editor-storage">
+              <summary>{props.t("boc.controls.editor.storage")}</summary>
+              <p class="controls-editor-path">
+                <bdi dir="ltr">{view.document?.path}</bdi>
+              </p>
+              <p>{props.t("boc.controls.editor.inheritHint")}</p>
+              <p>{props.t("boc.controls.editor.nativeHint")}</p>
+            </details>
+          </Show>
         </Show>
       </div>
       <footer>
@@ -652,7 +696,7 @@ export function ConfigurationEditor(props: {
             </Button>
           </Show>
           <Button
-            disabled={!dirty() || !parsed().valid || view.invalidCode || view.saving || view.loading}
+            disabled={!dirty() || !parsed().valid || view.invalidCode || view.saving || view.loading || addExists()}
             onClick={() => void save()}
           >
             {props.t(view.saving ? "boc.controls.editor.saving" : "boc.controls.editor.save")}

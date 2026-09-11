@@ -7,7 +7,7 @@ import { createProjectControls } from "./state"
 function snapshot(directory: string): ControlState {
   return {
     info: {
-      protocol: 1,
+      protocol: 2,
       version: "0.2.1",
       project: { id: directory, canonical: directory },
       location: { directory },

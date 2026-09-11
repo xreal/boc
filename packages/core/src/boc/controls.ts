@@ -49,6 +49,7 @@ export const Definition = define({
     const selection = yield* BocSelection.Service
     const discovery = yield* InstructionDiscovery.Service
     const project = yield* policies.project(ctx.location.project.id)
+    const defaults = yield* policies.global()
     const inventory: Record<BocControls.Kind, Capability[]> = {
       agent: [],
       skill: [],
@@ -58,7 +59,8 @@ export const Definition = define({
     }
     const failed = new Set<BocControls.Kind>()
     const pending = new Set<BocControls.Kind>()
-    const disabled = (kind: BocControls.Kind, id: string) => project.policy.settings[kind][id] === false
+    const disabled = (kind: BocControls.Kind, id: string) =>
+      defaults.policy.settings[kind][id] === false || project.policy.settings[kind][id] === false
     const configurationPath = (scope: BocControls.ConfigurationScope) =>
       scope === "global"
         ? path.join(global.config, "opencode.jsonc")
@@ -214,6 +216,11 @@ export const Definition = define({
       }))
       inventory.skill.filter((item) => disabled("skill", item.id)).forEach((item) => editor.remove(item.id))
     })
+    yield* ctx.agent.transform((editor) => {
+      Object.entries(defaults.policy.settings.agent)
+        .filter(([, enabled]) => !enabled)
+        .forEach(([id]) => editor.remove(id))
+    })
     yield* ctx.tool.transform((editor) => {
       inventory.tool = editor.list().map((tool) => ({
         id: tool.id,
@@ -246,6 +253,9 @@ export const Definition = define({
             value.disabled = !enabled
           })
       })
+      Object.entries(defaults.policy.settings.mcp)
+        .filter(([, enabled]) => !enabled)
+        .forEach(([id]) => editor.update(id, (value) => (value.disabled = true)))
     })
     yield* selection.register((event) => {
       inventory.instruction = event.candidates.map((item) => ({
@@ -257,7 +267,11 @@ export const Definition = define({
         mutable: item.source === "project",
       }))
       inventory.instruction
-        .filter((item) => item.mutable && disabled("instruction", item.id))
+        .filter(
+          (item) =>
+            defaults.policy.settings.instruction[item.id] === false ||
+            (item.mutable && project.policy.settings.instruction[item.id] === false),
+        )
         .forEach((item) => event.exclude(item.id))
     })
     yield* ctx.permission.hook("evaluate", (event) =>
@@ -277,7 +291,7 @@ export const Definition = define({
     )
 
     const info = () => ({
-      protocol: 1 as const,
+      protocol: 2 as const,
       version: "1",
       project: { id: ctx.location.project.id, canonical: ctx.location.project.canonical },
       location: {
@@ -308,7 +322,7 @@ export const Definition = define({
       if (kind === "mcp") return ctx.mcp.reload()
       return Effect.void
     }
-    const state = Effect.fn("BocProjectControls.state")(function* () {
+    const state = Effect.fn("BocProjectControls.state")(function* (scope: BocControls.ConfigurationScope = "project") {
       const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
       const defaultAgent = Config.latest(documents, "default_agent")
       const agents = yield* ctx.agent.list({})
@@ -367,34 +381,96 @@ export const Definition = define({
       })
       const statuses = new Map(mcp.data.map((item) => [item.name, item.status.status]))
       const incomplete: BocControls.Kind[] = Array.isArray(instructions) ? [] : ["instruction"]
+      const globalDocuments = documents.filter((document) => {
+        const source = document.path
+        return source !== undefined && globalSourceRoots(global).some((root) => FSUtil.contains(root, source))
+      })
+      const globalAgents = new Map(
+        globalDocuments.flatMap((document) =>
+          Object.entries(document.info.agents ?? {}).map(
+            ([id, agent]) => [id, { id, agent, source: document.path }] as const,
+          ),
+        ),
+      )
+      const globalMcp = new Map(
+        globalDocuments.flatMap((document) =>
+          Object.entries(document.info.mcp?.servers ?? {}).map(
+            ([id, server]) => [id, { id, server, source: document.path }] as const,
+          ),
+        ),
+      )
+      const available: Record<BocControls.Kind, Capability[]> =
+        scope === "project"
+          ? inventory
+          : {
+              agent: Array.from(globalAgents.values()).map(({ id, agent, source }) => ({
+                id,
+                name: id,
+                description: agent.description ?? "",
+                source,
+                definition: agent,
+                ...(agent.disabled === undefined ? {} : { nativeOverride: !agent.disabled }),
+                defaultEnabled: true,
+                mutable: true,
+                ...(Config.latest(globalDocuments, "default_agent") === id &&
+                agent.mode !== "subagent" &&
+                !agent.disabled
+                  ? { defaultAgent: true }
+                  : {}),
+                ...(agent.mode ? { agentMode: agent.mode } : {}),
+                ...(agent.model ? { model: formatModel(agent.model) } : {}),
+              })),
+              skill: inventory.skill.filter((item) => item.source && sourceScope(item.source) === "global"),
+              tool: [],
+              mcp: Array.from(globalMcp.values()).map(({ id, server, source }) => ({
+                id,
+                name: id,
+                description: "",
+                source,
+                definition: server,
+                ...(server.disabled === undefined ? {} : { nativeOverride: !server.disabled }),
+                defaultEnabled: true,
+                mutable: true,
+              })),
+              instruction: inventory.instruction
+                .filter((item) => item.source && sourceScope(item.source) === "global")
+                .map((item) => ({ ...item, mutable: true })),
+            }
+      const policy = scope === "global" ? defaults.policy : project.policy
       const items = BocControls.kinds.flatMap((kind) => {
-        const known = new Set(inventory[kind].map((item) => item.id))
-        const missing = Object.keys(project.policy.settings[kind])
+        const known = new Set(available[kind].map((item) => item.id))
+        const missing: Capability[] = Object.keys(policy.settings[kind])
           .filter(() => kind !== "agent")
           .filter((id) => !known.has(id))
           .map((id) => ({ id, name: id, description: "", defaultEnabled: true, mutable: false }))
-        return [...inventory[kind], ...missing].map((item) =>
-          describe({
+        return [...available[kind], ...missing].map((item) => {
+          const provenance =
+            scope === "global"
+              ? { source: item.source ?? "opencode.registry", origin: "global" as const }
+              : originOf(item, {
+                  inventory,
+                  plugins: plugins.data,
+                  documents,
+                  global,
+                  directory: ctx.location.directory,
+                  canonical: ctx.location.project.canonical,
+                })
+          return describe({
             kind,
             item,
             present: known.has(item.id),
-            policy: project.policy,
+            policy,
             failed,
             pending,
             incomplete,
             status: statuses.get(item.id),
-            provenance: originOf(item, {
-              inventory,
-              plugins: plugins.data,
-              documents,
-              global,
-              directory: ctx.location.directory,
-              canonical: ctx.location.project.canonical,
-            }),
-          }),
-        )
+            provenance,
+            policyControlsNative: scope === "global",
+            globallyDisabled: scope === "project" && defaults.policy.settings[kind][item.id] === false,
+          })
+        })
       })
-      return { info: info(), revision: project.policy.revision, items, incomplete }
+      return { info: info(), revision: policy.revision, items, incomplete }
     })
     const member: BocControlPolicy.Member = {
       apply: (kind) =>
@@ -413,6 +489,10 @@ export const Definition = define({
       Effect.sync(() => project.members.add(member)),
       () => Effect.sync(() => project.members.delete(member)),
     )
+    yield* Effect.acquireRelease(
+      Effect.sync(() => defaults.members.add(member)),
+      () => Effect.sync(() => defaults.members.delete(member)),
+    )
     const mutate = (
       change: {
         kind: BocControls.Kind
@@ -420,16 +500,19 @@ export const Definition = define({
         expectedRevision: number
         action: "set" | "clear" | "retry"
         enabled?: boolean
+        scope?: BocControls.ConfigurationScope
       },
       call: RpcCallContext<typeof BocControls.Rpc.methods.setEnabled>,
     ) =>
       policies.lock.withPermits(1)(
         Effect.gen(function* () {
-          if (change.expectedRevision !== project.policy.revision)
+          const scope = change.scope ?? "project"
+          const policy = scope === "global" ? defaults : project
+          if (change.expectedRevision !== policy.policy.revision)
             return yield* Effect.fail(
-              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+              call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
             )
-          const current = yield* state().pipe(Effect.orDie)
+          const current = yield* state(scope).pipe(Effect.orDie)
           const item = current.items.find((item) => item.kind === change.kind && item.id === change.id)
           if (!item) return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
           // Clearing is allowed on read-only and missing items so leftover overrides can be removed.
@@ -438,21 +521,26 @@ export const Definition = define({
           if (change.action !== "clear" && current.incomplete.includes(change.kind))
             return yield* Effect.fail(call.error("not_ready", "boc.controls.not_ready", {}))
           if (change.action !== "retry") {
-            const overrides = { ...project.policy.settings[change.kind] }
+            const overrides = { ...policy.policy.settings[change.kind] }
             if (change.action === "clear") delete overrides[change.id]
-            if (change.action === "set" && change.enabled !== undefined) overrides[change.id] = change.enabled
-            const settings = { ...project.policy.settings, [change.kind]: overrides }
-            yield* policies
-              .save(ctx.location.project.id, project, { revision: project.policy.revision + 1, settings })
-              .pipe(
-                Effect.catchCause(() =>
-                  Effect.fail(call.error("persistence_failed", "boc.controls.persistence_failed", {})),
-                ),
-              )
+            if (change.action === "set" && change.enabled !== undefined) {
+              if (scope === "global" && change.enabled) delete overrides[change.id]
+              if (scope === "project" || !change.enabled) overrides[change.id] = change.enabled
+            }
+            const settings = { ...policy.policy.settings, [change.kind]: overrides }
+            const save =
+              scope === "global"
+                ? policies.saveGlobal(policy, { revision: policy.policy.revision + 1, settings })
+                : policies.save(ctx.location.project.id, policy, { revision: policy.policy.revision + 1, settings })
+            yield* save.pipe(
+              Effect.catchCause(() =>
+                Effect.fail(call.error("persistence_failed", "boc.controls.persistence_failed", {})),
+              ),
+            )
           }
-          yield* Effect.forEach(project.members, (member) => member.apply(change.kind))
-          yield* Effect.forEach(project.members, (member) => member.changed())
-          return yield* state().pipe(Effect.orDie)
+          yield* Effect.forEach(policy.members, (member) => member.apply(change.kind))
+          yield* Effect.forEach(policy.members, (member) => member.changed())
+          return yield* state(scope).pipe(Effect.orDie)
         }).pipe(Effect.uninterruptible),
       )
     const mutateNative = (
@@ -462,21 +550,25 @@ export const Definition = define({
         expectedRevision: number
         action: "set" | "clear"
         enabled?: boolean
+        scope: BocControls.ConfigurationScope
       },
       call: RpcCallContext<typeof BocControls.Rpc.methods.setEnabled>,
     ) =>
       policies.lock.withPermits(1)(
         Effect.gen(function* () {
-          if (change.expectedRevision !== project.policy.revision)
+          const policy = change.scope === "global" ? defaults : project
+          if (change.expectedRevision !== policy.policy.revision)
             return yield* Effect.fail(
-              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+              call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
             )
-          const current = yield* state().pipe(Effect.orDie)
+          const current = yield* state(change.scope).pipe(Effect.orDie)
           const item = current.items.find((item) => item.kind === change.kind && item.id === change.id)
           if (!item) return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
-          if (!item.mutable) return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
-          const capability = inventory[change.kind].find((item) => item.id === change.id)
-          const scope = "project" as const
+          if (change.action !== "clear" && !item.mutable)
+            return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
+          const capability =
+            change.scope === "global" ? item : inventory[change.kind].find((item) => item.id === change.id)
+          const scope = change.scope
           const document = yield* configuration(scope).pipe(Effect.orDie)
           const targetContainsDefinition = capability?.source === document.path
           const definition =
@@ -514,24 +606,28 @@ export const Definition = define({
           if (saved.type === "conflict") {
             pending.delete(change.kind)
             return yield* Effect.fail(
-              call.error("conflict", "boc.controls.conflict", { revision: project.policy.revision }),
+              call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
             )
           }
           if (saved.type === "invalid") {
             pending.delete(change.kind)
             return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
           }
-          const legacy = { ...project.policy.settings[change.kind] }
-          delete legacy[change.id]
-          const settings = { ...project.policy.settings, [change.kind]: legacy }
-          yield* policies.save(ctx.location.project.id, project, { revision: project.policy.revision + 1, settings })
-          yield* Effect.forEach(project.members, (member) => member.changed())
-          return yield* state().pipe(Effect.orDie)
+          const overrides = { ...policy.policy.settings[change.kind] }
+          if (change.scope === "global" && change.action === "set" && !change.enabled) overrides[change.id] = false
+          if (change.action === "clear" || change.scope === "project" || change.enabled) delete overrides[change.id]
+          const settings = { ...policy.policy.settings, [change.kind]: overrides }
+          const next = { revision: policy.policy.revision + 1, settings }
+          if (change.scope === "global") yield* policies.saveGlobal(policy, next)
+          if (change.scope === "project") yield* policies.save(ctx.location.project.id, policy, next)
+          if (change.scope === "global") yield* Effect.forEach(policy.members, (member) => member.apply(change.kind))
+          yield* Effect.forEach(policy.members, (member) => member.changed())
+          return yield* state(change.scope).pipe(Effect.orDie)
         }).pipe(Effect.uninterruptible),
       )
     const registration = yield* ctx.rpc.register(BocControls.Rpc, {
       info: () => Effect.succeed(info()),
-      getState: () => policies.lock.withPermits(1)(state().pipe(Effect.orDie)),
+      getState: ({ scope }) => policies.lock.withPermits(1)(state(scope).pipe(Effect.orDie)),
       getConfiguration: ({ scope }) => configuration(scope).pipe(Effect.orDie),
       saveConfiguration: (input, call) =>
         policies.lock.withPermits(1)(
@@ -584,13 +680,17 @@ export const Definition = define({
           return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
         }),
       setEnabled: (target, call) => {
-        if (target.kind === "agent") return mutateNative({ ...target, kind: "agent", action: "set" }, call)
-        if (target.kind === "mcp") return mutateNative({ ...target, kind: "mcp", action: "set" }, call)
+        const scope = target.scope ?? "project"
+        if (scope === "global" && target.kind === "tool")
+          return Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
+        if (target.kind === "agent") return mutateNative({ ...target, scope, kind: "agent", action: "set" }, call)
+        if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "set" }, call)
         return mutate({ ...target, action: "set" }, call)
       },
       clearOverride: (target, call) => {
-        if (target.kind === "agent") return mutateNative({ ...target, kind: "agent", action: "clear" }, call)
-        if (target.kind === "mcp") return mutateNative({ ...target, kind: "mcp", action: "clear" }, call)
+        const scope = target.scope ?? "project"
+        if (target.kind === "agent") return mutateNative({ ...target, scope, kind: "agent", action: "clear" }, call)
+        if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "clear" }, call)
         return mutate({ ...target, action: "clear" }, call)
       },
       retryApply: (target, call) => mutate({ ...target, action: "retry" }, call),
@@ -631,17 +731,21 @@ function describe(input: {
   incomplete: readonly BocControls.Kind[]
   status: string | undefined
   provenance: { source: string; origin: typeof BocControls.Origin.Type }
+  policyControlsNative?: boolean
+  globallyDisabled?: boolean
 }): BocControls.Item {
   // Agent activation is native. Existing MCP policy overrides retain their
   // prior precedence until users explicitly migrate or clear them.
   const policyOverride = input.policy.settings[input.kind][input.item.id]
   const override =
     input.kind === "agent"
-      ? (input.item.nativeOverride ?? null)
+      ? input.policyControlsNative
+        ? (policyOverride ?? input.item.nativeOverride ?? null)
+        : (input.item.nativeOverride ?? null)
       : input.kind === "mcp"
         ? (policyOverride ?? input.item.nativeOverride ?? null)
         : (policyOverride ?? null)
-  const enabled = override ?? input.item.defaultEnabled
+  const enabled = input.globallyDisabled ? false : (override ?? input.item.defaultEnabled)
   const unconfirmed =
     !input.present ||
     (override !== null && !input.item.mutable) ||
@@ -659,12 +763,14 @@ function describe(input: {
     ...(input.item.defaultAgent ? { defaultAgent: true } : {}),
     ...(input.item.agentMode ? { agentMode: input.item.agentMode } : {}),
     ...(input.item.model ? { model: input.item.model } : {}),
-    mutable: input.present && input.item.mutable,
+    mutable: input.present && input.item.mutable && !input.globallyDisabled,
     present: input.present,
-    effective: unconfirmed ? "unknown" : enabled ? "enabled" : "disabled",
+    effective: input.globallyDisabled ? "disabled" : unconfirmed ? "unknown" : enabled ? "enabled" : "disabled",
     application: input.failed.has(input.kind) ? "failed" : input.pending.has(input.kind) ? "pending" : "applied",
     availability: availability(input.kind, input.present, enabled, input.status),
-    ...reason(input.present, input.failed.has(input.kind), input.item.mutable, override),
+    ...(input.globallyDisabled
+      ? { reason: "disabled_globally" as const }
+      : reason(input.present, input.failed.has(input.kind), input.item.mutable, override)),
     effect: effect(input.kind),
   }
 }

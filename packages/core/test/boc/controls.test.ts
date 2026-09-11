@@ -217,6 +217,31 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
     const initial = yield* client.getState({})
     expect(initial.items.find((item) => item.id === "sample")?.origin).toBe("system")
     expect(initial.items.find((item) => item.id === "guide")?.origin).toBe("system")
+    const globalState = yield* client.getState({ scope: "global" })
+    expect(globalState.items.some((item) => item.kind === "tool")).toBe(false)
+    expect(globalState.items.find((item) => item.source === `${global.config}/AGENTS.md`)).toMatchObject({
+      origin: "global",
+      mutable: true,
+    })
+    yield* client.setEnabled({
+      scope: "global",
+      kind: "instruction",
+      id: `${global.config}/AGENTS.md`,
+      enabled: false,
+      expectedRevision: 0,
+    })
+    const withoutGlobalInstruction = yield* discovery.list()
+    expect(
+      Array.isArray(withoutGlobalInstruction) &&
+        withoutGlobalInstruction.every((file) => file.path !== `${global.config}/AGENTS.md`),
+    ).toBe(true)
+    yield* client.setEnabled({
+      scope: "global",
+      kind: "instruction",
+      id: `${global.config}/AGENTS.md`,
+      enabled: true,
+      expectedRevision: 1,
+    })
     const disabled = yield* client.setEnabled({ kind: "skill", id: "guide", enabled: false, expectedRevision: 0 })
     expect(disabled.revision).toBe(1)
     expect(disabled.items.find((item) => item.id === "guide")?.effective).toBe("disabled")
@@ -302,6 +327,11 @@ live.live("controls apply native configuration through real config plugins and f
         await fs.mkdir(global, { recursive: true })
         await fs.mkdir(path.dirname(projectConfig), { recursive: true })
         await Bun.write(path.join(global, "writer.txt"), "Global prompt")
+        await fs.mkdir(path.join(global, "skill", "shared"), { recursive: true })
+        await Bun.write(
+          path.join(global, "skill", "shared", "SKILL.md"),
+          "---\nname: Shared\ndescription: Shared globally\n---\nShared skill\n",
+        )
         await Bun.write(
           globalConfig,
           JSON.stringify({
@@ -333,6 +363,7 @@ live.live("controls apply native configuration through real config plugins and f
             const plugins = yield* Plugin.Service
             const rpc = yield* Rpc.Service
             const agents = yield* Agent.Service
+            const skills = yield* Skill.Service
             const config = yield* Config.Service
             expect(
               (yield* config.entries()).filter((entry) => entry.type === "document").map((entry) => entry.path),
@@ -400,6 +431,65 @@ live.live("controls apply native configuration through real config plugins and f
               origin: "global",
               source: globalConfig,
             })
+            const globalState = yield* client.getState({ scope: "global" })
+            expect(globalState.items).toEqual(
+              expect.arrayContaining([
+                expect.objectContaining({ kind: "agent", id: "writer", origin: "global" }),
+                expect.objectContaining({ kind: "mcp", id: "remote", origin: "global" }),
+                expect.objectContaining({ kind: "skill", id: "shared", origin: "global" }),
+              ]),
+            )
+            expect(globalState.items.some((item) => item.id === "builder" || item.kind === "tool")).toBe(false)
+            yield* client.setEnabled({
+              scope: "global",
+              kind: "skill",
+              id: "shared",
+              enabled: false,
+              expectedRevision: 0,
+            })
+            expect(yield* skills.get(Skill.ID.make("shared"))).toBeUndefined()
+            expect(
+              (yield* client.getState({})).items.find((item) => item.kind === "skill" && item.id === "shared"),
+            ).toMatchObject({ effective: "disabled", mutable: false, reason: "disabled_globally" })
+            yield* client.setEnabled({
+              scope: "global",
+              kind: "skill",
+              id: "shared",
+              enabled: true,
+              expectedRevision: 1,
+            })
+            expect(yield* skills.get(Skill.ID.make("shared"))).toBeDefined()
+            yield* client.setEnabled({
+              scope: "global",
+              kind: "agent",
+              id: "writer",
+              enabled: false,
+              expectedRevision: 2,
+            })
+            yield* waitUntil(
+              "globally disabled writer",
+              agents.get(Agent.ID.make("writer")).pipe(Effect.map((agent) => agent === undefined)),
+            )
+            expect(
+              (yield* client.getState({})).items.find((item) => item.kind === "agent" && item.id === "writer"),
+            ).toMatchObject({ effective: "disabled", mutable: false, reason: "disabled_globally" })
+            yield* client.setEnabled({
+              scope: "global",
+              kind: "agent",
+              id: "writer",
+              enabled: true,
+              expectedRevision: 3,
+            })
+            yield* waitUntil(
+              "globally enabled writer",
+              client.getState({ scope: "global" }).pipe(
+                Effect.map((state) => {
+                  const writer = state.items.find((item) => item.kind === "agent" && item.id === "writer")
+                  return writer?.application === "applied" && writer.effective === "enabled"
+                }),
+                Effect.orDie,
+              ),
+            )
 
             const configuration = yield* client.getConfiguration({ scope: "project" })
             expect(configuration.instructionExists).toBe(false)
@@ -444,7 +534,13 @@ live.live("controls apply native configuration through real config plugins and f
             yield* client.setEnabled({ kind: "agent", id: "writer", enabled: true, expectedRevision: 1 })
             yield* waitUntil(
               "writer re-enabled",
-              agents.get(Agent.ID.make("writer")).pipe(Effect.map((agent) => agent !== undefined)),
+              client.getState({}).pipe(
+                Effect.map((state) => {
+                  const writer = state.items.find((item) => item.kind === "agent" && item.id === "writer")
+                  return writer?.application === "applied" && writer.effective === "enabled"
+                }),
+                Effect.orDie,
+              ),
             )
             expect(yield* agents.get(Agent.ID.make("writer"))).toMatchObject({ system: "Global prompt" })
             expect(

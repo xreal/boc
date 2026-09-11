@@ -22,7 +22,7 @@ export const Policy = Schema.Struct({
 export interface Policy extends Schema.Schema.Type<typeof Policy> {}
 export const Origin = Schema.Literals(["system", "global", "project", "plugin"])
 export const Info = Schema.Struct({
-  protocol: Schema.Literal(1),
+  protocol: Schema.Literal(2),
   version: Schema.String,
   project: Schema.Struct({ id: Schema.String, canonical: Schema.String }),
   location: Schema.Struct({ directory: Schema.String, workspaceID: optional(Schema.String) }),
@@ -56,6 +56,7 @@ export const Item = Schema.Struct({
       "apply_failed",
       "unconfirmed_policy",
       "observed_tools",
+      "disabled_globally",
     ]),
   ),
   effect: Schema.Literals([
@@ -100,6 +101,7 @@ const Target = Schema.Struct({
   kind: Kind,
   id: Schema.String.check(Schema.isMinLength(1)),
   expectedRevision: Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+  scope: optional(ConfigurationScope),
 })
 const schema = Schema.toStandardSchemaV1
 const errors = {
@@ -115,7 +117,7 @@ export const Rpc = {
   id: "boc.controls.v1",
   methods: {
     info: { input: schema(Schema.Struct({})), output: schema(Info) },
-    getState: { input: schema(Schema.Struct({})), output: schema(State), errors },
+    getState: { input: schema(Schema.Struct({ scope: optional(ConfigurationScope) })), output: schema(State), errors },
     getConfiguration: {
       input: schema(Schema.Struct({ scope: ConfigurationScope })),
       output: schema(Configuration),
