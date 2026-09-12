@@ -1,4 +1,4 @@
-export type JiraReadScope = "board" | "issue"
+export type JiraReadScope = "board" | "issue" | "issue-statuses" | "comments" | "assignees" | "pull-requests"
 
 export function createJiraReadCoordinator() {
   const active = new Map<JiraReadScope, { requestId: string; controller: AbortController }>()

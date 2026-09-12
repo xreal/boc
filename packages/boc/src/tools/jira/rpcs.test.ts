@@ -65,6 +65,7 @@ describe("Jira RPC success schemas", () => {
         id: "10001",
         key: "PLAT-1",
         summary: "Safe summary",
+        assignee: null,
         labels: [],
         url: "https://acme.atlassian.net/browse/PLAT-1",
         token: TOKEN_FIXTURE,
@@ -79,6 +80,7 @@ describe("Jira RPC success schemas", () => {
         id: "10001",
         key: "PLAT-1",
         summary: "Safe summary",
+        assignee: null,
         labels: [],
         url: "https://acme.atlassian.net/browse/PLAT-1",
       },
@@ -88,6 +90,11 @@ describe("Jira RPC success schemas", () => {
 
   test("registers connection and read-only board operations", () => {
     expect([...JiraRpcs.requests.keys()]).toEqual([
+      "BocJiraListComments",
+      "BocJiraSearchAssignees",
+      "BocJiraAssignIssue",
+      "BocJiraListPullRequests",
+      "BocJiraCancelIssueResourceRead",
       "BocJiraGetSessionInstructions",
       "BocJiraSaveSessionInstructions",
       "BocJiraListSessionLinks",
@@ -101,6 +108,7 @@ describe("Jira RPC success schemas", () => {
       "BocJiraGetBoard",
       "BocJiraListIssues",
       "BocJiraGetIssue",
+      "BocJiraListIssueStatuses",
       "BocJiraCancelBoardRead",
       "BocJiraCancelIssueRead",
       "BocJiraGetPreferences",

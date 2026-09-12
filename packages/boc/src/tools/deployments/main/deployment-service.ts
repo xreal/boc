@@ -49,8 +49,10 @@ import {
   autoSyncEntrypoint,
   autoSyncCapability,
   createDeploymentReadiness,
+  resolveDevenvRoot,
   validateDeploymentSettings,
   type DeploymentFileExists,
+  type DeploymentFindDevenvRoot,
 } from "./readiness"
 import {
   normalizeDeploymentSettings,
@@ -72,6 +74,7 @@ export type DeploymentRuntime = {
   now?: () => number
   createId?: () => string
   fileExists?: DeploymentFileExists
+  findDevenvRoot?: DeploymentFindDevenvRoot
   runCache?: (environment: AllowedDevEnvironment, onUpdate: (snapshot: CacheRunSnapshot) => void) => void
   notifyFinished?: (operation: DeploymentOperationSummary) => void
 }
@@ -229,7 +232,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const readFresh = async (settings: DeploymentSettings, targetGeneration: number, signal: AbortSignal) => {
     const [argoResult, autoSync, githubResult] = await Promise.all([
       readArgoFleet(argo, settings, signal),
-      autoSyncCapability(settings, runtime.fileExists),
+      autoSyncCapability(settings, runtime.fileExists, runtime.findDevenvRoot),
       githubReadiness(github, signal),
     ])
     const readiness = createDeploymentReadiness({
@@ -770,14 +773,14 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       changingAutoSync.add(input.environment)
       try {
         const settings = readDeploymentSettings(runtime.store)
-        const devenvPath = settings.devenvPath
+        const devenvPath = await resolveDevenvRoot(settings, runtime.findDevenvRoot)
         if (!devenvPath) {
           return deploymentFailure("invalid-input", {
             capability: "bf_deploy_auto_sync",
             context: { field: "devenvPath" },
           })
         }
-        const entrypoint = await autoSyncEntrypoint(settings, runtime.fileExists)
+        const entrypoint = await autoSyncEntrypoint(devenvPath, runtime.fileExists)
         if (!entrypoint) {
           return deploymentFailure("not-found", {
             capability: "bf_deploy_auto_sync",

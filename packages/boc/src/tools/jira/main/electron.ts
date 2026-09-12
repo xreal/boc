@@ -2,6 +2,7 @@ import Store from "electron-store"
 import { app, safeStorage } from "electron"
 import { createJiraHandlers, type JiraRuntime } from "./handlers"
 import { JIRA_STORE_NAME } from "./store"
+import { createDeploymentCommandRunner } from "../../deployments/main/command-runner"
 
 let file: Store | undefined
 
@@ -17,6 +18,7 @@ function getStore() {
 }
 
 const electronJiraRuntime: JiraRuntime = {
+  run: createDeploymentCommandRunner(),
   store: {
     readSessionInstructions: () => getStore().get("sessionInstructions"),
     writeSessionInstructions: (value) => getStore().set("sessionInstructions", value),

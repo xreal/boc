@@ -8,22 +8,18 @@ import {
   configurationFilterId,
   configurationName,
   configurationSubQuery,
-  isJiraIssueKey,
   mapJiraBoardIssue,
   mapJiraBoardSummary,
-  mapJiraIssueDetail,
   mapJiraSprint,
   selectableSprints,
   storyPointFieldIds,
   type JiraBoardIssue,
   type JiraBoardSummary,
   type JiraBoardView,
-  type JiraIssueDetail,
   type JiraSprintSummary,
 } from "../domain/board"
 import { failJira, type JiraClientFailure } from "../domain/errors"
-import type { JiraCloudOrigin } from "../domain/site"
-import { decodeUnknownJson, jiraRequest, type JiraFetch, type JiraWait } from "./client"
+import { decodeUnknownJson, jiraRequest, type JiraAuth } from "./client"
 
 const BOARD_PAGE_SIZE = 50
 const MAX_BOARD_PAGES = 40
@@ -32,7 +28,6 @@ const MAX_SPRINT_PAGES = 40
 const ISSUE_PAGE_SIZE = 100
 const MAX_ISSUE_PAGES = 50
 const ISSUE_FIELDS = ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated"]
-const ISSUE_DETAIL_FIELDS = [...ISSUE_FIELDS, "description", "reporter"]
 
 const AgilePage = Schema.Struct({
   isLast: Schema.optionalKey(Schema.Boolean),
@@ -49,15 +44,6 @@ const SearchPage = Schema.Struct({
 
 const decodeAgilePage = Schema.decodeUnknownOption(Schema.fromJsonString(AgilePage))
 const decodeSearchPage = Schema.decodeUnknownOption(Schema.fromJsonString(SearchPage))
-
-export type JiraAuth = {
-  origin: JiraCloudOrigin
-  email: string
-  token: string
-  fetch: JiraFetch
-  signal?: AbortSignal
-  wait?: JiraWait
-}
 
 export async function fetchJiraBoards(auth: JiraAuth): Promise<{ ok: true; boards: JiraBoardSummary[] } | JiraClientFailure> {
   const boards: JiraBoardSummary[] = []
@@ -226,26 +212,6 @@ export async function fetchJiraIssuesByJql(
   }
 
   return { ok: true, issues }
-}
-
-export async function fetchJiraIssue(
-  auth: JiraAuth,
-  issueKey: string,
-): Promise<{ ok: true; issue: JiraIssueDetail } | JiraClientFailure> {
-  const key = issueKey.trim()
-  if (!isJiraIssueKey(key)) return failJira("malformed")
-
-  const result = await jiraRequest({
-    ...auth,
-    path: `/rest/api/3/issue/${encodeURIComponent(key)}`,
-    query: { fields: ISSUE_DETAIL_FIELDS.join(",") },
-    retry: "safe-read",
-  })
-  if (!result.ok) return result
-
-  const issue = mapJiraIssueDetail(decodeUnknown(result.text), auth.origin.origin)
-  if (!issue) return failJira("malformed")
-  return { ok: true, issue }
 }
 
 function sprintFailureAsEmpty(type: "scrum" | "kanban", failure: JiraClientFailure) {

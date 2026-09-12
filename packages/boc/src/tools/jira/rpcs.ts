@@ -1,13 +1,21 @@
 import { Schema } from "effect"
 import { JiraSessionLink, JiraSessionInstructions } from "./domain/sessions"
 import { Rpc, RpcGroup } from "effect/unstable/rpc"
+import { JiraBoardIssue, JiraBoardSummary, JiraBoardView, JiraPreferences } from "./domain/board"
 import {
-  JiraBoardIssue,
-  JiraBoardSummary,
-  JiraBoardView,
   JiraIssueDetail,
-  JiraPreferences,
-} from "./domain/board"
+  JiraIssueKey,
+  JiraIssueUser,
+  JiraComment,
+  JiraCommentPage,
+  JiraMutationFailure,
+  JiraAccountId,
+  JiraPageOffset,
+  JiraIssueStatus,
+  JIRA_ISSUE_STATUS_BATCH_SIZE,
+} from "./domain/issue"
+import { JiraPullRequest, JiraPullRequestFailure } from "./domain/pull-request"
+export { JiraIssueDetail, JiraIssueStatus } from "./domain/issue"
 
 export {
   JiraBoardColumn,
@@ -15,7 +23,6 @@ export {
   JiraBoardSummary,
   JiraBoardType,
   JiraBoardView,
-  JiraIssueDetail,
   JiraPreferences,
   JiraSprintSummary,
 } from "./domain/board"
@@ -107,9 +114,15 @@ export type JiraBoardIssuesInput = typeof JiraBoardIssuesInput.Type
 
 export const JiraIssueKeyInput = Schema.Struct({
   requestId: JiraReadRequestId,
-  issueKey: Schema.String,
+  issueKey: JiraIssueKey,
 })
 export type JiraIssueKeyInput = typeof JiraIssueKeyInput.Type
+
+export const JiraIssueStatusesInput = Schema.Struct({
+  requestId: JiraReadRequestId,
+  issueKeys: Schema.Array(JiraIssueKey).check(Schema.isMinLength(1), Schema.isMaxLength(JIRA_ISSUE_STATUS_BATCH_SIZE)),
+})
+export type JiraIssueStatusesInput = typeof JiraIssueStatusesInput.Type
 
 export const JiraBoardsResult = Schema.Union([
   Schema.Struct({
@@ -147,6 +160,62 @@ export const JiraIssueResult = Schema.Union([
 ])
 export type JiraIssueResult = typeof JiraIssueResult.Type
 
+export const JiraIssueStatusesResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), statuses: Schema.Array(JiraIssueStatus) }),
+  JiraConnectionFailure,
+])
+export type JiraIssueStatusesResult = typeof JiraIssueStatusesResult.Type
+
+export const JiraCommentsResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), page: JiraCommentPage }),
+  JiraConnectionFailure,
+])
+export type JiraCommentsResult = typeof JiraCommentsResult.Type
+export const JiraAddCommentResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), comment: JiraComment }),
+  JiraMutationFailure,
+])
+export type JiraAddCommentResult = typeof JiraAddCommentResult.Type
+export const JiraAssigneesResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), users: Schema.Array(JiraIssueUser) }),
+  JiraConnectionFailure,
+])
+export type JiraAssigneesResult = typeof JiraAssigneesResult.Type
+export const JiraAssignResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), issue: JiraIssueDetail }),
+  Schema.Struct({ ...JiraMutationFailure.fields, issue: Schema.optionalKey(JiraIssueDetail) }),
+])
+export type JiraAssignResult = typeof JiraAssignResult.Type
+export const JiraPullRequestsResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), requests: Schema.Array(JiraPullRequest), searchUrl: Schema.String }),
+  JiraPullRequestFailure,
+])
+export type JiraPullRequestsResult = typeof JiraPullRequestsResult.Type
+
+export const BocJiraListComments = Rpc.make("BocJiraListComments", {
+  payload: { ...JiraIssueKeyInput.fields, startAt: JiraPageOffset },
+  success: JiraCommentsResult,
+})
+export const BocJiraSearchAssignees = Rpc.make("BocJiraSearchAssignees", {
+  payload: { ...JiraIssueKeyInput.fields, query: Schema.String.check(Schema.isMaxLength(255)) },
+  success: JiraAssigneesResult,
+})
+export const BocJiraAssignIssue = Rpc.make("BocJiraAssignIssue", {
+  payload: { issueKey: JiraIssueKey, accountId: Schema.NullOr(JiraAccountId) },
+  success: JiraAssignResult,
+})
+export const BocJiraListPullRequests = Rpc.make("BocJiraListPullRequests", {
+  payload: { ...JiraIssueKeyInput.fields, refresh: Schema.Boolean },
+  success: JiraPullRequestsResult,
+})
+export const BocJiraCancelIssueResourceRead = Rpc.make("BocJiraCancelIssueResourceRead", {
+  payload: {
+    requestId: JiraReadRequestId,
+    resource: Schema.Literals(["comments", "assignees", "pull-requests", "issue-statuses"]),
+  },
+  success: Schema.Void,
+})
+
 export const BocJiraGetConnectionStatus = Rpc.make("BocJiraGetConnectionStatus", {
   success: JiraConnectionStatus,
 })
@@ -183,6 +252,11 @@ export const BocJiraListIssues = Rpc.make("BocJiraListIssues", {
 export const BocJiraGetIssue = Rpc.make("BocJiraGetIssue", {
   payload: JiraIssueKeyInput,
   success: JiraIssueResult,
+})
+
+export const BocJiraListIssueStatuses = Rpc.make("BocJiraListIssueStatuses", {
+  payload: JiraIssueStatusesInput,
+  success: JiraIssueStatusesResult,
 })
 
 export const BocJiraCancelBoardRead = Rpc.make("BocJiraCancelBoardRead", {
@@ -229,6 +303,11 @@ export const BocJiraSaveSessionInstructions = Rpc.make("BocJiraSaveSessionInstru
 })
 
 export const JiraRpcs = RpcGroup.make(
+  BocJiraListComments,
+  BocJiraSearchAssignees,
+  BocJiraAssignIssue,
+  BocJiraListPullRequests,
+  BocJiraCancelIssueResourceRead,
   BocJiraGetSessionInstructions,
   BocJiraSaveSessionInstructions,
   BocJiraListSessionLinks,
@@ -242,6 +321,7 @@ export const JiraRpcs = RpcGroup.make(
   BocJiraGetBoard,
   BocJiraListIssues,
   BocJiraGetIssue,
+  BocJiraListIssueStatuses,
   BocJiraCancelBoardRead,
   BocJiraCancelIssueRead,
   BocJiraGetPreferences,

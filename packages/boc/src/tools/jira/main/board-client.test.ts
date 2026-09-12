@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
-import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchJiraIssue } from "./board-client"
+import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards } from "./board-client"
+import { fetchJiraIssue } from "./issue-client"
 import { parseJiraCloudSite } from "../domain/site"
 import { containsSecret } from "../domain/errors"
 import {
@@ -114,7 +115,11 @@ describe("Jira board client", () => {
         summary: "Render the Jira board",
         description: "Show the board columns.",
         statusName: "To Do",
-        assigneeName: "Mia Krystof",
+        assignee: {
+          accountId: "account-owner",
+          displayName: "Mia Krystof",
+          avatarUrl: "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
+        },
         reporterName: "Ada Lovelace",
         issueTypeName: "Story",
         priorityName: "Medium",

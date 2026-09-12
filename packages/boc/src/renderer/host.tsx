@@ -1,4 +1,4 @@
-import { createContext, useContext, type ParentProps } from "solid-js"
+import { createContext, useContext, type Component, type ParentProps } from "solid-js"
 
 import type { ControlsHost } from "../tools/controls/host"
 
@@ -11,7 +11,11 @@ export type BocTerminalInput = {
 export type BocHost = {
   controls?: ControlsHost
   terminal?: {
+    Panel: Component
     open(input: BocTerminalInput): void
+    close(): void
+    opened(): boolean
+    placement(): "side" | "bottom"
   }
   sessions?: {
     projects(): { server: string; directory: string; label: string }[]

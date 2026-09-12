@@ -48,6 +48,11 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
         invoke("BocDeploymentsResolveCacheRun", input),
     },
     jira: {
+      listComments: (input: BocDesktopInvokeArgs<"BocJiraListComments">[0]) => invoke("BocJiraListComments", input),
+      searchAssignees: (input: BocDesktopInvokeArgs<"BocJiraSearchAssignees">[0]) => invoke("BocJiraSearchAssignees", input),
+      assignIssue: (input: BocDesktopInvokeArgs<"BocJiraAssignIssue">[0]) => invoke("BocJiraAssignIssue", input),
+      listPullRequests: (input: BocDesktopInvokeArgs<"BocJiraListPullRequests">[0]) => invoke("BocJiraListPullRequests", input),
+      cancelIssueResourceRead: (input: BocDesktopInvokeArgs<"BocJiraCancelIssueResourceRead">[0]) => invoke("BocJiraCancelIssueResourceRead", input),
       getSessionInstructions: () => invoke("BocJiraGetSessionInstructions"),
       saveSessionInstructions: (input: BocDesktopInvokeArgs<"BocJiraSaveSessionInstructions">[0]) =>
         invoke("BocJiraSaveSessionInstructions", input),
@@ -67,6 +72,8 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
       getBoard: (input: BocDesktopInvokeArgs<"BocJiraGetBoard">[0]) => invoke("BocJiraGetBoard", input),
       listIssues: (input: BocDesktopInvokeArgs<"BocJiraListIssues">[0]) => invoke("BocJiraListIssues", input),
       getIssue: (input: BocDesktopInvokeArgs<"BocJiraGetIssue">[0]) => invoke("BocJiraGetIssue", input),
+      listIssueStatuses: (input: BocDesktopInvokeArgs<"BocJiraListIssueStatuses">[0]) =>
+        invoke("BocJiraListIssueStatuses", input),
       cancelBoardRead: (input: BocDesktopInvokeArgs<"BocJiraCancelBoardRead">[0]) =>
         invoke("BocJiraCancelBoardRead", input),
       cancelIssueRead: (input: BocDesktopInvokeArgs<"BocJiraCancelIssueRead">[0]) =>

@@ -23,7 +23,7 @@ describe("cache runner", () => {
     expect(command).toEqual([
       "ssh", "-tt", "-o", "BatchMode=yes", "-o", "StrictHostKeyChecking=yes", "-o", "ConnectTimeout=15",
       "-o", "ServerAliveInterval=15", "-o", "ServerAliveCountMax=3",
-      "admin.dev.gcp-www", "cd /var/www/dev-02.bergfreunde.de/shop/tools/ && ./flush-cache.sh --full --hard",
+      "bergfreunde@adminserver.dev.bergfreunde.io", "cd /var/www/dev-02.bergfreunde.de/shop/tools/ && ./flush-cache.sh --full --hard",
     ])
     expect(snapshots.at(-1)).toMatchObject({ state: "succeeded" })
     expect(snapshots.at(-1)?.output).toContain("€\n")

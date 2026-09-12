@@ -1,9 +1,18 @@
 import { Option, Schema } from "effect"
 import { failJira, jiraErrorFromHttpStatus, readRetryAfterSeconds, type JiraClientFailure } from "../domain/errors"
 import { isAllowedJiraCloudUrl, type JiraCloudOrigin } from "../domain/site"
+import type { JiraMutationFailure } from "../domain/issue"
 
 export type JiraFetch = (input: string | URL, init?: RequestInit) => Promise<Response>
 export type JiraWait = (milliseconds: number, signal?: AbortSignal) => Promise<void>
+export type JiraAuth = {
+  origin: JiraCloudOrigin
+  email: string
+  token: string
+  fetch: JiraFetch
+  signal?: AbortSignal
+  wait?: JiraWait
+}
 
 export type JiraUser = {
   accountId: string
@@ -45,21 +54,29 @@ export async function fetchJiraMyself(input: {
   return { ok: true, user }
 }
 
-export async function jiraRequest(input: {
+type JiraRequestInput = {
   origin: JiraCloudOrigin
   email: string
   token: string
   fetch: JiraFetch
   path: string
-  method?: "GET" | "POST"
+  method?: "GET" | "POST" | "PUT"
   query?: Record<string, string | number | undefined>
   body?: unknown
-  retry?: "safe-read"
+  retry?: "safe-read" | "write"
   signal?: AbortSignal
   wait?: JiraWait
-}): Promise<JiraTextResult> {
+}
+
+export function jiraRequest(
+  input: JiraRequestInput & { retry: "write" },
+): Promise<{ ok: true; text: string } | JiraMutationFailure>
+export function jiraRequest(input: JiraRequestInput): Promise<JiraTextResult>
+export async function jiraRequest(input: JiraRequestInput): Promise<JiraTextResult | JiraMutationFailure> {
+  const failure = (category: JiraClientFailure["category"], outcome: JiraMutationFailure["outcome"]) =>
+    input.retry === "write" ? { ...failJira(category), outcome } : failJira(category)
   const request = jiraUrl(input.origin, input.path, input.query)
-  if (!request || !isAllowedJiraCloudUrl(input.origin, request)) return failJira("invalid-site")
+  if (!request || !isAllowedJiraCloudUrl(input.origin, request)) return failure("invalid-site", "rejected")
 
   const headers: Record<string, string> = {
     Accept: "application/json",
@@ -68,22 +85,25 @@ export async function jiraRequest(input: {
   if (input.body !== undefined) headers["Content-Type"] = "application/json"
 
   for (let attempt = 0; attempt <= MAX_SAFE_READ_RETRIES; attempt++) {
-    if (input.signal?.aborted) return failJira("network")
+    if (input.signal?.aborted) return failure("network", "rejected")
     const response = await input
       .fetch(request, {
         method: input.method ?? "GET",
         headers,
         redirect: "error",
-        signal: input.signal,
+        signal: input.retry === "write" ? AbortSignal.timeout(30_000) : input.signal,
         ...(input.body !== undefined ? { body: JSON.stringify(input.body) } : {}),
       })
       .then(
         (value) => value,
         () => undefined,
       )
-    if (!response) return failJira("network")
+    if (!response) return failure("network", "unknown")
 
     const result = await readJiraResponse(response)
+    if (input.retry === "write" && !result.ok) {
+      return failure(result.category, response.status >= 400 && response.status < 500 ? "rejected" : "unknown")
+    }
     if (result.ok || result.category !== "rate-limit") return result
     if (input.retry !== "safe-read" || attempt === MAX_SAFE_READ_RETRIES) return result
     if (result.retryAfterSeconds === undefined || result.retryAfterSeconds > MAX_RETRY_AFTER_SECONDS) return result

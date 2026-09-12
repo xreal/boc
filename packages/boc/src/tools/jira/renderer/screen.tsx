@@ -16,9 +16,9 @@ import {
   type JiraBoardLane,
   type JiraBoardSummary,
   type JiraBoardView,
-  type JiraIssueDetail,
   type JiraPreferences,
 } from "../domain/board"
+import type { JiraIssueDetail } from "../domain/issue"
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
 import {
   deploymentTicketKey,
@@ -33,6 +33,7 @@ import { JiraPickBoardDialog } from "./pick-board"
 import { JiraSettingsDialog } from "./settings"
 import { jiraBoardMessage, jiraBoardSurface } from "./surface"
 import { JiraBoardHeader, JiraBoardToolbar } from "./toolbar"
+import { createJiraAssignments } from "./assignments"
 
 type BoardLoadOptions = {
   request?: LatestRequest
@@ -69,6 +70,14 @@ export default function JiraScreen(props: BocScreenProps) {
   })
 
   if (!desktop) return null
+
+  const assignments = createJiraAssignments(desktop.jira, (issueUrl, assignee) => {
+    setView("issues", (issue) => issue.url === issueUrl, {
+      assigneeName: assignee?.displayName,
+      assigneeAvatarUrl: assignee?.avatarUrl,
+    })
+    if (view.issue?.url === issueUrl) setView("issue", (issue) => issue ? { ...issue, assignee } : issue)
+  })
 
   const filtered = () =>
     filterIssuesByLane(
@@ -346,7 +355,7 @@ export default function JiraScreen(props: BocScreenProps) {
     const syncWide = () => setView("wide", wide.matches)
     const syncOnline = () => setView("online", navigator.onLine)
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== "Escape" || !view.selectedIssueKey) return
+      if (event.defaultPrevented || event.key !== "Escape" || !view.selectedIssueKey) return
       closeInspector()
     }
     syncWide()
@@ -430,6 +439,9 @@ export default function JiraScreen(props: BocScreenProps) {
           />
           <Show when={view.selectedIssueKey}>
             <JiraIssueInspector
+              api={desktop.jira}
+              assignments={assignments}
+              online={view.online}
               t={t}
               locale={props.host.locale()}
               issueKey={view.selectedIssueKey!}

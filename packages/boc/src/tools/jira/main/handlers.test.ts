@@ -33,6 +33,7 @@ function runtime(overrides?: Partial<JiraRuntime> & { encryptionAvailable?: bool
     vault: overrides?.vault ?? memoryVault(overrides?.encryptionAvailable ?? true),
     fetch: overrides?.fetch ?? fetchScript(() => myselfSuccessResponse()),
     wait: overrides?.wait ?? (async () => undefined),
+    now: overrides?.now,
   }
 }
 
@@ -226,6 +227,58 @@ describe("Jira connection handlers", () => {
 })
 
 describe("Jira board handlers", () => {
+  test("caches issue statuses for sixty seconds and batches uncached keys", async () => {
+    const vault = memoryVault()
+    const store = memoryJiraStore({
+      site: SITE_FIXTURE,
+      email: EMAIL_FIXTURE,
+      displayName: "Mia Krystof",
+      tokenCiphertext: sealToken(vault, TOKEN_FIXTURE)!,
+    })
+    let now = 0
+    let statusReads = 0
+    const jira = runtime({
+      store,
+      vault,
+      now: () => now,
+      fetch: fetchScript((url) => {
+        if (url.pathname !== "/rest/api/3/search/jql") return jsonResponse(404, {})
+        statusReads += 1
+        return jsonResponse(200, {
+          issues: [
+            { key: "SHOP-617", fields: { status: { name: "Open" } } },
+            { key: "PLAT-1", fields: { status: { name: "In progress" } } },
+          ],
+        })
+      }),
+    })
+
+    const result = await runJira(
+      jira,
+      Effect.gen(function* () {
+        const client = yield* RpcTest.makeClient(JiraRpcs)
+        const first = yield* client.BocJiraListIssueStatuses({
+          requestId: "status-first",
+          issueKeys: ["SHOP-617", "PLAT-1"],
+        })
+        const cached = yield* client.BocJiraListIssueStatuses({
+          requestId: "status-cached",
+          issueKeys: ["SHOP-617", "PLAT-1"],
+        })
+        now = 60_000
+        const expired = yield* client.BocJiraListIssueStatuses({
+          requestId: "status-expired",
+          issueKeys: ["SHOP-617", "PLAT-1"],
+        })
+        return { first, cached, expired }
+      }),
+    )
+
+    expect(statusReads).toBe(2)
+    expect(result.first).toEqual(result.cached)
+    expect(result.expired).toEqual(result.first)
+  })
+
   test("lists boards and issues from a stored connection without returning the token", async () => {
     const vault = memoryVault()
     const store = memoryJiraStore({

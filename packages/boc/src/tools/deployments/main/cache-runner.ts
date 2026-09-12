@@ -1,5 +1,5 @@
 import { StringDecoder } from "node:string_decoder"
-import { DEPLOYMENT_ADMIN_HOST, deploymentAdminDirectory } from "../domain/admin-server"
+import { DEPLOYMENT_ADMIN_TARGET, deploymentAdminDirectory } from "../domain/admin-server"
 import type { AllowedDevEnvironment } from "../domain/environments"
 import { spawnDeploymentStream } from "./command-runner"
 
@@ -38,7 +38,7 @@ export function createCacheRunner(launch: CacheSpawn = spawnDeploymentStream) {
       "ServerAliveInterval=15",
       "-o",
       "ServerAliveCountMax=3",
-      DEPLOYMENT_ADMIN_HOST,
+      DEPLOYMENT_ADMIN_TARGET,
       `cd ${deploymentAdminDirectory(environment)}/shop/tools/ && ./flush-cache.sh --full --hard`,
     ] as const
     const startedAt = new Date().toISOString()

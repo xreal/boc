@@ -3,6 +3,11 @@ import { BocDesktopRpcs } from "@boc/extensions/desktop/shared"
 import { DesktopRpcs } from "../shared/ipc-rpc"
 
 const jiraTags = [
+  "BocJiraListComments",
+  "BocJiraSearchAssignees",
+  "BocJiraAssignIssue",
+  "BocJiraListPullRequests",
+  "BocJiraCancelIssueResourceRead",
   "BocJiraGetSessionInstructions",
   "BocJiraSaveSessionInstructions",
   "BocJiraListSessionLinks",
@@ -16,6 +21,7 @@ const jiraTags = [
   "BocJiraGetBoard",
   "BocJiraListIssues",
   "BocJiraGetIssue",
+  "BocJiraListIssueStatuses",
   "BocJiraCancelBoardRead",
   "BocJiraCancelIssueRead",
   "BocJiraGetPreferences",

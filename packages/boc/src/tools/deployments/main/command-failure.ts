@@ -20,7 +20,7 @@ export function deploymentCommandFailure(
   if (/forbidden|permission denied|access denied|http\s*403/.test(diagnostic)) {
     return deploymentFailure("permission", { capability })
   }
-  if (/not found|http\s*404/.test(diagnostic)) {
+  if (/not found|could not find|http\s*404/.test(diagnostic)) {
     return deploymentFailure("not-found", { capability })
   }
   if (/connection refused|network|no such host|timed out/.test(diagnostic)) {

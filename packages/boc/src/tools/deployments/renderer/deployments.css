@@ -28,6 +28,17 @@
   min-width: 12rem;
 }
 
+[data-boc-deployments-table] [data-deployment-column="sync"],
+[data-boc-deployments-table] [data-deployment-column="health"] {
+  width: 4.5rem;
+  min-width: 4.5rem;
+  max-width: 4.5rem;
+}
+
+[data-boc-deployments-table] [data-deployment-column="ticket-status"] {
+  min-width: 8rem;
+}
+
 [data-boc-deployments-table] [data-deployment-column="actions"] {
   width: 9.5rem;
 }
@@ -52,7 +63,8 @@
 }
 
 @container boc-deployments (max-width: 43.99rem) {
-  [data-deployment-column="ticket"] {
+  [data-deployment-column="ticket"],
+  [data-deployment-column="ticket-status"] {
     display: none;
   }
 }

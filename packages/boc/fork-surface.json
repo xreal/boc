@@ -18,6 +18,10 @@
   ],
   "approved": [
     {
+      "path": "packages/ui/src/components/popover.tsx",
+      "reason": "Expose the optional Kobalte autofocus hook for the Jira assignee search field"
+    },
+    {
       "path": "packages/storybook/.storybook/mocks/app/context/layout.ts",
       "reason": "Supply the current route to the real settings-surface provider used by Boc environment stories"
     },
@@ -64,10 +68,6 @@
     {
       "path": "packages/app/src/session/header/session-header.tsx",
       "reason": "Mount the Boc environment control inside the existing right titlebar slot"
-    },
-    {
-      "path": "packages/app/src/session/terminal/context.tsx",
-      "reason": "Allow the Boc session bridge to create a normal workspace terminal with an explicit command"
     },
     {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",

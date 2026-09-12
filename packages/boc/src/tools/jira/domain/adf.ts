@@ -1,3 +1,5 @@
+import { adfEmoji, replaceEmojiShortcodes } from "./emoji"
+
 export function adfToMarkdown(value: unknown): string | undefined {
   if (typeof value === "string") {
     const trimmed = value.trim()
@@ -74,7 +76,7 @@ function renderBlock(value: unknown, tight = false): string {
   if (type === "mediaInline") return mediaMarkdown(value, true)
   if (type === "hardBreak") return "\n"
   if (type === "mention") return mention(attrs)
-  if (type === "emoji") return text(attrs?.text) ?? text(attrs?.shortName) ?? ""
+  if (type === "emoji") return escapeMarkdown(adfEmoji(attrs))
   if (type === "inlineCard" || type === "blockCard" || type === "embedCard") return card(attrs)
   if (type === "status") {
     const label = text(attrs?.text)
@@ -93,7 +95,7 @@ function renderInline(value: unknown): string {
   if (value.type === "mention") return mention(isRecord(value.attrs) ? value.attrs : undefined)
   if (value.type === "emoji") {
     const attrs = isRecord(value.attrs) ? value.attrs : undefined
-    return text(attrs?.text) ?? text(attrs?.shortName) ?? ""
+    return escapeMarkdown(adfEmoji(attrs))
   }
   if (value.type === "inlineCard") return card(isRecord(value.attrs) ? value.attrs : undefined)
   if (value.type === "mediaInline" || value.type === "image" || value.type === "media") {
@@ -194,12 +196,16 @@ function mediaFileName(attrs: Record<string, unknown> | undefined) {
 function applyMarks(raw: string, marks: unknown) {
   const list = Array.isArray(marks) ? marks.filter(isRecord) : []
   if (list.some((mark) => mark.type === "code")) return `\`${raw.replace(/`/g, "\\`")}\``
-  let result = escapeMarkdown(raw)
+  let result = escapeMarkdown(replaceEmojiShortcodes(raw))
   if (list.some((mark) => mark.type === "strong")) result = `**${result}**`
   if (list.some((mark) => mark.type === "em")) result = `*${result}*`
   if (list.some((mark) => mark.type === "strike")) result = `~~${result}~~`
   const href = linkHref(list)
   if (href) result = `[${result}](${href})`
+  const colorMark = list.find((mark) => mark.type === "textColor")
+  const color = isRecord(colorMark?.attrs) ? text(colorMark.attrs.color) : undefined
+  // Markdown has no text-color mark; retain it as a narrowly supported inline span.
+  if (color && /^#[\da-f]{6}$/i.test(color)) result = `<span style="color:${color}">${result}</span>`
   return result
 }
 
@@ -236,6 +242,7 @@ function collectPlain(value: unknown): string {
   if (Array.isArray(value)) return value.map(collectPlain).join("")
   if (!isRecord(value)) return ""
   if (typeof value.text === "string") return value.text
+  if (value.type === "emoji") return adfEmoji(isRecord(value.attrs) ? value.attrs : undefined)
   const inner = Array.isArray(value.content) ? value.content.map(collectPlain).join("") : ""
   if (value.type === "paragraph" || value.type === "heading" || value.type === "blockquote") return inner ? `${inner}\n\n` : ""
   if (value.type === "listItem") return inner ? `${inner}\n` : ""

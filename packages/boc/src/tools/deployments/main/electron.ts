@@ -6,6 +6,7 @@ import { createDeploymentHandlers } from "./handlers"
 import { DEPLOYMENT_STORE_NAME } from "./store"
 import { createCacheRunner } from "./cache-runner"
 import { notifyDeploymentFinished } from "./notification"
+import { findInstalledDevenvRoot } from "./readiness"
 import { openDeploymentSettings, sealDeploymentSettings } from "./site-credentials"
 
 let file: Store | undefined
@@ -46,6 +47,7 @@ const service = createDeploymentService({
   // Desktop initialization imports the login-shell environment into process.env before IPC starts.
   run: createDeploymentCommandRunner(() => process.env),
   platform: process.platform,
+  findDevenvRoot: findInstalledDevenvRoot,
   runCache: createCacheRunner(),
   notifyFinished: notifyDeploymentFinished,
 })

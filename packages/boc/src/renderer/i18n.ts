@@ -1,4 +1,5 @@
 import { resolveTemplate, translator } from "@solid-primitives/i18n"
+import { pluralCategory, type UiPluralCategory } from "@opencode/ui/context/i18n"
 import { controlsEnglish } from "../tools/controls/i18n/en"
 import { deploymentsEnglish } from "../tools/deployments/i18n/en"
 import { jiraEnglish } from "../tools/jira/i18n/en"
@@ -21,19 +22,37 @@ export const bocEnglish = {
   "boc.extension.desktopRequired.title": "Desktop app required",
   "boc.extension.desktopRequired.description": "This Boc extension is available in the desktop app.",
   "boc.terminal.sessionRequired": "Open a local session before starting a terminal command.",
-  "boc.terminal.failed": "The terminal could not be opened.",
+  "boc.terminal.starting": "Starting SSH session…",
+  "boc.terminal.ended": "SSH session ended.",
+  "boc.terminal.connectFailed": "SSH could not connect. Check your network or VPN connection and SSH access.",
   ...controlsEnglish,
   ...deploymentsEnglish,
   ...jiraEnglish,
   ...environmentsEnglish,
 } as const
 
-export type BocI18nKey = keyof typeof bocEnglish
-export type BocTranslator = (key: BocI18nKey, params?: Record<string, string | number | boolean>) => string
+type BocEnglishKey = keyof typeof bocEnglish
+type PluralBase<Key> = Key extends `${infer Base}.other` ? (`${Base}.one` extends BocEnglishKey ? Base : never) : never
+export type BocPluralKey = PluralBase<BocEnglishKey>
+export type BocI18nKey = Exclude<BocEnglishKey, `${BocPluralKey}.${UiPluralCategory}`>
+type BocParams = Record<string, string | number | boolean>
+export type BocTranslator = {
+  (key: BocI18nKey, params?: BocParams): string
+  plural: (key: BocPluralKey, count: number, params?: BocParams) => string
+}
 
 export function createBocTranslator(locale: () => string) {
-  return translator(() => {
+  const translate = translator(() => {
     locale()
     return bocEnglish
-  }, resolveTemplate) as BocTranslator
+  }, resolveTemplate)
+  return Object.assign(translate, {
+    plural: (key: BocPluralKey, count: number, params?: BocParams) => {
+      locale()
+      // Boc currently has English source copy only: fallback grammar follows the source locale.
+      const category = pluralCategory("en", count)
+      const values: Partial<Record<string, string>> = bocEnglish
+      return resolveTemplate(values[`${key}.${category}`] ?? values[`${key}.other`] ?? key, { ...params, count })
+    },
+  }) as BocTranslator
 }

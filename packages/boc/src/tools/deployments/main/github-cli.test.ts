@@ -161,6 +161,36 @@ describe("GitHub CLI boundary", () => {
     expect(listed).toMatchObject({ ok: false, capability: "github_workflow_dispatch" })
   })
 
+  test("skips active workflows that do not exist on an older selected branch", async () => {
+    const listed = await listGithubWorkflowTargets(
+      {
+        run: scriptedRunner(
+          [],
+          [
+            success(
+              JSON.stringify([
+                { name: "Shop", path: ".github/workflows/app-shop.yml", state: "active" },
+                { name: "SAP", path: ".github/workflows/app-api-sap.yml", state: "active" },
+              ]),
+            ),
+            success(deploymentShopWorkflowYaml),
+            {
+              ok: false,
+              reason: "failed",
+              exitCode: 1,
+              stdout: "",
+              stderr: "could not find workflow file app-api-sap.yml on SHOP-42, try specifying a different ref",
+            },
+            success(JSON.stringify({ ref: "refs/heads/SHOP-42" })),
+          ],
+        ),
+      },
+      "SHOP-42",
+    )
+
+    expect(listed).toMatchObject({ ok: true, targets: [{ target: { filename: "app-shop.yml" } }] })
+  })
+
   test("dispatches through stdin JSON on the fixed repo and treats missing run URLs as unknown", async () => {
     const commands: DeploymentCommand[] = []
     const dispatched = await dispatchGithubWorkflow(

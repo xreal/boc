@@ -11,7 +11,7 @@ import type { DeploymentOperationSummary } from "../domain/operations"
 import { isReservedDevEnvironment } from "../domain/environments"
 import type { DeploymentSystem } from "../domain/systems"
 import { createDeploymentPreflight, type DeploymentDialogApi } from "./deploy-preflight"
-import { deploymentFailureMessage } from "./deployment-failure"
+import { deploymentFailureMessage, workflowDiscoveryFailureMessage } from "./deployment-failure"
 import { DeploymentWorkflowPicker } from "./workflow-picker"
 import "./deploy-dialog.css"
 
@@ -44,6 +44,7 @@ export function DeploymentDialog(props: {
     if (!state.failure) return ""
     if (submissionUnknown()) return t("boc.deployments.deploy.submissionUnknown")
     if (branchFailure() && state.failure.category === "not-found") return t("boc.deployments.deploy.branch.notFound")
+    if (state.targetsStatus === "failed") return workflowDiscoveryFailureMessage(t, state.failure)
     if (
       state.failure.category === "network" ||
       (state.failure.category === "timeout" && state.failure.context?.field !== "preflight")

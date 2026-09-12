@@ -4,6 +4,40 @@ import { adfToMarkdown, adfToPlainText, safeHttpUrl } from "./adf"
 const doc = (...content: unknown[]) => ({ type: "doc", version: 1, content })
 
 describe("adfToMarkdown", () => {
+  test("resolves common emoji short names in descriptions, comments, and plain text", () => {
+    const value = doc({
+      type: "paragraph",
+      content: [
+        { type: "emoji", attrs: { shortName: ":thumbsup:" } },
+        { type: "emoji", attrs: { shortName: ":tada:", text: ":tada:" } },
+        { type: "emoji", attrs: { shortName: ":white_check_mark:" } },
+        { type: "emoji", attrs: { shortName: ":check_mark:" } },
+        { type: "emoji", attrs: { shortName: ":warning:" } },
+        { type: "emoji", attrs: { shortName: ":rocket:" } },
+        { type: "emoji", attrs: { shortName: ":thumbsup::skin-tone-4:" } },
+        { type: "emoji", attrs: { shortName: ":thumbsup:", text: "👍🏿" } },
+      ],
+    })
+    expect(adfToMarkdown(value)).toBe("👍🎉✅✔️⚠️🚀👍🏽👍🏿")
+    expect(adfToPlainText(value)).toBe("👍🎉✅✔️⚠️🚀👍🏽👍🏿")
+  })
+
+  test("converts prose while preserving custom emoji labels and code", () => {
+    const value = doc({
+      type: "paragraph",
+      content: [
+        { type: "emoji", attrs: { shortName: ":custom_team_logo:", id: "custom-id" } },
+        { type: "text", text: " :rocket: " },
+        { type: "text", text: ":thumbsup:", marks: [{ type: "code" }] },
+        { type: "emoji", attrs: { text: "", shortName: ":SMILE:" } },
+        { type: "emoji", attrs: { text: 123, shortName: null } },
+      ],
+    })
+    expect(adfToMarkdown(value)).toBe(":custom\\_team\\_logo: 🚀 `:thumbsup:`😄")
+    expect(adfToPlainText(value)).toBe(":custom_team_logo: :rocket: :thumbsup:😄")
+    expect(adfToMarkdown(doc({ type: "emoji", attrs: { shortName: ":+1:" } }))).toBe("👍")
+  })
+
   test("keeps headings, emphasis, lists, and code", () => {
     expect(
       adfToMarkdown(

@@ -23,6 +23,7 @@ export const deploymentsEnglish = {
   "boc.deployments.table.system": "System",
   "boc.deployments.table.branch": "Branch",
   "boc.deployments.table.ticket": "Ticket",
+  "boc.deployments.table.ticketStatus": "Ticket status",
   "boc.deployments.table.sync": "Sync",
   "boc.deployments.table.health": "Health",
   "boc.deployments.table.age": "Age",
@@ -135,6 +136,7 @@ export const deploymentsEnglish = {
   "boc.deployments.error.title": "Development systems could not be loaded",
   "boc.deployments.error.description": "Check deployment readiness and try again.",
   "boc.deployments.error.retry": "Retry",
+  "boc.deployments.info": "More information about {{topic}}",
   "boc.deployments.stale.title": "Showing the last successful fleet",
   "boc.deployments.stale.description": "The latest refresh failed. These systems may be out of date.",
   "boc.deployments.partial.title": "Some applications were ignored",
@@ -142,15 +144,19 @@ export const deploymentsEnglish = {
   "boc.deployments.refresh.success": "Development systems refreshed.",
   "boc.deployments.refresh.failure":
     "Development systems could not be refreshed. Previous data is still shown when available.",
+  "boc.deployments.githubNotice.cli": "GitHub CLI is unavailable.",
+  "boc.deployments.githubNotice.auth": "Sign in to GitHub with gh.",
+  "boc.deployments.githubNotice.access": "Switch the active gh account to one with bergfreunde/shop access.",
+  "boc.deployments.githubNotice.workflows": "GitHub workflow access needs attention.",
   "boc.deployments.readiness.title": "Connect your development tools",
   "boc.deployments.readiness.description":
     "Complete the system checks to load your dev systems. GitHub is only needed to deploy; Devenv is optional.",
-  "boc.deployments.readiness.group.fleet": "View dev systems",
+  "boc.deployments.readiness.group.fleet": "Dev systems",
   "boc.deployments.readiness.group.fleet.help": "Required to load applications from the Kubernetes dev context.",
-  "boc.deployments.readiness.group.deploy": "Deploy with GitHub",
+  "boc.deployments.readiness.group.deploy": "GitHub",
   "boc.deployments.readiness.group.deploy.help":
     "Uses your GitHub CLI account for bergfreunde/shop. System browsing works without it.",
-  "boc.deployments.readiness.group.optional": "Optional tools",
+  "boc.deployments.readiness.group.optional": "Optional",
   "boc.deployments.readiness.group.optional.help": "Missing optional tools never block browsing or deployment.",
   "boc.deployments.readiness.status.available": "Ready",
   "boc.deployments.readiness.status.unavailable": "Needs attention",
@@ -170,7 +176,7 @@ export const deploymentsEnglish = {
   "boc.deployments.settings.checked": "Checks complete. Review the results below.",
   "boc.deployments.settings.failure.connection":
     "Could not complete the request. Check again to refresh the saved settings and connection status.",
-  "boc.deployments.readiness.otherChecks": "Passed and pending checks",
+  "boc.deployments.readiness.otherChecks": "Details",
   "boc.deployments.readiness.notConfigured": "Not configured",
   "boc.deployments.readiness.retrying": "Checking…",
   "boc.deployments.readiness.degraded": "Readiness issue",
@@ -200,12 +206,12 @@ export const deploymentsEnglish = {
   "boc.deployments.readiness.fix.settings":
     "Review the advanced Argo filter. Staging and production identifiers are blocked.",
   "boc.deployments.readiness.fix.devenv":
-    "Choose a Devenv checkout containing src/platform/tools/bf-deploy. Fleet reads remain available.",
+    "Install the devenv command or choose a checkout containing src/platform/tools/bf-deploy. Fleet reads remain available.",
   "boc.deployments.readiness.fix.gh_cli": "Install gh and make it available in your login-shell PATH.",
   "boc.deployments.readiness.fix.github_auth":
     "Run gh auth login --hostname github.com in your terminal, then check again.",
   "boc.deployments.readiness.fix.github_repo":
-    "Run gh repo view bergfreunde/shop in your terminal. If access is denied, check your active GitHub account and repository permissions.",
+    "Switch the active gh account to one with bergfreunde/shop access, then check again.",
   "boc.deployments.readiness.fix.github_dispatch":
     "Check that GitHub Actions workflows are visible in bergfreunde/shop. Write permission is verified when a deployment is submitted.",
   "boc.deployments.readiness.fix.future": "This capability is not available in the current delivery slice.",
@@ -257,7 +263,11 @@ export const deploymentsEnglish = {
   "boc.deployments.deploy.branch.searchHint": "Type a branch name or ticket number.",
   "boc.deployments.deploy.workflows.loading": "Loading workflows…",
   "boc.deployments.deploy.workflows.chooseBranch": "Choose a branch to see its workflows.",
-  "boc.deployments.deploy.workflows.failed": "Could not load workflows.",
+  "boc.deployments.deploy.workflows.failure.cli": "GitHub CLI is unavailable.",
+  "boc.deployments.deploy.workflows.failure.permission": "GitHub denied access to workflow definitions.",
+  "boc.deployments.deploy.workflows.failure.rateLimit": "GitHub is rate limiting workflow checks. Try again later.",
+  "boc.deployments.deploy.workflows.failure.malformed": "A workflow definition on this branch could not be read.",
+  "boc.deployments.deploy.workflows.failure.generic": "GitHub could not load workflows for this branch.",
   "boc.deployments.deploy.workflows.empty": "No supported deployment workflows are available on this branch.",
   "boc.deployments.deploy.workflows.noMatches": "No matching workflows.",
   "boc.deployments.deploy.options": "Options",
@@ -286,15 +296,13 @@ export const deploymentsEnglish = {
     "Used when opening dev system links. Leave either field empty to use the regular URL. The password is stored encrypted on this device.",
   "boc.deployments.settings.site.encryptionUnavailable":
     "The password could not be saved because encrypted storage is unavailable on this device.",
-  "boc.deployments.settings.description":
-    "Check your connections, configure optional tools, and choose which development applications to show.",
-  "boc.deployments.settings.devenv.label": "Devenv checkout (optional)",
+  "boc.deployments.settings.devenv.label": "Devenv checkout",
   "boc.deployments.settings.devenv.placeholder": "/path/to/devenv",
   "boc.deployments.settings.devenv.help":
-    "Optional. Auto-sync requires src/platform/tools/bf-deploy (or its legacy src/tools location); fleet reads do not.",
-  "boc.deployments.settings.notifications.label": "Completion notifications",
+    "Auto-detected from the installed devenv command. Set an override only when needed. Auto-sync prefers src/platform/tools/bf-deploy and supports its legacy src/tools location.",
+  "boc.deployments.settings.notifications.label": "Notifications",
   "boc.deployments.settings.notifications.help": "Notify when a tracked deployment reaches a terminal state.",
-  "boc.deployments.settings.advanced": "Advanced Argo filter",
+  "boc.deployments.settings.advanced": "Argo filter",
   "boc.deployments.settings.context": "Kubernetes context: dev (fixed)",
   "boc.deployments.settings.project.label": "Argo project (optional)",
   "boc.deployments.settings.labelKey.label": "Application label key",

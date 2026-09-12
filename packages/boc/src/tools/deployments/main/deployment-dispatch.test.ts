@@ -25,13 +25,13 @@ describe("deployment preflight and dispatch", () => {
     }
     const service = createDeploymentService({
       store: memoryDeploymentStore({
-        devenvPath: "/work/devenv",
         applicationLabelKey: "app",
         applicationLabelValue: "shop",
         notificationsEnabled: true,
       }),
       platform: "darwin",
       fileExists: async () => true,
+      findDevenvRoot: async () => "/work/devenv",
       run,
     })
 

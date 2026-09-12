@@ -1,7 +1,8 @@
 import { Button } from "@opencode/ui/button"
 import { Collapsible } from "@opencode/ui/collapsible"
-import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitleGroup } from "@opencode/ui/dialog"
+import { Dialog, DialogBody, DialogFooter, DialogHeader, DialogTitle } from "@opencode/ui/dialog"
 import { Field } from "@opencode/ui/field"
+import { Icon } from "@opencode/ui/icon"
 import { Switch } from "@opencode/ui/switch"
 import { TextInput } from "@opencode/ui/text-input"
 import { Show } from "solid-js"
@@ -9,6 +10,7 @@ import { createStore } from "solid-js/store"
 import type { BocDesktopAPI } from "../../../desktop/renderer/api"
 import { createBocTranslator } from "../../../renderer/i18n"
 import type { DeploymentFailure, DeploymentReadiness, DeploymentSettings } from "../rpcs"
+import { DeploymentInfo } from "./info-tooltip"
 import { DeploymentReadinessSummary } from "./readiness-panel"
 
 export function DeploymentSettingsDialog(props: {
@@ -103,12 +105,9 @@ export function DeploymentSettingsDialog(props: {
       data-boc-dialog="deployment-settings"
     >
       <DialogHeader closeLabel={t("boc.deployments.settings.close")}>
-        <DialogTitleGroup
-          title={t("boc.deployments.settings.title")}
-          description={t("boc.deployments.settings.description")}
-        />
+        <DialogTitle>{t("boc.deployments.settings.title")}</DialogTitle>
       </DialogHeader>
-      <DialogBody class="flex min-w-0 flex-col gap-4 overflow-x-hidden !overflow-y-auto px-4 pb-4">
+      <DialogBody class="flex min-w-0 flex-col gap-3 overflow-x-hidden !overflow-y-auto px-4 pb-4">
         <Show when={form.failure}>
           <p role="alert" class="text-[13px] leading-[var(--line-height-compact)] text-v2-state-fg-danger">
             {settingsFailureMessage(t, form.failure!)}
@@ -132,7 +131,14 @@ export function DeploymentSettingsDialog(props: {
         </Show>
 
         <Field>
-          <Field.Label>{t("boc.deployments.settings.devenv.label")}</Field.Label>
+          <div class="flex items-center gap-1">
+            <Field.Label>{t("boc.deployments.settings.devenv.label")}</Field.Label>
+            <DeploymentInfo
+              t={t}
+              topic={t("boc.deployments.settings.devenv.label")}
+              value={t("boc.deployments.settings.devenv.help")}
+            />
+          </div>
           <TextInput
             class="!w-full"
             name="deployment-devenv-path"
@@ -143,7 +149,6 @@ export function DeploymentSettingsDialog(props: {
             disabled={form.busy !== false}
             onInput={(event) => setForm("devenvPath", event.currentTarget.value)}
           />
-          <Field.Prefix>{t("boc.deployments.settings.devenv.help")}</Field.Prefix>
         </Field>
 
         <section class="flex flex-col gap-3 rounded-md border border-v2-border-border-muted p-3">
@@ -182,13 +187,15 @@ export function DeploymentSettingsDialog(props: {
         </section>
 
         <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2.5">
-          <div>
-            <p class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+          <div class="flex min-w-0 items-center gap-1">
+            <span class="truncate text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
               {t("boc.deployments.settings.notifications.label")}
-            </p>
-            <p class="mt-1 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-              {t("boc.deployments.settings.notifications.help")}
-            </p>
+            </span>
+            <DeploymentInfo
+              t={t}
+              topic={t("boc.deployments.settings.notifications.label")}
+              value={t("boc.deployments.settings.notifications.help")}
+            />
           </div>
           <Switch
             checked={form.notificationsEnabled}
@@ -198,13 +205,20 @@ export function DeploymentSettingsDialog(props: {
           />
         </div>
 
-        <Collapsible variant="ghost" data-boc-deployment-settings-advanced>
-          <Collapsible.Trigger>
-            <span>{t("boc.deployments.settings.advanced")}</span>
-            <Collapsible.Arrow />
+        <Collapsible
+          variant="ghost"
+          class="!overflow-hidden !border !border-v2-border-border-muted"
+          data-boc-deployment-settings-advanced
+        >
+          <Collapsible.Trigger class="!h-10 !cursor-pointer !px-3 hover:!bg-v2-background-bg-layer-02">
+            <Icon name="outline-sliders" class="me-2 text-v2-icon-icon-muted" />
+            <span class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+              {t("boc.deployments.settings.advanced")}
+            </span>
+            <Collapsible.Arrow class="ms-auto !opacity-100" />
           </Collapsible.Trigger>
           <Collapsible.Content>
-            <div class="flex flex-col gap-3 pt-3">
+            <div class="flex flex-col gap-3 border-t border-v2-border-border-muted px-3 pb-3 pt-3">
               <p class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
                 {t("boc.deployments.settings.context")}
               </p>
@@ -251,9 +265,16 @@ export function DeploymentSettingsDialog(props: {
         </Collapsible>
 
         <div class="border-t border-v2-border-border-muted pt-4">
-          <h2 class="mb-2 text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
-            {t("boc.deployments.settings.readiness")}
-          </h2>
+          <div class="mb-2 flex items-center gap-1">
+            <h2 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+              {t("boc.deployments.settings.readiness")}
+            </h2>
+            <DeploymentInfo
+              t={t}
+              topic={t("boc.deployments.settings.readiness")}
+              value={t("boc.deployments.readiness.pendingHelp")}
+            />
+          </div>
           <DeploymentReadinessSummary t={t} readiness={form.readiness} />
         </div>
       </DialogBody>

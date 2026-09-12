@@ -7,7 +7,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Loader } from "@opencode/ui/loader"
 import { createEffect, For, Show, type JSX } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
-import type { JiraIssueDetail } from "../domain/board"
+import type { JiraIssueDetail } from "../domain/issue"
 import type { JiraConnectionFailure } from "../rpcs"
 import type { DeploymentSystem } from "../../deployments/domain/systems"
 import { jiraConnectionErrorKey } from "./status"
@@ -15,8 +15,16 @@ import { JiraIssueDescription } from "./description"
 import { JiraIssueDeployments } from "./deployments"
 import { jiraRelativeTime } from "./time"
 import { jiraPriorityTone, jiraToneText } from "./tone"
+import { JiraAssignee } from "./assignee"
+import type { JiraAssignments } from "./assignments"
+import { JiraComments } from "./comments"
+import { JiraPullRequests } from "./pull-requests"
+import type { JiraCollaborationApi } from "./resource"
 
 export function JiraIssueInspector(props: {
+  api: JiraCollaborationApi
+  assignments: JiraAssignments
+  online: boolean
   t: BocTranslator
   locale: string
   issueKey: string
@@ -46,14 +54,14 @@ export function JiraIssueInspector(props: {
       tabIndex={-1}
       class="flex min-h-0 flex-col overflow-hidden rounded-[8px] outline-none select-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
       classList={{
-        "absolute bottom-3 right-3 top-0 z-10 w-[min(36rem,calc(100%-1.5rem))] bg-v2-background-bg-base shadow-[var(--v2-elevation-floating)]":
+        "absolute bottom-3 end-3 top-0 z-10 w-[min(36rem,calc(100%-1.5rem))] bg-v2-background-bg-base shadow-[var(--v2-elevation-floating)]":
           props.overlay,
         "relative w-[36rem] shrink-0 bg-v2-background-bg-layer-01": !props.overlay,
       }}
     >
-      <div class="flex h-10 shrink-0 items-center gap-1 pl-4 pr-2">
+      <div class="flex h-10 shrink-0 items-center gap-1 ps-4 pe-2">
         <span class="min-w-0 flex-1 truncate text-[12px] leading-[var(--line-height-compact)] tabular-nums text-v2-text-text-muted [font-weight:530]">
-          {props.issueKey}
+          <bdi dir="ltr">{props.issueKey}</bdi>
         </span>
         <Show when={props.issue}>
           {(issue) => (
@@ -78,108 +86,129 @@ export function JiraIssueInspector(props: {
         />
       </div>
 
-      <div class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 text-[13px] leading-[var(--line-height-compact)]">
-        <Show when={props.loading}>
-          <div role="status" aria-live="polite" class="flex flex-col gap-3">
-            <p
-              id="boc-jira-issue-inspector-title"
-              class="text-[15px] leading-[var(--line-height-base)] text-v2-text-text-muted"
-            >
-              {props.t("boc.jira.board.loading")}
-            </p>
-            <Loader />
-          </div>
+      <div
+        data-jira-scroll
+        class="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-4 pb-4 text-[13px] leading-[var(--line-height-compact)]"
+      >
+        <Show when={!props.online}>
+          <p role="status" class="text-v2-state-fg-warning">
+            {props.t("boc.jira.collaboration.offline")}
+          </p>
         </Show>
-        <Show when={!props.loading && props.failure}>
-          {(failure) => (
-            <p id="boc-jira-issue-inspector-title" role="alert" class="text-v2-state-fg-danger">
-              {inspectorError(props.t, failure())}
-            </p>
-          )}
-        </Show>
-        <Show when={!props.loading && !props.failure && props.issue}>
-          {(issue) => (
-            <>
-              <h2
+        <Show when={props.issueKey} keyed>
+          <Show when={props.loading}>
+            <div role="status" aria-live="polite" class="flex flex-col gap-3">
+              <p
                 id="boc-jira-issue-inspector-title"
-                class="text-[15px] leading-[var(--line-height-base)] text-v2-text-text-base [font-weight:530]"
+                class="text-[15px] leading-[var(--line-height-base)] text-v2-text-text-muted"
               >
-                {issue().summary}
-              </h2>
+                {props.t("boc.jira.board.loading")}
+              </p>
+              <Loader />
+            </div>
+          </Show>
+          <Show when={!props.loading && props.failure}>
+            {(failure) => (
+              <p id="boc-jira-issue-inspector-title" role="alert" class="text-v2-state-fg-danger">
+                {inspectorError(props.t, failure())}
+              </p>
+            )}
+          </Show>
+          <Show when={!props.loading && !props.failure && props.issue}>
+            {(issue) => (
+              <>
+                <h2
+                  id="boc-jira-issue-inspector-title"
+                  class="text-[15px] leading-[var(--line-height-base)] text-v2-text-text-base [font-weight:530]"
+                >
+                  <bdi dir="auto">{issue().summary}</bdi>
+                </h2>
 
-              <dl
-                aria-label={props.t("boc.jira.board.inspector.properties")}
-                class="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2"
-              >
-                <Property label={props.t("boc.jira.board.inspector.status")}>
-                  <Text value={issue().statusName} />
-                </Property>
-                <Property label={props.t("boc.jira.board.filters.type")}>
-                  <Text value={issue().issueTypeName} />
-                </Property>
-                <Property label={props.t("boc.jira.board.filters.priority")}>
-                  <Show when={issue().priorityName} fallback={<Empty />}>
-                    {(priority) => (
-                      <span class={jiraToneText[jiraPriorityTone(priority())]}>{priority()}</span>
-                    )}
+                <dl
+                  aria-label={props.t("boc.jira.board.inspector.properties")}
+                  class="grid grid-cols-[6.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2"
+                >
+                  <Property label={props.t("boc.jira.board.inspector.status")}>
+                    <Text value={issue().statusName} />
+                  </Property>
+                  <Property label={props.t("boc.jira.board.filters.type")}>
+                    <Text value={issue().issueTypeName} />
+                  </Property>
+                  <Property label={props.t("boc.jira.board.filters.priority")}>
+                    <Show when={issue().priorityName} fallback={<Empty />}>
+                      {(priority) => <span class={jiraToneText[jiraPriorityTone(priority())]}>{priority()}</span>}
+                    </Show>
+                  </Property>
+                  <Property label={props.t("boc.jira.board.filters.assignee")}>
+                    <JiraAssignee
+                      api={props.api}
+                      assignments={props.assignments}
+                      issue={issue()}
+                      t={props.t}
+                      online={props.online}
+                    />
+                  </Property>
+                  <Property label={props.t("boc.jira.board.inspector.reporter")}>
+                    <Show when={issue().reporterName} fallback={<Empty />}>
+                      {(reporter) => <Person name={reporter()} />}
+                    </Show>
+                  </Property>
+                  <Show when={issue().labels.length > 0}>
+                    <Property label={props.t("boc.jira.board.inspector.labels")}>
+                      <span class="flex flex-wrap gap-1">
+                        <For each={issue().labels}>{(label) => <Badge>{label}</Badge>}</For>
+                      </span>
+                    </Property>
                   </Show>
-                </Property>
-                <Property label={props.t("boc.jira.board.filters.assignee")}>
+                  <Property label={props.t("boc.jira.board.inspector.created")}>
+                    <Text value={jiraRelativeTime(issue().createdAt, props.locale)} />
+                  </Property>
+                  <Property label={props.t("boc.jira.board.inspector.updated")}>
+                    <Text value={jiraRelativeTime(issue().updatedAt, props.locale)} />
+                  </Property>
+                </dl>
+
+                <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
+                  <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
+                    {props.t("boc.jira.board.inspector.description")}
+                  </h3>
                   <Show
-                    when={issue().assigneeName}
+                    when={issue().description}
                     fallback={
-                      <span class="text-v2-text-text-muted">{props.t("boc.jira.board.inspector.unassigned")}</span>
+                      <p class="text-v2-text-text-faint">{props.t("boc.jira.board.inspector.emptyDescription")}</p>
                     }
                   >
-                    {(assignee) => <Person name={assignee()} />}
+                    {(description) => (
+                      <JiraIssueDescription markdown={description()} onOpenExternal={props.onOpenExternal} />
+                    )}
                   </Show>
-                </Property>
-                <Property label={props.t("boc.jira.board.inspector.reporter")}>
-                  <Show when={issue().reporterName} fallback={<Empty />}>
-                    {(reporter) => <Person name={reporter()} />}
-                  </Show>
-                </Property>
-                <Show when={issue().labels.length > 0}>
-                  <Property label={props.t("boc.jira.board.inspector.labels")}>
-                    <span class="flex flex-wrap gap-1">
-                      <For each={issue().labels}>{(label) => <Badge>{label}</Badge>}</For>
-                    </span>
-                  </Property>
-                </Show>
-                <Property label={props.t("boc.jira.board.inspector.created")}>
-                  <Text value={jiraRelativeTime(issue().createdAt, props.locale)} />
-                </Property>
-                <Property label={props.t("boc.jira.board.inspector.updated")}>
-                  <Text value={jiraRelativeTime(issue().updatedAt, props.locale)} />
-                </Property>
-              </dl>
-
-              <JiraIssueSessions issue={issue()} boardId={props.boardId} t={props.t} />
-
-              <JiraIssueDeployments
-                t={props.t}
-                locale={props.locale}
-                systems={props.deployedSystems}
-                onDeploy={props.onDeploy}
-              />
-
-              <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
-                <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
-                  {props.t("boc.jira.board.inspector.description")}
-                </h3>
-                <Show
-                  when={issue().description}
-                  fallback={
-                    <p class="text-v2-text-text-faint">{props.t("boc.jira.board.inspector.emptyDescription")}</p>
-                  }
-                >
-                  {(description) => (
-                    <JiraIssueDescription markdown={description()} onOpenExternal={props.onOpenExternal} />
-                  )}
-                </Show>
-              </section>
-            </>
-          )}
+                </section>
+                <JiraIssueSessions issue={issue()} boardId={props.boardId} t={props.t} />
+                <JiraPullRequests
+                  api={props.api}
+                  issueKey={props.issueKey}
+                  t={props.t}
+                  locale={props.locale}
+                  online={props.online}
+                  onOpenExternal={props.onOpenExternal}
+                />
+                <JiraIssueDeployments
+                  t={props.t}
+                  locale={props.locale}
+                  systems={props.deployedSystems}
+                  onDeploy={props.online ? props.onDeploy : undefined}
+                />
+                <JiraComments
+                  api={props.api}
+                  issueKey={props.issueKey}
+                  t={props.t}
+                  locale={props.locale}
+                  online={props.online}
+                  onOpenExternal={props.onOpenExternal}
+                />
+              </>
+            )}
+          </Show>
         </Show>
       </div>
     </aside>
@@ -207,7 +236,9 @@ function Person(props: { name: string }) {
   return (
     <span class="flex items-center gap-1.5">
       <Avatar size="small" fallback={props.name} />
-      <span class="truncate">{props.name}</span>
+      <bdi dir="auto" class="truncate">
+        {props.name}
+      </bdi>
     </span>
   )
 }

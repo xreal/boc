@@ -1,6 +1,24 @@
 import { describe, expect, test } from "bun:test"
 import { createJiraReadCoordinator } from "./read-coordinator"
 
+test("secondary reads cancel only the matching resource and request", async () => {
+  const reads = createJiraReadCoordinator()
+  const deferred = Promise.withResolvers<void>()
+  const signals = new Map<string, AbortSignal>()
+  const pending = (["comments", "assignees", "pull-requests"] as const).map((scope) => reads.run(scope, scope, async (signal) => {
+    signals.set(scope, signal)
+    await deferred.promise
+  }))
+  reads.cancel("comments", "old-request")
+  expect(signals.get("comments")?.aborted).toBe(false)
+  reads.cancel("comments", "comments")
+  expect(signals.get("comments")?.aborted).toBe(true)
+  expect(signals.get("assignees")?.aborted).toBe(false)
+  expect(signals.get("pull-requests")?.aborted).toBe(false)
+  deferred.resolve()
+  await Promise.all(pending)
+})
+
 describe("Jira read coordinator", () => {
   test("aborts the stale read when a newer read starts in the same scope", async () => {
     const reads = createJiraReadCoordinator()

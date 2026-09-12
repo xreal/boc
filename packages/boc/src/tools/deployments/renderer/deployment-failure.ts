@@ -11,6 +11,19 @@ export function deploymentFailureMessage(t: BocTranslator, failure: DeploymentFa
   return t("boc.deployments.deploy.failure.generic")
 }
 
+export function workflowDiscoveryFailureMessage(t: BocTranslator, failure: DeploymentFailure) {
+  if (failure.category === "missing-cli") return t("boc.deployments.deploy.workflows.failure.cli")
+  if (failure.category === "not-authenticated") return t("boc.deployments.deploy.signInRequired")
+  if (failure.category === "permission") return t("boc.deployments.deploy.workflows.failure.permission")
+  if (failure.category === "network" || failure.category === "timeout") {
+    return t("boc.deployments.deploy.connectionFailed")
+  }
+  if (failure.category === "rate-limit") return t("boc.deployments.deploy.workflows.failure.rateLimit")
+  if (failure.category === "malformed") return t("boc.deployments.deploy.workflows.failure.malformed")
+  if (failure.category === "not-found") return t("boc.deployments.deploy.workflows.empty")
+  return t("boc.deployments.deploy.workflows.failure.generic")
+}
+
 export function cacheFailureMessage(
   t: BocTranslator,
   phase: "read" | "start" | "resolve",
