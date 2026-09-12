@@ -126,6 +126,7 @@ export const deploymentsEnglish = {
   "boc.deployments.cache.state.unknown": "Cache flush outcome unknown",
   "boc.deployments.cache.state.resolved": "Unknown outcome manually resolved",
   "boc.deployments.action.openSsh": "Open SSH session",
+  "boc.deployments.ssh.title": "SSH {{system}}",
   "boc.deployments.loading": "Loading development systems…",
   "boc.deployments.empty.title": "No development systems found",
   "boc.deployments.empty.description": "Review the Argo filter or try loading the fleet again.",
@@ -199,7 +200,7 @@ export const deploymentsEnglish = {
   "boc.deployments.readiness.fix.settings":
     "Review the advanced Argo filter. Staging and production identifiers are blocked.",
   "boc.deployments.readiness.fix.devenv":
-    "Choose a Devenv checkout containing src/tools/bf-deploy. Fleet reads remain available.",
+    "Choose a Devenv checkout containing src/platform/tools/bf-deploy. Fleet reads remain available.",
   "boc.deployments.readiness.fix.gh_cli": "Install gh and make it available in your login-shell PATH.",
   "boc.deployments.readiness.fix.github_auth":
     "Run gh auth login --hostname github.com in your terminal, then check again.",
@@ -271,7 +272,8 @@ export const deploymentsEnglish = {
     "Check your connections, configure optional tools, and choose which development applications to show.",
   "boc.deployments.settings.devenv.label": "Devenv checkout (optional)",
   "boc.deployments.settings.devenv.placeholder": "/path/to/devenv",
-  "boc.deployments.settings.devenv.help": "Optional. Auto-sync requires src/tools/bf-deploy; fleet reads do not.",
+  "boc.deployments.settings.devenv.help":
+    "Optional. Auto-sync requires src/platform/tools/bf-deploy (or its legacy src/tools location); fleet reads do not.",
   "boc.deployments.settings.notifications.label": "Completion notifications",
   "boc.deployments.settings.notifications.help": "Notify when a tracked deployment reaches a terminal state.",
   "boc.deployments.settings.advanced": "Advanced Argo filter",

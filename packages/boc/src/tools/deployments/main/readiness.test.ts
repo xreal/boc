@@ -46,6 +46,32 @@ describe("deployment readiness", () => {
     ).toMatchObject({ category: "unsafe-target" })
   })
 
+  test("finds the current bf-deploy location before the legacy location", async () => {
+    const status = await autoSyncCapability(
+      {
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      },
+      async (file) => file.includes("/src/platform/tools/bf-deploy/"),
+    )
+    expect(status.status).toBe("available")
+  })
+
+  test("keeps supporting the legacy bf-deploy location", async () => {
+    const status = await autoSyncCapability(
+      {
+        devenvPath: "/work/devenv",
+        applicationLabelKey: "app",
+        applicationLabelValue: "shop",
+        notificationsEnabled: true,
+      },
+      async (file) => file.includes("/src/tools/bf-deploy/"),
+    )
+    expect(status.status).toBe("available")
+  })
+
   test("requires both reviewed bf-deploy files without changing fleet readiness", async () => {
     const checked: string[] = []
     const status = await autoSyncCapability(
@@ -61,6 +87,8 @@ describe("deployment readiness", () => {
       },
     )
     expect(checked).toEqual([
+      "/work/devenv/src/platform/tools/bf-deploy/__main__.py",
+      "/work/devenv/src/platform/tools/bf-deploy/src/bf_deploy.py",
       "/work/devenv/src/tools/bf-deploy/__main__.py",
       "/work/devenv/src/tools/bf-deploy/src/bf_deploy.py",
     ])

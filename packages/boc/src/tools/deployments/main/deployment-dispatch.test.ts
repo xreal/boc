@@ -41,7 +41,7 @@ describe("deployment preflight and dispatch", () => {
     expect(commands.find((command) => command.executable === "python3")).toEqual({
       executable: "python3",
       args: [
-        "/work/devenv/src/tools/bf-deploy/__main__.py",
+        "/work/devenv/src/platform/tools/bf-deploy/__main__.py",
         "argo",
         "--auto-sync",
         "off",

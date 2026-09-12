@@ -2,8 +2,17 @@ import { createContext, useContext, type ParentProps } from "solid-js"
 
 import type { ControlsHost } from "../tools/controls/host"
 
+export type BocTerminalInput = {
+  command: string
+  args: readonly string[]
+  title: string
+}
+
 export type BocHost = {
   controls?: ControlsHost
+  terminal?: {
+    open(input: BocTerminalInput): void
+  }
   sessions?: {
     projects(): { server: string; directory: string; label: string }[]
     start(input: {

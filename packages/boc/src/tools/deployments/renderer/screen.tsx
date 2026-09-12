@@ -28,6 +28,7 @@ import "./deployments.css"
 import { AutoSyncOffDialog } from "./auto-sync-dialog"
 import { CacheDialog } from "./cache-dialog"
 import { DEPLOYMENT_ACTIONS_URL } from "../domain/github"
+import { deploymentSshCommand } from "../domain/admin-server"
 
 export default function DeploymentsScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
@@ -308,6 +309,13 @@ export default function DeploymentsScreen(props: BocScreenProps) {
     ))
   }
 
+  const openSsh = (system: DeploymentSystem) => {
+    props.host.terminal?.open({
+      ...deploymentSshCommand(system.environment),
+      title: t("boc.deployments.ssh.title", { system: system.name }),
+    })
+  }
+
   onMount(() => {
     const clock = setInterval(() => setNow(Date.now()), 1000)
     if (!fixtureEnabled) void bootstrap()
@@ -455,6 +463,7 @@ export default function DeploymentsScreen(props: BocScreenProps) {
             onTurnAutoSyncOff={openAutoSyncOff}
             cacheRuns={view.cacheRuns}
             onClearCache={openClearCache}
+            onOpenSsh={props.host.terminal ? openSsh : undefined}
           />
         </Show>
         <Show when={surface() === "loading"}>

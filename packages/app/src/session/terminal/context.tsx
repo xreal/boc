@@ -11,6 +11,14 @@ import { ScopedKey, ServerScope } from "@/runtime/server/scope"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Schema, SchemaGetter } from "effect"
 
+export type TerminalCreateInput = {
+  command?: string
+  args?: readonly string[]
+  cwd?: string
+  title?: string
+  env?: Readonly<Record<string, string>>
+}
+
 const PTY = Persistence.struct({
   id: Schema.NonEmptyString,
   title: Persistence.fallback(Schema.String, () => ""),
@@ -244,23 +252,24 @@ function createWorkspaceTerminalSession(
         setStore("all", [])
       })
     },
-    new() {
+    new(input: TerminalCreateInput = {}) {
       const nextNumber = pickNextTerminalNumber()
       const focusRequest = requestFocus(undefined, true)
+      const title = input.title ?? defaultTitle(nextNumber)
 
       const doCreate = async () => {
-        return serverSDK.api.pty.create({ location, title: defaultTitle(nextNumber) }).then((result) => result.data)
+        return serverSDK.api.pty.create({ ...input, location, title }).then((result) => result.data)
       }
-      doCreate()
+      return doCreate()
         .then((data) => {
           const id = data?.id
           if (!id) {
             cancelFocus(focusRequest)
-            return
+            return undefined
           }
           const newTerminal = {
             id,
-            title: data?.title ?? defaultTitle(nextNumber),
+            title: data.title ?? title,
             titleNumber: nextNumber,
           }
           batch(() => {
@@ -270,10 +279,12 @@ function createWorkspaceTerminalSession(
               setUi("focus", { request: focusRequest, id, pending: false })
             }
           })
+          return data
         })
         .catch((error: unknown) => {
           cancelFocus(focusRequest)
           console.error("Failed to create terminal", error)
+          return undefined
         })
     },
     update(pty: Partial<LocalPTY> & { id: string }) {
@@ -440,7 +451,7 @@ export const { use: useTerminal, provider: TerminalProvider } = createSimpleCont
       ready: () => workspace().ready(),
       all: () => workspace().all(),
       active: () => workspace().active(),
-      new: () => workspace().new(),
+      new: (input?: TerminalCreateInput) => workspace().new(input),
       update: (pty: Partial<LocalPTY> & { id: string }) => workspace().update(pty),
       trim: (id: string) => workspace().trim(id),
       trimAll: () => workspace().trimAll(),

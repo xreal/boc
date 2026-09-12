@@ -5,6 +5,7 @@ import type { BocHost } from "@boc/extensions/renderer"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useCurrentRoute } from "@/shell/state/layout"
+import { createBocTerminal } from "./terminal"
 
 export function createBocHost(): BocHost {
   const navigate = useNavigate()
@@ -17,6 +18,7 @@ export function createBocHost(): BocHost {
 
   return {
     sessions,
+    terminal: createBocTerminal(),
     controls: createBocControls(),
     navigate,
     location: () => ({ pathname: location.pathname, search: location.search }),

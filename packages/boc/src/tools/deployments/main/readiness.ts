@@ -94,9 +94,7 @@ export async function autoSyncCapability(
       context: { field: "devenvPath" },
     }
   }
-  const root = path.join(settings.devenvPath, "src", "tools", "bf-deploy")
-  const required = [path.join(root, "__main__.py"), path.join(root, "src", "bf_deploy.py")]
-  if ((await Promise.all(required.map(fileExists))).every(Boolean)) {
+  if (await autoSyncEntrypoint(settings, fileExists)) {
     return { capability: "bf_deploy_auto_sync", status: "available" }
   }
   return {
@@ -105,6 +103,26 @@ export async function autoSyncCapability(
     failure: "not-found",
     context: { field: "devenvPath" },
   }
+}
+
+export async function autoSyncEntrypoint(
+  settings: DeploymentSettings,
+  fileExists: DeploymentFileExists = deploymentFileExists,
+) {
+  if (!settings.devenvPath) return undefined
+  const roots = [
+    path.join(settings.devenvPath, "src", "platform", "tools", "bf-deploy"),
+    path.join(settings.devenvPath, "src", "tools", "bf-deploy"),
+  ]
+  const entrypoints = await Promise.all(
+    roots.map(async (root) =>
+      (await Promise.all([path.join(root, "__main__.py"), path.join(root, "src", "bf_deploy.py")].map(fileExists)))
+        .every(Boolean)
+        ? path.join(root, "__main__.py")
+        : undefined,
+    ),
+  )
+  return entrypoints.find((entrypoint): entrypoint is string => entrypoint !== undefined)
 }
 
 function identifiesUnsafeTarget(value: string) {

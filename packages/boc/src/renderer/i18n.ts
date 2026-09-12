@@ -20,6 +20,8 @@ export const bocEnglish = {
   "boc.extension.notFound.description": "This Boc extension is not registered.",
   "boc.extension.desktopRequired.title": "Desktop app required",
   "boc.extension.desktopRequired.description": "This Boc extension is available in the desktop app.",
+  "boc.terminal.sessionRequired": "Open a local session before starting a terminal command.",
+  "boc.terminal.failed": "The terminal could not be opened.",
   ...controlsEnglish,
   ...deploymentsEnglish,
   ...jiraEnglish,

@@ -23,6 +23,7 @@ export function DeploymentSystemsTable(props: {
   onRedeploy?: (system: DeploymentSystem) => void
   onTurnAutoSyncOff?: (system: DeploymentSystem) => void
   onClearCache?: (system: DeploymentSystem) => void
+  onOpenSsh?: (system: DeploymentSystem) => void
   cacheRuns?: Record<string, DeploymentCacheRunSnapshot | undefined>
   now: number
   openExternal: (url: string) => void
@@ -126,6 +127,7 @@ export function DeploymentSystemsTable(props: {
                         onRedeploy={props.onRedeploy}
                         onTurnAutoSyncOff={props.onTurnAutoSyncOff}
                         onClearCache={props.onClearCache}
+                        onOpenSsh={props.onOpenSsh}
                         cacheRun={props.cacheRuns?.[system.environment]}
                       />
                     </td>
@@ -225,6 +227,7 @@ function SystemActions(props: {
   onRedeploy?: (system: DeploymentSystem) => void
   onTurnAutoSyncOff?: (system: DeploymentSystem) => void
   onClearCache?: (system: DeploymentSystem) => void
+  onOpenSsh?: (system: DeploymentSystem) => void
   cacheRun?: DeploymentCacheRunSnapshot
 }) {
   const canDeploy = () => props.system.allowedActions?.includes("deploy") === true
@@ -305,7 +308,15 @@ function SystemActions(props: {
             >
               {props.t("boc.deployments.action.clearCache")}
             </Menu.Item>
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
+            <Menu.Item
+              disabled={!props.onOpenSsh || !props.system.allowedActions?.includes("ssh")}
+              badge={
+                props.onOpenSsh && props.system.allowedActions?.includes("ssh")
+                  ? undefined
+                  : props.t("boc.deployments.action.unavailable.short")
+              }
+              onSelect={() => props.onOpenSsh?.(props.system)}
+            >
               {props.t("boc.deployments.action.openSsh")}
             </Menu.Item>
           </Menu.Content>

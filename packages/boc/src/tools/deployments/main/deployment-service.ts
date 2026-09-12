@@ -46,6 +46,7 @@ import {
   type GithubWorkflowTarget,
 } from "./github-cli"
 import {
+  autoSyncEntrypoint,
   autoSyncCapability,
   createDeploymentReadiness,
   validateDeploymentSettings,
@@ -214,6 +215,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
               ...(readiness.deploymentReady ? (["deploy", "reset", ...redeploy] as const) : []),
               ...autoSync,
               ...(!isReservedDevEnvironment(system.environment) && runtime.runCache ? (["clear-cache"] as const) : []),
+              ...(!isReservedDevEnvironment(system.environment) ? (["ssh"] as const) : []),
             ]
           : []
       return {
@@ -767,11 +769,18 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       changingAutoSync.add(input.environment)
       try {
         const settings = readDeploymentSettings(runtime.store)
-        const capability = await autoSyncCapability(settings, runtime.fileExists)
-        if (capability.status !== "available" || !settings.devenvPath) {
-          return deploymentFailure(capability.failure ?? "not-found", {
+        const devenvPath = settings.devenvPath
+        if (!devenvPath) {
+          return deploymentFailure("invalid-input", {
             capability: "bf_deploy_auto_sync",
-            context: capability.context,
+            context: { field: "devenvPath" },
+          })
+        }
+        const entrypoint = await autoSyncEntrypoint(settings, runtime.fileExists)
+        if (!entrypoint) {
+          return deploymentFailure("not-found", {
+            capability: "bf_deploy_auto_sync",
+            context: { field: "devenvPath" },
           })
         }
         const target = await verifyArgoDevTarget(argo, settings)
@@ -816,7 +825,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
         const result = await runtime.run({
           executable: "python3",
           args: [
-            path.join(settings.devenvPath, "src", "tools", "bf-deploy", "__main__.py"),
+            entrypoint,
             "argo",
             "--auto-sync",
             "off",
@@ -825,7 +834,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
             "--deployment",
             "shop",
           ],
-          cwd: path.join(settings.devenvPath, "src"),
+          cwd: path.join(devenvPath, "src"),
         })
         if (!result.ok) return deploymentCommandFailure(result, "bf_deploy_auto_sync")
         changingAutoSync.delete(input.environment)

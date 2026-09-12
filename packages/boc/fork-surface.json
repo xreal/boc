@@ -66,6 +66,10 @@
       "reason": "Mount the Boc environment control inside the existing right titlebar slot"
     },
     {
+      "path": "packages/app/src/session/terminal/context.tsx",
+      "reason": "Allow the Boc session bridge to create a normal workspace terminal with an explicit command"
+    },
+    {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
       "reason": "Select Lane when Boc creates a checkout while moving a session"
     },

@@ -1,9 +1,9 @@
 import { StringDecoder } from "node:string_decoder"
+import { DEPLOYMENT_ADMIN_HOST, deploymentAdminDirectory } from "../domain/admin-server"
 import type { AllowedDevEnvironment } from "../domain/environments"
 import { spawnDeploymentStream } from "./command-runner"
 
 export const CACHE_OUTPUT_LIMIT = 128 * 1024
-export const CACHE_SSH_HOST = "admin.dev.gcp-www"
 
 export type CacheRunState = "running" | "succeeded" | "failed" | "unknown" | "resolved"
 
@@ -38,8 +38,8 @@ export function createCacheRunner(launch: CacheSpawn = spawnDeploymentStream) {
       "ServerAliveInterval=15",
       "-o",
       "ServerAliveCountMax=3",
-      CACHE_SSH_HOST,
-      `cd /var/www/dev-${environment}.bergfreunde.de/shop/tools/ && ./flush-cache.sh --full --hard`,
+      DEPLOYMENT_ADMIN_HOST,
+      `cd ${deploymentAdminDirectory(environment)}/shop/tools/ && ./flush-cache.sh --full --hard`,
     ] as const
     const startedAt = new Date().toISOString()
     let output = ""

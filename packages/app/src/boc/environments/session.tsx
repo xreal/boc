@@ -4,6 +4,7 @@ import { useData, useServer } from "@/runtime/server/current"
 import { usePlatform } from "@/runtime/platform/platform"
 import { createMemo, Show } from "solid-js"
 import { EnvironmentTitlebarControl, environmentTarget } from "./view"
+import { BocTerminalRequestBridge } from "../terminal"
 
 export function BocEnvironmentSessionControl() {
   const server = useServer()
@@ -24,5 +25,12 @@ export function BocEnvironmentSessionControl() {
       os: platform.os,
     }),
   )
-  return <Show when={target()} keyed>{(value) => <EnvironmentTitlebarControl target={value} />}</Show>
+  return (
+    <>
+      <BocTerminalRequestBridge />
+      <Show when={target()} keyed>
+        {(value) => <EnvironmentTitlebarControl target={value} />}
+      </Show>
+    </>
+  )
 }
