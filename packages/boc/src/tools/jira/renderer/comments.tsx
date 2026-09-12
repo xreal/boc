@@ -1,4 +1,4 @@
-import { Avatar } from "@opencode/ui/avatar"
+import { JiraAvatar } from "./person"
 import { Button } from "@opencode/ui/button"
 import { Loader } from "@opencode/ui/loader"
 import { Tooltip } from "@opencode/ui/tooltip"
@@ -116,8 +116,7 @@ export function JiraComments(props: {
         <For each={resource.state.data?.comments}>
           {(comment) => (
             <article data-comment={comment.id} class="flex min-w-0 gap-2.5">
-              <Avatar
-                size="small"
+              <JiraAvatar
                 src={comment.author?.avatarUrl}
                 fallback={comment.author?.displayName ?? props.t("boc.jira.collaboration.unknownAuthor")}
               />

@@ -23,16 +23,29 @@ import type {
 } from "../rpcs"
 import { decodeUnknownJson, jiraRequest, type JiraAuth } from "./client"
 
-export async function fetchJiraIssue(auth: JiraAuth, issueKey: string): Promise<JiraIssueResult> {
+export async function fetchJiraIssue(
+  auth: JiraAuth,
+  issueKey: string,
+  storyPointFields: readonly string[] = [],
+): Promise<JiraIssueResult> {
   if (!Schema.is(JiraIssueKey)(issueKey)) return failJira("malformed")
   const result = await jiraRequest({
     ...auth,
     path: `/rest/api/3/issue/${issueKey}`,
-    query: { fields: "summary,status,assignee,issuetype,priority,labels,created,updated,description,reporter" },
+    query: {
+      fields: [
+        "summary,status,assignee,issuetype,priority,labels,created,updated,description,reporter,parent,subtasks,issuelinks,attachment",
+        ...storyPointFields,
+      ].join(","),
+    },
     retry: "safe-read",
   })
   if (!result.ok) return result
-  const issue = mapJiraIssueDetail(Option.getOrUndefined(decodeUnknownJson(result.text)), auth.origin.origin)
+  const issue = mapJiraIssueDetail(
+    Option.getOrUndefined(decodeUnknownJson(result.text)),
+    auth.origin.origin,
+    storyPointFields,
+  )
   return issue ? { ok: true, issue } : failJira("malformed")
 }
 

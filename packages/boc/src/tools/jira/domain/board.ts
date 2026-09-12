@@ -1,4 +1,5 @@
 import { Schema } from "effect"
+import { compact } from "./compact"
 
 export { adfToMarkdown, adfToPlainText, safeHttpUrl } from "./adf"
 
@@ -506,10 +507,6 @@ function isSubtaskIssueType(issueType: Record<string, unknown> | undefined) {
 function isSubtaskTypeName(name: string | undefined) {
   if (!name) return false
   return name.toLowerCase().replace(/[\s_-]+/g, "") === "subtask"
-}
-
-function compact<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T
 }
 
 function stringList(value: unknown) {

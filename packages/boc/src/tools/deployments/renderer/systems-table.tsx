@@ -14,6 +14,7 @@ import type { DeploymentCacheRunSnapshot, DeploymentSettings } from "../rpcs"
 import { DeploymentProgress } from "./operation-progress"
 import { deploymentSiteUrl } from "../domain/site-url"
 import { DEPLOYMENT_GITHUB_REPOSITORY } from "../domain/github"
+import { StatusText, statusIcon, syncTone, healthTone, type StatusTone } from "./system-status"
 
 export function DeploymentSystemsTable(props: {
   t: BocTranslator
@@ -402,52 +403,6 @@ function SystemActions(props: {
   )
 }
 
-type StatusTone = "success" | "info" | "warning" | "danger" | "muted"
-type StatusIcon = "circle-check" | "warning" | "circle-exclamation" | "info"
-
-function StatusText(props: {
-  label: string
-  tone: StatusTone
-  icon?: StatusIcon
-}) {
-  const toneClasses = {
-    "text-v2-state-fg-success": props.tone === "success",
-    "text-v2-state-fg-info": props.tone === "info",
-    "text-v2-state-fg-warning": props.tone === "warning",
-    "text-v2-state-fg-danger": props.tone === "danger",
-    "text-v2-text-text-muted": props.tone === "muted",
-  }
-  if (!props.icon) {
-    return (
-      <span class="inline-flex items-center gap-1" classList={toneClasses}>
-        {props.label}
-      </span>
-    )
-  }
-  return (
-    <Tooltip value={props.label} placement="top" class="inline-flex">
-      <span class="inline-flex items-center" classList={toneClasses}>
-        <Icon name={props.icon} size="small" aria-hidden="true" />
-        <span class="sr-only">{props.label}</span>
-      </span>
-    </Tooltip>
-  )
-}
-
-function statusIcon(tone: StatusTone): StatusIcon {
-  if (tone === "success") return "circle-check"
-  if (tone === "info") return "info"
-  if (tone === "warning") return "warning"
-  if (tone === "danger") return "circle-exclamation"
-  return "info"
-}
-
-function syncTone(sync: DeploymentSystem["sync"]): StatusTone {
-  if (sync === "synced") return "success"
-  if (sync === "out-of-sync") return "warning"
-  return "muted"
-}
-
 export function jiraTicketStatusTone(status?: string): StatusTone {
   const normalized = status?.trim().toLowerCase()
   if (!normalized || normalized === "n/a") return "muted"
@@ -455,13 +410,6 @@ export function jiraTicketStatusTone(status?: string): StatusTone {
   if (["closed", "resolved"].includes(normalized)) return "success"
   if (["blocked", "rejected", "cancelled", "canceled"].includes(normalized)) return "danger"
   return "warning"
-}
-
-function healthTone(health: DeploymentSystem["health"]): StatusTone {
-  if (health === "healthy") return "success"
-  if (health === "progressing" || health === "suspended") return "warning"
-  if (health === "degraded" || health === "missing") return "danger"
-  return "muted"
 }
 
 function availabilityTextTone(availability: DeploymentSystem["availability"]) {

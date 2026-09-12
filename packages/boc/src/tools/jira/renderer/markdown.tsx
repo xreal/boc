@@ -11,6 +11,16 @@ export function JiraMarkdown(props: { markdown: string; onOpenExternal: (url: st
         if (!link?.href) return
         event.preventDefault()
         event.stopPropagation()
+        if (/^#jira-attachment-\d+$/.test(link.getAttribute("href") ?? "")) {
+          const id = link.hash.slice("#jira-attachment-".length)
+          const target = event.currentTarget
+            .closest("[data-boc-issue-inspector]")
+            ?.querySelector<HTMLButtonElement>(`[data-jira-attachment="${id}"]`)
+          target?.scrollIntoView({ block: "nearest" })
+          target?.focus({ preventScroll: true })
+          target?.click()
+          return
+        }
         props.onOpenExternal(link.href)
       }}
     />

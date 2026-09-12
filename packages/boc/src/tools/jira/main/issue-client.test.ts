@@ -1,5 +1,12 @@
 import { expect, test } from "bun:test"
-import { assignJiraIssue, fetchJiraComments, fetchJiraIssueStatuses, searchJiraAssignees } from "./issue-client"
+import {
+  assignJiraIssue,
+  fetchJiraComments,
+  fetchJiraIssue,
+  fetchJiraIssueStatuses,
+  searchJiraAssignees,
+} from "./issue-client"
+import { fetchStoryPointFieldIds } from "./board-client"
 import { jiraRequest } from "./client"
 import { parseJiraCloudSite } from "../domain/site"
 import { fetchScript, EMAIL_FIXTURE, TOKEN_FIXTURE } from "../fixtures/http"
@@ -8,6 +15,20 @@ import { issueDetailFixture } from "../fixtures/board"
 const origin = parseJiraCloudSite("example")
 if (!origin) throw new Error("Invalid fixture site")
 const credentials = { origin, email: EMAIL_FIXTURE, token: TOKEN_FIXTURE }
+
+test("issue details use the board's story-point field discovery and retain zero estimates", async () => {
+  const auth = {
+    ...credentials,
+    fetch: fetchScript((url) => {
+      if (url.pathname === "/rest/api/3/field")
+        return Response.json([{ id: "customfield_10300", name: "Story point estimate" }])
+      expect(url.searchParams.get("fields")?.split(",")).toContain("customfield_10300")
+      return Response.json({ ...issueDetailFixture, fields: { ...issueDetailFixture.fields, customfield_10300: 0 } })
+    }),
+  }
+  const result = await fetchJiraIssue(auth, "PLAT-1", await fetchStoryPointFieldIds(auth))
+  expect(result.ok && result.issue.storyPoints).toBe(0)
+})
 
 test("comments request one newest-first bounded page", async () => {
   const calls: string[] = []

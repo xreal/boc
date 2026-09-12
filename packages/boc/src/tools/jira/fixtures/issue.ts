@@ -2,6 +2,7 @@ import type { JiraComment, JiraIssueDetail, JiraIssueUser } from "../domain/issu
 import type { JiraPullRequest } from "../domain/pull-request"
 import type { JiraCollaborationApi } from "../renderer/resource"
 import { adfToMarkdown } from "../domain/adf"
+import { jiraAttachmentPreview } from "./attachment"
 
 const formatting = adfToMarkdown({
   type: "doc",
@@ -53,12 +54,31 @@ export function jiraIssueFixture(key = "SHOP-617"): JiraIssueDetail {
   return {
     id: key,
     key,
-    summary: `${key}: Keep product-gallery navigation consistent across layouts`,
+    summary: "Keep product-gallery navigation consistent across layouts",
     assignee: jiraUserFixtures[0] ?? null,
-    reporterName: "Product team",
+    reporter: {
+      accountId: "reporter",
+      displayName: "Product team",
+      avatarUrl:
+        "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Crect width='32' height='32' fill='%23608090'/%3E%3Ccircle cx='16' cy='12' r='6' fill='%23e0e8ef'/%3E%3Cpath d='M4 32a12 12 0 0 1 24 0' fill='%23e0e8ef'/%3E%3C/svg%3E",
+    },
+    parent: { key: "SHOP-610", summary: "Product experience", statusName: "In progress" },
+    subtasks: [{ key: "SHOP-618", summary: "Keyboard navigation", statusName: "Done", statusCategory: "done" }],
+    links: [
+      {
+        id: "1",
+        relationship: "is blocked by",
+        issue: { key: "SHOP-619", summary: "Gallery API response", statusName: "In progress" },
+      },
+    ],
+    attachments: [
+      { id: "100", filename: "gallery-layout.png", mimeType: "image/png", size: 24000 },
+      { id: "101", filename: "test-results.pdf", mimeType: "application/pdf", size: 12000 },
+    ],
     statusName: "In progress",
     issueTypeName: "Story",
     priorityName: "Medium",
+    storyPoints: 5,
     labels: ["gallery", "accessibility"],
     createdAt: "2026-09-01T10:00:00.000Z",
     updatedAt: "2026-09-12T10:00:00.000Z",
@@ -112,9 +132,37 @@ export function createJiraFixtureApi(scenario: JiraFixtureScenario = "default") 
     searches: [] as string[],
     pullRequests: 0,
     cancellations: [] as string[],
+    downloads: [] as string[],
+    previews: [] as string[],
   }
   const wait = (milliseconds: number) => new Promise<void>((resolve) => setTimeout(resolve, milliseconds))
   const api: JiraCollaborationApi = {
+    async listBranches(input) {
+      if (scenario === "failed") return { ok: false, category: "not-authenticated" }
+      return {
+        ok: true,
+        branches:
+          scenario === "empty"
+            ? []
+            : [
+                {
+                  name: `${input.issueKey}-gallery-navigation`,
+                  url: `https://github.com/example/shop/tree/${input.issueKey}-gallery-navigation`,
+                },
+              ],
+        truncated: false,
+      }
+    },
+    async previewAttachment(input) {
+      calls.previews.push(input.attachmentId)
+      if (scenario === "slow") await wait(1200)
+      if (scenario === "failed") return { ok: false, category: "permission" }
+      return { ok: true, base64: jiraAttachmentPreview, mimeType: "image/png" }
+    },
+    async downloadAttachment(input) {
+      calls.downloads.push(input.attachmentId)
+      return scenario === "failed" ? { ok: false, category: "permission" } : { ok: true, saved: true }
+    },
     async listComments(input) {
       calls.comments += 1
       if (scenario === "slow" || scenario === "switching") await wait(input.issueKey === "SHOP-617" ? 1_200 : 50)

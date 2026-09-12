@@ -45,7 +45,9 @@ const SearchPage = Schema.Struct({
 const decodeAgilePage = Schema.decodeUnknownOption(Schema.fromJsonString(AgilePage))
 const decodeSearchPage = Schema.decodeUnknownOption(Schema.fromJsonString(SearchPage))
 
-export async function fetchJiraBoards(auth: JiraAuth): Promise<{ ok: true; boards: JiraBoardSummary[] } | JiraClientFailure> {
+export async function fetchJiraBoards(
+  auth: JiraAuth,
+): Promise<{ ok: true; boards: JiraBoardSummary[] } | JiraClientFailure> {
   const boards: JiraBoardSummary[] = []
   let startAt = 0
 
@@ -74,7 +76,10 @@ export async function fetchJiraBoards(auth: JiraAuth): Promise<{ ok: true; board
   return { ok: true, boards }
 }
 
-export async function fetchJiraBoard(auth: JiraAuth, boardId: number): Promise<{ ok: true; board: JiraBoardView } | JiraClientFailure> {
+export async function fetchJiraBoard(
+  auth: JiraAuth,
+  boardId: number,
+): Promise<{ ok: true; board: JiraBoardView } | JiraClientFailure> {
   if (!Number.isSafeInteger(boardId) || boardId <= 0) return failJira("malformed")
 
   const [boardResult, configurationResult, sprintResult] = await Promise.all([
@@ -93,9 +98,7 @@ export async function fetchJiraBoard(auth: JiraAuth, boardId: number): Promise<{
   const filterId = configurationFilterId(configuration)
   if (!name || !type || !filterId) return failJira("malformed")
 
-  const sprints = sprintResult.ok
-    ? sprintResult.sprints
-    : sprintFailureAsEmpty(type, sprintResult)
+  const sprints = sprintResult.ok ? sprintResult.sprints : sprintFailureAsEmpty(type, sprintResult)
   if (!Array.isArray(sprints)) return sprints
 
   const activeSprint = activeSprintFrom(sprints)
@@ -220,7 +223,7 @@ function sprintFailureAsEmpty(type: "scrum" | "kanban", failure: JiraClientFailu
   return []
 }
 
-async function fetchStoryPointFieldIds(auth: JiraAuth) {
+export async function fetchStoryPointFieldIds(auth: JiraAuth) {
   const result = await jiraRequest({
     ...auth,
     path: "/rest/api/3/field",

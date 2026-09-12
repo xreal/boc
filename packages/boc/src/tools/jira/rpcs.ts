@@ -13,6 +13,7 @@ import {
   JiraPageOffset,
   JiraIssueStatus,
   JIRA_ISSUE_STATUS_BATCH_SIZE,
+  JiraAttachmentId,
 } from "./domain/issue"
 import { JiraPullRequest, JiraPullRequestFailure } from "./domain/pull-request"
 export { JiraIssueDetail, JiraIssueStatus } from "./domain/issue"
@@ -89,6 +90,18 @@ export const JiraConnectionFailure = Schema.Struct({
 })
 export type JiraConnectionFailure = typeof JiraConnectionFailure.Type
 
+export const JiraAttachmentResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), base64: Schema.String, mimeType: Schema.String }),
+  JiraConnectionFailure,
+])
+export type JiraAttachmentResult = typeof JiraAttachmentResult.Type
+
+export const JiraAttachmentDownloadResult = Schema.Union([
+  Schema.Struct({ ok: Schema.Literal(true), saved: Schema.Boolean }),
+  JiraConnectionFailure,
+])
+export type JiraAttachmentDownloadResult = typeof JiraAttachmentDownloadResult.Type
+
 export const JiraConnectionAttempt = Schema.Union([JiraConnectionSuccess, JiraConnectionFailure])
 export type JiraConnectionAttempt = typeof JiraConnectionAttempt.Type
 
@@ -117,6 +130,15 @@ export const JiraIssueKeyInput = Schema.Struct({
   issueKey: JiraIssueKey,
 })
 export type JiraIssueKeyInput = typeof JiraIssueKeyInput.Type
+
+export const BocJiraPreviewAttachment = Rpc.make("BocJiraPreviewAttachment", {
+  payload: { ...JiraIssueKeyInput.fields, attachmentId: JiraAttachmentId },
+  success: JiraAttachmentResult,
+})
+export const BocJiraDownloadAttachment = Rpc.make("BocJiraDownloadAttachment", {
+  payload: { ...JiraIssueKeyInput.fields, attachmentId: JiraAttachmentId },
+  success: JiraAttachmentDownloadResult,
+})
 
 export const JiraIssueStatusesInput = Schema.Struct({
   requestId: JiraReadRequestId,
@@ -192,6 +214,20 @@ export const JiraPullRequestsResult = Schema.Union([
 ])
 export type JiraPullRequestsResult = typeof JiraPullRequestsResult.Type
 
+export const JiraBranchesResult = Schema.Union([
+  Schema.Struct({
+    ok: Schema.Literal(true),
+    branches: Schema.Array(Schema.Struct({ name: Schema.String, url: Schema.String })),
+    truncated: Schema.Boolean,
+  }),
+  JiraPullRequestFailure,
+])
+export type JiraBranchesResult = typeof JiraBranchesResult.Type
+export const BocJiraListBranches = Rpc.make("BocJiraListBranches", {
+  payload: JiraIssueKeyInput,
+  success: JiraBranchesResult,
+})
+
 export const BocJiraListComments = Rpc.make("BocJiraListComments", {
   payload: { ...JiraIssueKeyInput.fields, startAt: JiraPageOffset },
   success: JiraCommentsResult,
@@ -211,7 +247,7 @@ export const BocJiraListPullRequests = Rpc.make("BocJiraListPullRequests", {
 export const BocJiraCancelIssueResourceRead = Rpc.make("BocJiraCancelIssueResourceRead", {
   payload: {
     requestId: JiraReadRequestId,
-    resource: Schema.Literals(["comments", "assignees", "pull-requests", "issue-statuses"]),
+    resource: Schema.Literals(["comments", "assignees", "pull-requests", "issue-statuses", "attachment", "branches"]),
   },
   success: Schema.Void,
 })
@@ -303,6 +339,9 @@ export const BocJiraSaveSessionInstructions = Rpc.make("BocJiraSaveSessionInstru
 })
 
 export const JiraRpcs = RpcGroup.make(
+  BocJiraListBranches,
+  BocJiraPreviewAttachment,
+  BocJiraDownloadAttachment,
   BocJiraListComments,
   BocJiraSearchAssignees,
   BocJiraAssignIssue,

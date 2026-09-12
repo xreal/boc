@@ -32,6 +32,7 @@ const parser = new Marked({
     },
     link({ href, title, tokens }) {
       const text = this.parser.parseInline(tokens)
+      if (/^#jira-attachment-\d+$/.test(href)) return `<a href="${href}">${text}</a>`
       const url = safeHttpUrl(href)
       if (!url) return text
       const titleAttr = title ? ` title="${escapeHtml(title)}"` : ""

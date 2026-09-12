@@ -2,6 +2,7 @@ import { Option, Schema } from "effect"
 import { adfToMarkdown } from "./adf"
 import { jiraAssetUrl, mapJiraBoardIssue } from "./board"
 import { JIRA_ERROR_CATEGORIES } from "./errors"
+import { compact } from "./compact"
 
 export const JIRA_COMMENT_LIMIT = 10_000
 export const JIRA_COMMENT_PAGE_SIZE = 20
@@ -37,6 +38,35 @@ export const JiraIssueUser = Schema.Struct({
 })
 export type JiraIssueUser = typeof JiraIssueUser.Type
 
+export const JiraRelatedIssue = Schema.Struct({
+  key: JiraIssueKey,
+  summary: Schema.String,
+  statusName: Schema.optionalKey(Schema.String),
+  statusCategory: Schema.optionalKey(Schema.String),
+  issueTypeName: Schema.optionalKey(Schema.String),
+})
+export type JiraRelatedIssue = typeof JiraRelatedIssue.Type
+
+export const JiraIssueLink = Schema.Struct({
+  id: Schema.String,
+  relationship: Schema.String,
+  issue: JiraRelatedIssue,
+})
+
+export const JiraAttachmentId = Schema.String.check(Schema.isPattern(/^\d+$/), Schema.isMaxLength(128))
+export const JIRA_PREVIEW_MAX_BYTES = 10 * 1024 * 1024
+export const JiraAttachment = Schema.Struct({
+  id: JiraAttachmentId,
+  filename: Schema.NonEmptyString,
+  mimeType: Schema.String,
+  size: Schema.Number.check(Schema.isInt(), Schema.isGreaterThanOrEqualTo(0)),
+})
+export type JiraAttachment = typeof JiraAttachment.Type
+
+export function jiraAttachmentIsImage(attachment: JiraAttachment) {
+  return ["image/png", "image/jpeg", "image/gif", "image/webp", "image/avif"].includes(attachment.mimeType)
+}
+
 export const JiraIssueDetail = Schema.Struct({
   id: Schema.String,
   key: Schema.String,
@@ -44,9 +74,16 @@ export const JiraIssueDetail = Schema.Struct({
   description: Schema.optionalKey(Schema.String),
   statusName: Schema.optionalKey(Schema.String),
   assignee: Schema.NullOr(JiraIssueUser),
-  reporterName: Schema.optionalKey(Schema.String),
+  reporter: Schema.optionalKey(JiraIssueUser),
+  parent: Schema.optionalKey(JiraRelatedIssue),
+  subtasks: Schema.Array(JiraRelatedIssue),
+  links: Schema.Array(JiraIssueLink),
+  attachments: Schema.Array(JiraAttachment),
   issueTypeName: Schema.optionalKey(Schema.String),
   priorityName: Schema.optionalKey(Schema.String),
+  issueTypeIconUrl: Schema.optionalKey(Schema.String),
+  subtask: Schema.optionalKey(Schema.Boolean),
+  storyPoints: Schema.optionalKey(Schema.Number),
   labels: Schema.Array(Schema.String),
   createdAt: Schema.optionalKey(Schema.String),
   updatedAt: Schema.optionalKey(Schema.String),
@@ -117,8 +154,12 @@ export function mapJiraUser(raw: unknown, origin: string): JiraIssueUser | undef
   }
 }
 
-export function mapJiraIssueDetail(raw: unknown, origin: string): JiraIssueDetail | undefined {
-  const issue = mapJiraBoardIssue(raw, origin)
+export function mapJiraIssueDetail(
+  raw: unknown,
+  origin: string,
+  storyPointFields: readonly string[] = [],
+): JiraIssueDetail | undefined {
+  const issue = mapJiraBoardIssue(raw, origin, storyPointFields)
   const detail = Option.getOrUndefined(
     Schema.decodeUnknownOption(
       Schema.Struct({
@@ -126,6 +167,10 @@ export function mapJiraIssueDetail(raw: unknown, origin: string): JiraIssueDetai
           description: Schema.optionalKey(Schema.Unknown),
           assignee: Schema.Unknown,
           reporter: Schema.optionalKey(Schema.Unknown),
+          parent: Schema.optionalKey(Schema.Unknown),
+          subtasks: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+          issuelinks: Schema.optionalKey(Schema.Array(Schema.Unknown)),
+          attachment: Schema.optionalKey(Schema.Array(Schema.Unknown)),
         }),
       }),
     )(raw),
@@ -133,21 +178,75 @@ export function mapJiraIssueDetail(raw: unknown, origin: string): JiraIssueDetai
   if (!issue || !detail) return
   const assignee = detail.fields.assignee === null ? null : mapJiraUser(detail.fields.assignee, origin)
   if (assignee === undefined) return
-  return {
+  const attachments = (detail.fields.attachment ?? []).flatMap((raw) => {
+    const attachment = Option.getOrUndefined(Schema.decodeUnknownOption(JiraAttachment)(raw))
+    return attachment ? [attachment] : []
+  })
+  return compact({
     id: issue.id,
     key: issue.key,
     summary: issue.summary,
     labels: issue.labels,
     url: issue.url,
     assignee,
-    description: adfToMarkdown(detail.fields.description),
-    reporterName: mapJiraUser(detail.fields.reporter, origin)?.displayName,
+    description: adfToMarkdown(detail.fields.description, attachments),
+    reporter: mapJiraUser(detail.fields.reporter, origin),
+    parent: mapRelatedIssue(detail.fields.parent),
+    subtasks: (detail.fields.subtasks ?? []).flatMap((raw) => {
+      const issue = mapRelatedIssue(raw)
+      return issue ? [issue] : []
+    }),
+    links: (detail.fields.issuelinks ?? []).flatMap((raw) => {
+      const link = Option.getOrUndefined(Schema.decodeUnknownOption(RawIssueLink)(raw))
+      if (!link) return []
+      const issue = mapRelatedIssue(link.inwardIssue ?? link.outwardIssue)
+      const relationship = link.inwardIssue ? link.type.inward : link.type.outward
+      return issue ? [{ id: link.id, relationship, issue }] : []
+    }),
+    attachments,
     statusName: issue.statusName,
     issueTypeName: issue.issueTypeName,
+    issueTypeIconUrl: issue.issueTypeIconUrl,
+    subtask: issue.subtask,
+    storyPoints: issue.storyPoints,
     priorityName: issue.priorityName,
     createdAt: issue.createdAt,
     updatedAt: issue.updatedAt,
-  }
+  })
+}
+
+const RawRelatedIssue = Schema.Struct({
+  key: JiraIssueKey,
+  fields: Schema.Struct({
+    summary: Schema.String,
+    status: Schema.optionalKey(
+      Schema.NullOr(
+        Schema.Struct({
+          name: Schema.String,
+          statusCategory: Schema.optionalKey(Schema.Struct({ key: Schema.String })),
+        }),
+      ),
+    ),
+    issuetype: Schema.optionalKey(Schema.Struct({ name: Schema.String })),
+  }),
+})
+const RawIssueLink = Schema.Struct({
+  id: Schema.String,
+  type: Schema.Struct({ inward: Schema.String, outward: Schema.String }),
+  inwardIssue: Schema.optionalKey(Schema.Unknown),
+  outwardIssue: Schema.optionalKey(Schema.Unknown),
+})
+
+function mapRelatedIssue(raw: unknown): JiraRelatedIssue | undefined {
+  const issue = Option.getOrUndefined(Schema.decodeUnknownOption(RawRelatedIssue)(raw))
+  if (!issue) return
+  return compact({
+    key: issue.key,
+    summary: issue.fields.summary,
+    statusName: issue.fields.status?.name,
+    statusCategory: issue.fields.status?.statusCategory?.key,
+    issueTypeName: issue.fields.issuetype?.name,
+  })
 }
 
 export function mapJiraIssueStatus(raw: unknown): JiraIssueStatus | undefined {

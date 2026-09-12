@@ -1,0 +1,296 @@
+.jira-ticket-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+}
+
+[data-component="dialog-v2"] [data-slot="dialog-container"].jira-ticket-dialog {
+  width: min(1130px, calc(100vw - 48px));
+  height: min(900px, calc(100dvh - 64px));
+  border-radius: 12px;
+}
+
+.jira-ticket {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--v2-background-bg-base);
+  color: var(--v2-text-text-base);
+  font-size: 13px;
+  line-height: var(--line-height-base);
+  user-select: text;
+}
+.jira-ticket-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 72px;
+  flex-shrink: 0;
+  padding-inline: 20px 12px;
+  border-block-end: 1px solid var(--v2-border-border-muted);
+}
+.jira-ticket-identity {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 4px;
+  padding-block: 10px;
+}
+.jira-ticket-topic {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+.jira-ticket-header-details {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-inline-start: 24px;
+  color: var(--v2-text-text-muted);
+  font-size: 12px;
+  line-height: var(--line-height-compact);
+}
+.jira-ticket-external {
+  flex-shrink: 0;
+  margin-inline-end: 10px;
+}
+.jira-ticket-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 378px;
+  flex: 1;
+  min-height: 0;
+}
+.jira-ticket-mobile-nav {
+  display: none;
+}
+.jira-ticket-document,
+.jira-ticket-work {
+  min-width: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+.jira-ticket-document {
+  padding: 28px 32px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.jira-ticket-work {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  border-inline-start: 1px solid var(--v2-border-border-muted);
+  background: var(--v2-background-bg-layer-01);
+}
+.jira-ticket-work > *,
+.jira-ticket-document > * {
+  flex-shrink: 0;
+}
+.jira-ticket-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.jira-ticket-heading h2 {
+  font-size: 24px;
+  line-height: 32px;
+  font-weight: 600;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+.jira-ticket-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-block-start: 1px solid var(--v2-border-border-muted);
+  padding-block-start: 20px;
+}
+.jira-ticket-section h3 {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 12px;
+  line-height: var(--line-height-compact);
+  color: var(--v2-text-text-muted);
+  font-weight: 530;
+}
+.jira-ticket-description {
+  border: 0;
+  padding-block-start: 0;
+}
+.jira-ticket-count {
+  color: var(--v2-text-text-faint);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+.jira-ticket-properties {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 12px 8px;
+  align-items: center;
+  font-size: 12px;
+  line-height: var(--line-height-compact);
+}
+.jira-ticket-properties dt {
+  color: var(--v2-text-text-muted);
+}
+.jira-ticket-properties dd {
+  min-width: 0;
+}
+.jira-ticket-dates {
+  border-block-start: 1px solid var(--v2-border-border-muted);
+  padding-block-start: 16px;
+  color: var(--v2-text-text-muted);
+}
+.jira-ticket-parent {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--v2-text-text-muted);
+  text-align: start;
+  font-size: 12px;
+}
+.jira-ticket-parent:hover {
+  color: var(--v2-text-text-base);
+}
+.jira-ticket-related {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  min-height: 36px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  text-align: start;
+}
+.jira-ticket-related:hover {
+  background: var(--v2-background-bg-layer-01);
+}
+.jira-ticket button:focus-visible {
+  outline: 2px solid var(--v2-border-border-focus);
+  outline-offset: 2px;
+}
+.jira-ticket-status-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border: 1.5px solid var(--v2-text-text-muted);
+  border-radius: 50%;
+}
+.jira-ticket-status-dot[data-done="true"] {
+  border-color: var(--v2-state-fg-success);
+  background: var(--v2-state-fg-success);
+}
+.jira-ticket-loading {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 16px;
+}
+.jira-attachment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(144px, 1fr));
+  gap: 12px;
+}
+.jira-attachment-card {
+  min-width: 0;
+  border: 1px solid var(--v2-border-border-muted);
+  border-radius: 8px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.jira-attachment-file {
+  display: flex;
+  flex-direction: column;
+  align-items: start;
+  gap: 6px;
+  text-align: start;
+}
+.jira-attachment-art {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 92px;
+  border-radius: 4px;
+  background: var(--v2-background-bg-layer-01);
+  color: var(--v2-text-text-muted);
+  overflow: hidden;
+}
+.jira-attachment-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+[data-component="dialog-v2"] [data-slot="dialog-container"].jira-attachment-dialog {
+  width: min(960px, calc(100vw - 32px));
+  height: min(800px, calc(100dvh - 48px));
+}
+.jira-attachment-preview {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: auto;
+  padding: 16px;
+}
+.jira-attachment-preview img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+@media (max-width: 800px) {
+  [data-component="dialog-v2"] [data-slot="dialog-container"].jira-ticket-dialog {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+  .jira-ticket {
+    border-radius: 0;
+  }
+  .jira-ticket-mobile-nav {
+    display: flex;
+    flex-shrink: 0;
+    gap: 8px;
+    padding: 4px 12px;
+    border-block-end: 1px solid var(--v2-border-border-muted);
+  }
+  .jira-ticket-layout {
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .jira-ticket-document,
+  .jira-ticket-work {
+    overflow: visible;
+    scrollbar-gutter: auto;
+    padding: 20px;
+  }
+  .jira-ticket-work {
+    border-inline-start: 0;
+    border-block-start: 1px solid var(--v2-border-border-muted);
+  }
+  .jira-ticket-heading h2 {
+    font-size: 21px;
+    line-height: 28px;
+  }
+  .jira-ticket-header {
+    padding-inline: 12px 8px;
+  }
+}

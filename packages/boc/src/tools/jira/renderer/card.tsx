@@ -1,4 +1,4 @@
-import { Avatar } from "@opencode/ui/avatar"
+import { JiraAvatar } from "./person"
 import { Badge } from "@opencode/ui/badge"
 import { Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
@@ -72,7 +72,7 @@ export function JiraIssueCard(props: {
             <Show when={props.issue.assigneeName}>
               {(assignee) => (
                 <>
-                  <Avatar size="small" fallback={assignee()} src={props.issue.assigneeAvatarUrl} />
+                  <JiraAvatar fallback={assignee()} src={props.issue.assigneeAvatarUrl} />
                   <span class="sr-only">{assignee()}</span>
                 </>
               )}

@@ -20,13 +20,10 @@ import {
 } from "../domain/board"
 import type { JiraIssueDetail } from "../domain/issue"
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
-import {
-  deploymentTicketKey,
-  type DeploymentSystem,
-} from "../../deployments/domain/systems"
+import { deploymentTicketKey, type DeploymentSystem } from "../../deployments/domain/systems"
 import { DeploymentDialog } from "../../deployments/renderer/deploy-dialog"
 import { JiraBoardColumns } from "./columns"
-import { JiraIssueInspector } from "./inspector"
+import { JiraIssueDialog } from "./inspector"
 import { createJiraBoardLanes } from "./lanes"
 import { createLatestRequest, type LatestRequest } from "./latest-request"
 import { JiraPickBoardDialog } from "./pick-board"
@@ -48,7 +45,8 @@ export default function JiraScreen(props: BocScreenProps) {
   let inspectorReturnFocus: HTMLButtonElement | undefined
   const [view, setView] = createStore({
     online: true,
-    wide: true,
+    history: [] as { issueKey: string; scroll: { document: number; work: number } }[],
+    scrollPosition: { document: 0, work: 0 },
     connection: undefined as JiraConnectionStatus | undefined,
     boards: [] as readonly JiraBoardSummary[],
     preferences: { savedBoards: [] } as JiraPreferences,
@@ -76,7 +74,7 @@ export default function JiraScreen(props: BocScreenProps) {
       assigneeName: assignee?.displayName,
       assigneeAvatarUrl: assignee?.avatarUrl,
     })
-    if (view.issue?.url === issueUrl) setView("issue", (issue) => issue ? { ...issue, assignee } : issue)
+    if (view.issue?.url === issueUrl) setView("issue", (issue) => (issue ? { ...issue, assignee } : issue))
   })
 
   const filtered = () =>
@@ -240,11 +238,30 @@ export default function JiraScreen(props: BocScreenProps) {
     boardRequests.finish(request)
   }
 
-  const loadIssue = async (issueKey: string, returnFocus: HTMLButtonElement) => {
+  const currentScroll = { document: 0, work: 0 }
+  const navigateIssue = (issueKey: string) => {
+    if (issueKey === view.selectedIssueKey) return
+    if (view.selectedIssueKey)
+      setView("history", (items) => [...items, { issueKey: view.selectedIssueKey ?? "", scroll: { ...currentScroll } }])
+    setView("scrollPosition", { document: 0, work: 0 })
+    void loadIssue(issueKey)
+  }
+  const backIssue = () => {
+    const previous = view.history.at(-1)
+    if (!previous) return
+    setView("history", (items) => items.slice(0, -1))
+    setView("scrollPosition", previous.scroll)
+    void loadIssue(previous.issueKey)
+  }
+  const loadIssue = async (issueKey: string, returnFocus?: HTMLButtonElement) => {
+    const opening = !view.selectedIssueKey
     const request = issueRequests.begin()
-    inspectorReturnFocus = returnFocus
+    if (returnFocus) inspectorReturnFocus = returnFocus
     setView({ selectedIssueKey: issueKey, loading: "issue", issue: undefined, issueFailure: undefined })
-    const result = await desktop.jira.getIssue({ requestId: request.requestId, issueKey })
+    if (opening) setView({ history: [], scrollPosition: { document: 0, work: 0 } })
+    const result = await desktop.jira
+      .getIssue({ requestId: request.requestId, issueKey })
+      .catch(() => ({ ok: false as const, category: "network" as const }))
     if (!issueRequests.isCurrent(request)) return
     if (!result.ok) {
       setView({ loading: false, issueFailure: result })
@@ -290,8 +307,7 @@ export default function JiraScreen(props: BocScreenProps) {
 
   const closeInspector = () => {
     issueRequests.invalidate()
-    setView({ selectedIssueKey: undefined, issue: undefined, issueFailure: undefined })
-    queueMicrotask(() => inspectorReturnFocus?.focus())
+    setView({ selectedIssueKey: undefined, issue: undefined, issueFailure: undefined, history: [], loading: false })
   }
 
   const loadDeployments = async (force = false) => {
@@ -332,11 +348,9 @@ export default function JiraScreen(props: BocScreenProps) {
 
   const openDeploy = (system?: DeploymentSystem) => {
     const target =
-      system ??
-      view.deploymentSystems.find((entry) => entry.availability === "free") ??
-      view.deploymentSystems[0]
+      system ?? view.deploymentSystems.find((entry) => entry.availability === "free") ?? view.deploymentSystems[0]
     if (!target) return
-    void dialog.show(() => (
+    void dialog.push(() => (
       <DeploymentDialog
         api={desktop.deployments}
         locale={props.host.locale}
@@ -351,19 +365,10 @@ export default function JiraScreen(props: BocScreenProps) {
   }
 
   onMount(() => {
-    const wide = window.matchMedia("(min-width: 56rem)")
-    const syncWide = () => setView("wide", wide.matches)
     const syncOnline = () => setView("online", navigator.onLine)
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.key !== "Escape" || !view.selectedIssueKey) return
-      closeInspector()
-    }
-    syncWide()
     syncOnline()
-    wide.addEventListener("change", syncWide)
     window.addEventListener("online", syncOnline)
     window.addEventListener("offline", syncOnline)
-    window.addEventListener("keydown", onKeyDown)
     void bootstrap()
     void loadDeployments(false)
     const deploymentTimer = setInterval(() => {
@@ -373,10 +378,9 @@ export default function JiraScreen(props: BocScreenProps) {
       boardRequests.invalidate()
       issueRequests.invalidate()
       clearInterval(deploymentTimer)
-      wide.removeEventListener("change", syncWide)
       window.removeEventListener("online", syncOnline)
       window.removeEventListener("offline", syncOnline)
-      window.removeEventListener("keydown", onKeyDown)
+      if (view.selectedIssueKey) dialog.close()
     })
   })
 
@@ -438,23 +442,30 @@ export default function JiraScreen(props: BocScreenProps) {
             onOpenExternal={(url) => props.host.openExternal(url)}
           />
           <Show when={view.selectedIssueKey}>
-            <JiraIssueInspector
-              api={desktop.jira}
-              assignments={assignments}
-              online={view.online}
-              t={t}
-              locale={props.host.locale()}
-              issueKey={view.selectedIssueKey!}
-              boardId={view.selectedBoardId!}
-              issue={view.issue}
-              loading={view.loading === "issue"}
-              overlay={!view.wide}
-              failure={view.issueFailure}
-              deployedSystems={deployedSystemsForIssue(view.selectedIssueKey!)}
-              onDeploy={openDeploy}
-              onClose={closeInspector}
-              onOpenExternal={(url) => props.host.openExternal(url)}
-            />
+            {(key) => (
+              <JiraIssueDialog
+                api={desktop.jira}
+                assignments={assignments}
+                online={view.online}
+                t={t}
+                locale={props.host.locale()}
+                issueKey={key()}
+                boardId={view.selectedBoardId ?? 0}
+                issue={view.issue}
+                loading={view.loading === "issue"}
+                failure={view.issueFailure}
+                deployedSystems={deployedSystemsForIssue(key())}
+                onDeploy={openDeploy}
+                onClose={closeInspector}
+                returnFocus={inspectorReturnFocus}
+                onNavigate={navigateIssue}
+                onBack={view.history.length ? backIssue : undefined}
+                onRetry={() => void loadIssue(key())}
+                scrollPosition={view.scrollPosition}
+                onScroll={(position) => Object.assign(currentScroll, position)}
+                onOpenExternal={(url) => props.host.openExternal(url)}
+              />
+            )}
           </Show>
         </div>
       </Show>

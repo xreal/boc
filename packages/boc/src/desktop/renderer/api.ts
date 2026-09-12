@@ -48,11 +48,19 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
         invoke("BocDeploymentsResolveCacheRun", input),
     },
     jira: {
+      listBranches: (input: BocDesktopInvokeArgs<"BocJiraListBranches">[0]) => invoke("BocJiraListBranches", input),
+      previewAttachment: (input: BocDesktopInvokeArgs<"BocJiraPreviewAttachment">[0]) =>
+        invoke("BocJiraPreviewAttachment", input),
+      downloadAttachment: (input: BocDesktopInvokeArgs<"BocJiraDownloadAttachment">[0]) =>
+        invoke("BocJiraDownloadAttachment", input),
       listComments: (input: BocDesktopInvokeArgs<"BocJiraListComments">[0]) => invoke("BocJiraListComments", input),
-      searchAssignees: (input: BocDesktopInvokeArgs<"BocJiraSearchAssignees">[0]) => invoke("BocJiraSearchAssignees", input),
+      searchAssignees: (input: BocDesktopInvokeArgs<"BocJiraSearchAssignees">[0]) =>
+        invoke("BocJiraSearchAssignees", input),
       assignIssue: (input: BocDesktopInvokeArgs<"BocJiraAssignIssue">[0]) => invoke("BocJiraAssignIssue", input),
-      listPullRequests: (input: BocDesktopInvokeArgs<"BocJiraListPullRequests">[0]) => invoke("BocJiraListPullRequests", input),
-      cancelIssueResourceRead: (input: BocDesktopInvokeArgs<"BocJiraCancelIssueResourceRead">[0]) => invoke("BocJiraCancelIssueResourceRead", input),
+      listPullRequests: (input: BocDesktopInvokeArgs<"BocJiraListPullRequests">[0]) =>
+        invoke("BocJiraListPullRequests", input),
+      cancelIssueResourceRead: (input: BocDesktopInvokeArgs<"BocJiraCancelIssueResourceRead">[0]) =>
+        invoke("BocJiraCancelIssueResourceRead", input),
       getSessionInstructions: () => invoke("BocJiraGetSessionInstructions"),
       saveSessionInstructions: (input: BocDesktopInvokeArgs<"BocJiraSaveSessionInstructions">[0]) =>
         invoke("BocJiraSaveSessionInstructions", input),

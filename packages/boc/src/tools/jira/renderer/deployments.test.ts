@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test"
 import { createBocTranslator } from "../../../renderer/i18n"
 import type { DeploymentSystem } from "../../deployments/domain/systems"
-import { deploymentAgeDisplay, healthTone, syncTone } from "./deployments"
+import { deploymentAgeDisplay } from "./deployments"
+import { healthTone, syncTone } from "../../deployments/renderer/system-status"
 
 const t = createBocTranslator(() => "en")
 
@@ -21,18 +22,18 @@ const testSystem: DeploymentSystem = {
 
 describe("Jira deployment display logic", () => {
   test("maps sync tones correctly", () => {
-    expect(syncTone("synced")).toBe("text-v2-state-fg-success")
-    expect(syncTone("out-of-sync")).toBe("text-v2-state-fg-warning")
-    expect(syncTone("unknown")).toBe("text-v2-text-text-muted")
+    expect(syncTone("synced")).toBe("success")
+    expect(syncTone("out-of-sync")).toBe("warning")
+    expect(syncTone("unknown")).toBe("muted")
   })
 
   test("maps health tones correctly", () => {
-    expect(healthTone("healthy")).toBe("text-v2-state-fg-success")
-    expect(healthTone("progressing")).toBe("text-v2-state-fg-warning")
-    expect(healthTone("suspended")).toBe("text-v2-state-fg-warning")
-    expect(healthTone("degraded")).toBe("text-v2-state-fg-danger")
-    expect(healthTone("missing")).toBe("text-v2-state-fg-danger")
-    expect(healthTone("unknown")).toBe("text-v2-text-text-muted")
+    expect(healthTone("healthy")).toBe("success")
+    expect(healthTone("progressing")).toBe("warning")
+    expect(healthTone("suspended")).toBe("warning")
+    expect(healthTone("degraded")).toBe("danger")
+    expect(healthTone("missing")).toBe("danger")
+    expect(healthTone("unknown")).toBe("muted")
   })
 
   test("formats deployment age using ageSeconds and dictionary key", () => {

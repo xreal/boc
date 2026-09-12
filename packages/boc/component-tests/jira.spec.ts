@@ -1,6 +1,148 @@
 import { expect, story } from "../../storybook/playwright/story"
 
 story(
+  "header shows issue identity, priority and story points with icon-only title copying",
+  async ({ mount, page }) => {
+    await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+    await mount("boc-jira--modal")
+    const header = page.locator(".jira-ticket-header")
+    await expect(header.locator(".jira-ticket-topic")).toContainText("SHOP-617")
+    await expect(header.locator(".jira-ticket-topic")).toContainText(
+      "Keep product-gallery navigation consistent across layouts",
+    )
+    await expect(header.locator('[title="Story"]')).toBeVisible()
+    await expect(header.getByText("Medium", { exact: true })).toBeVisible()
+    await expect(header.getByLabel("Story points", { exact: true })).toHaveText("5 pts")
+    await expect(page.getByRole("button", { name: "Copy link", exact: true })).toHaveCount(0)
+    await header.getByRole("button", { name: "Copy ticket key and title", exact: true }).click()
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
+      "SHOP-617: Keep product-gallery navigation consistent across layouts",
+    )
+    await expect(page.locator(".jira-ticket-work")).toHaveCSS("width", "378px")
+  },
+)
+
+story("modal keeps the working rail visible while reading a long ticket", async ({ mount, page }, testInfo) => {
+  await page.setViewportSize({ width: 1440, height: 1000 })
+  await mount("boc-jira--long-ticket", { globals: { theme: "dark" } })
+  const modal = page.getByRole("dialog", { name: "SHOP-617", exact: true })
+  const start = modal.getByRole("button", { name: "Work on this ticket", exact: true })
+  await expect(start).toBeInViewport()
+  await expect(
+    modal.getByRole("region", { name: "Boc sessions" }).getByRole("button", { name: /Implement gallery navigation/ }),
+  ).toBeVisible()
+  const before = await start.boundingBox()
+  await modal.getByRole("heading", { name: "Verification 15", exact: true }).scrollIntoViewIfNeeded()
+  expect((await start.boundingBox())?.y).toBe(before?.y)
+  await expect(start).toBeInViewport()
+  await modal.locator(".jira-ticket-document").evaluate((element) => {
+    element.scrollTop = 0
+  })
+  await page.screenshot({ path: testInfo.outputPath("ticket-modal.png") })
+})
+
+story("linked tickets reuse the modal and Back restores the reading position", async ({ mount, page }) => {
+  await mount("boc-jira--long-ticket")
+  const linked = page.getByRole("button", { name: /SHOP-619 Gallery API response/ })
+  await linked.scrollIntoViewIfNeeded()
+  const position = await page.locator(".jira-ticket-document").evaluate((element) => element.scrollTop)
+  await linked.click()
+  await expect(page.locator(".jira-ticket-topic")).toContainText("SHOP-619")
+  await expect(page.getByRole("dialog")).toHaveCount(1)
+  await page.getByRole("button", { name: "Back to previous ticket" }).click()
+  await expect(page.locator(".jira-ticket-topic")).toContainText("SHOP-617")
+  await expect
+    .poll(() => page.locator(".jira-ticket-document").evaluate((element) => element.scrollTop))
+    .toBeCloseTo(position, 0)
+})
+
+story("assignment in the workspace preserves the document reading position", async ({ mount, page }) => {
+  await mount("boc-jira--long-ticket")
+  await page.getByRole("heading", { name: "Verification 15", exact: true }).scrollIntoViewIfNeeded()
+  const position = await page.locator(".jira-ticket-document").evaluate((element) => element.scrollTop)
+  await page.getByRole("button", { name: "Change assignee", exact: true }).click()
+  await expect(page.getByRole("textbox", { name: "Search assignable people" })).toBeFocused()
+  await page.getByRole("textbox", { name: "Search assignable people" }).fill("reviewer")
+  await page.getByRole("button", { name: /Platform developer reviewer@example.invalid/ }).click()
+  await expect(page.getByLabel("Board assignee SHOP-617")).toContainText("reviewer@example.invalid")
+  expect(await page.locator(".jira-ticket-document").evaluate((element) => element.scrollTop)).toBeCloseTo(position, 0)
+})
+
+story("attachment preview stacks over the ticket and downloads through the attachment API", async ({ mount, page }) => {
+  await mount("boc-jira--modal")
+  const preview = page.getByRole("button", { name: "Preview gallery-layout.png", exact: true })
+  await preview.scrollIntoViewIfNeeded()
+  await expect(preview.locator("img")).toBeVisible()
+  await preview.click()
+  const imageDialog = page.getByRole("dialog", { name: "gallery-layout.png", exact: true })
+  await expect(imageDialog.getByRole("img", { name: "gallery-layout.png", exact: true })).toBeVisible()
+  await imageDialog.getByRole("button", { name: "Download", exact: true }).click()
+  await expect(imageDialog.getByRole("status")).toHaveText("Saved gallery-layout.png")
+  await page.keyboard.press("Escape")
+  await expect(imageDialog).not.toBeVisible()
+  await expect(page.getByRole("dialog", { name: "SHOP-617", exact: true })).toBeVisible()
+  await expect(preview).toBeFocused()
+  await page.getByRole("button", { name: "Download test-results.pdf", exact: true }).last().click()
+  await expect(page.getByRole("region", { name: "Attachments", exact: true }).getByRole("status")).toHaveText(
+    "Saved test-results.pdf",
+  )
+})
+
+story("attachment failures expose retry and do not close the ticket", async ({ mount, page }) => {
+  await mount("boc-jira--failed")
+  await page.getByRole("button", { name: "Preview gallery-layout.png", exact: true }).click()
+  const preview = page.getByRole("dialog", { name: "gallery-layout.png", exact: true })
+  await expect(preview.getByRole("alert")).toBeVisible()
+  await expect(preview.getByRole("button", { name: "Retry" })).toBeEnabled()
+  await preview.getByRole("button", { name: "Retry" }).click()
+  await expect(preview.getByRole("alert")).toBeVisible()
+})
+
+story("workspace opens branches, returns from deployment and reopens a linked Boc session", async ({ mount, page }) => {
+  await mount("boc-jira--modal")
+  const branches = page.getByRole("region", { name: "Branches", exact: true })
+  await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
+  await branches.getByRole("button", { name: "Copy branch SHOP-617-gallery-navigation", exact: true }).click()
+  expect(await page.evaluate(() => navigator.clipboard.readText())).toBe("SHOP-617-gallery-navigation")
+  await branches.getByRole("button", { name: "Open branch SHOP-617-gallery-navigation in GitHub", exact: true }).click()
+  await expect(page.getByLabel("Opened URL")).toHaveText(
+    "https://github.com/example/shop/tree/SHOP-617-gallery-navigation",
+  )
+  await page.getByRole("button", { name: "Deploy", exact: true }).click()
+  const deployment = page.getByRole("dialog", { name: "Fixture deployment" })
+  await expect(deployment).toBeVisible()
+  await page.keyboard.press("Escape")
+  await expect(page.locator('[data-slot="dialog-content"]').filter({ hasText: "Fixture deployment" })).toHaveCount(0)
+  await page
+    .getByRole("region", { name: "Boc sessions" })
+    .getByRole("button", { name: /Implement gallery navigation/ })
+    .click()
+  await expect(page.getByLabel("Opened session")).toHaveText("session-1")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+})
+
+story("modal start hands off to the composer and close restores the opener focus", async ({ mount, page }) => {
+  await mount("boc-jira--modal")
+  await page.getByRole("button", { name: "Work on this ticket", exact: true }).click()
+  await expect(page.getByLabel("Started model")).toContainText("gemini-3.8-flash")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+  await page.getByRole("button", { name: "Open ticket", exact: true }).click()
+  await page.keyboard.press("Escape")
+  await expect(page.getByRole("button", { name: "Open ticket", exact: true })).toBeFocused()
+})
+
+story("narrow RTL has a direct workspace jump and no horizontal overflow", async ({ mount, page }, testInfo) => {
+  await page.setViewportSize({ width: 540, height: 900 })
+  await mount("boc-jira--long-ticket", { globals: { direction: "rtl", locale: "ar", theme: "light" } })
+  await page.getByRole("button", { name: "Workspace", exact: true }).click()
+  await expect(page.getByRole("button", { name: "Work on this ticket", exact: true })).toBeInViewport()
+  expect(
+    await page.locator(".jira-ticket-layout").evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true)
+  await page.screenshot({ path: testInfo.outputPath("narrow-workspace.png") })
+})
+
+story(
   "ticket action is flush with its difficulty selector and uses the chosen model",
   async ({ mount, page }, testInfo) => {
     await mount("boc-jira--sessions", { globals: { theme: "dark" } })
@@ -147,7 +289,7 @@ story("late reads and assignment results stay with the initiating issue", async 
   await expect(comments.getByRole("article").first()).toContainText("SHOP-618 discussion")
   await expect(page.getByLabel("Board assignee SHOP-617")).toContainText("reviewer@example.invalid")
   await expect(page.getByLabel("Board assignee SHOP-618")).toContainText("platform@example.invalid")
-  await expect(page.getByRole("heading", { name: /SHOP-618:/ })).toBeVisible()
+  await expect(page.locator(".jira-ticket-topic")).toContainText("SHOP-618")
 })
 
 story("PR states and external navigation remain usable in narrow RTL", async ({ mount, page }) => {

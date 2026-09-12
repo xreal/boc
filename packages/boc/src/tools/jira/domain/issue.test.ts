@@ -1,8 +1,72 @@
 import { expect, test } from "bun:test"
 import { Schema } from "effect"
-import { JiraAccountId, JiraIssueKey, mapJiraCommentPage, mapJiraUser, mergeJiraComments } from "./issue"
+import {
+  JiraAccountId,
+  JiraIssueKey,
+  mapJiraCommentPage,
+  mapJiraIssueDetail,
+  mapJiraUser,
+  mergeJiraComments,
+} from "./issue"
+import { issueDetailFixture } from "../fixtures/board"
+import { adfToMarkdown } from "./adf"
 
 const origin = "https://example.atlassian.net"
+
+test("issue context preserves relationship direction, hierarchy, attachment metadata and reporter photos", () => {
+  const related = {
+    key: "SHOP-618",
+    fields: {
+      summary: "Gallery API",
+      status: { name: "Done", statusCategory: { key: "done" } },
+      issuetype: { name: "Task" },
+    },
+  }
+  const result = mapJiraIssueDetail(
+    {
+      ...issueDetailFixture,
+      fields: {
+        ...issueDetailFixture.fields,
+        reporter: {
+          accountId: "reporter",
+          displayName: "Product team",
+          avatarUrls: { "48x48": `${origin}/avatar.png` },
+        },
+        parent: related,
+        subtasks: [related, { key: "../invalid" }],
+        issuelinks: [
+          { id: "in", type: { inward: "is blocked by", outward: "blocks" }, inwardIssue: related },
+          { id: "out", type: { inward: "is blocked by", outward: "blocks" }, outwardIssue: related },
+        ],
+        attachment: [
+          { id: "100", filename: "capture.png", mimeType: "image/png", size: 42, content: "https://untrusted.invalid" },
+        ],
+      },
+    },
+    origin,
+  )
+  expect(result?.reporter?.avatarUrl).toBe(`${origin}/avatar.png`)
+  expect(result?.links.map((link) => link.relationship)).toEqual(["is blocked by", "blocks"])
+  expect(result?.parent?.key).toBe("SHOP-618")
+  expect(result?.subtasks).toHaveLength(1)
+  expect(result?.subtasks[0]?.statusCategory).toBe("done")
+  expect(result?.attachments).toEqual([{ id: "100", filename: "capture.png", mimeType: "image/png", size: 42 }])
+})
+
+test("file media resolves exact or unique filenames without confusing media UUIDs and attachment IDs", () => {
+  const document = {
+    type: "doc",
+    content: [
+      {
+        type: "mediaSingle",
+        content: [{ type: "media", attrs: { id: "media-uuid", type: "file", __fileName: "capture.png" } }],
+      },
+    ],
+  }
+  const attachment = { id: "100", filename: "capture.png", mimeType: "image/png", size: 42 }
+  expect(adfToMarkdown(document, [attachment])).toBe("[capture.png](#jira-attachment-100)")
+  expect(adfToMarkdown(document, [attachment, { ...attachment, id: "101" }])).toBe("*capture.png*")
+})
 const comment = (id: string, hour: number) => ({
   id,
   created: `2026-09-12T${hour}:00:00Z`,

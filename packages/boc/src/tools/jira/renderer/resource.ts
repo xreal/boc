@@ -5,13 +5,20 @@ import { createLatestRequest } from "./latest-request"
 
 export type JiraCollaborationApi = Pick<
   BocDesktopAPI["jira"],
-  "listComments" | "searchAssignees" | "assignIssue" | "listPullRequests" | "cancelIssueResourceRead"
+  | "listComments"
+  | "searchAssignees"
+  | "assignIssue"
+  | "listPullRequests"
+  | "cancelIssueResourceRead"
+  | "previewAttachment"
+  | "downloadAttachment"
+  | "listBranches"
 >
 
 /** One section owns its read identity and retains its last successful value during refresh. */
 export function createJiraResource<Value, Failure>(input: {
   api: JiraCollaborationApi
-  resource: "comments" | "assignees" | "pull-requests"
+  resource: "comments" | "assignees" | "pull-requests" | "branches"
 }) {
   const requests = createLatestRequest({
     prefix: `${input.resource}-${crypto.randomUUID()}`,

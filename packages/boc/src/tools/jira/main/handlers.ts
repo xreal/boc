@@ -18,7 +18,7 @@ import {
   type JiraIssueStatusesResult,
   type JiraIssuesResult,
 } from "../rpcs"
-import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards } from "./board-client"
+import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchStoryPointFieldIds } from "./board-client"
 import { fetchJiraMyself, type JiraAuth, type JiraFetch, type JiraWait } from "./client"
 import {
   assignJiraIssue,
@@ -41,6 +41,9 @@ import {
 } from "./store"
 import { JIRA_ISSUE_STATUS_CACHE_MS } from "../domain/issue"
 import { createJiraReadCoordinator, type JiraReadCoordinator } from "./read-coordinator"
+import { fetchJiraAttachment, previewJiraAttachment } from "./attachment-client"
+import { fetchJiraBranches } from "./github-branch-client"
+import type { JiraAttachmentDownloadResult } from "../rpcs"
 
 export type JiraRuntime = {
   store: JiraStore
@@ -49,6 +52,7 @@ export type JiraRuntime = {
   wait?: JiraWait
   run?: DeploymentCommandRunner
   now?: () => number
+  saveAttachment?: (filename: string, response: Response) => Promise<JiraAttachmentDownloadResult>
 }
 
 export function createJiraHandlers(runtime: JiraRuntime) {
@@ -58,6 +62,33 @@ export function createJiraHandlers(runtime: JiraRuntime) {
   const now = runtime.now ?? Date.now
   return JiraRpcs.toLayer(
     JiraRpcs.of({
+      BocJiraListBranches: (payload) =>
+        Effect.promise(() =>
+          reads.run("branches", payload.requestId, async (signal) =>
+            runtime.run
+              ? fetchJiraBranches(runtime.run, payload.issueKey, signal)
+              : { ok: false as const, category: "missing-cli" as const },
+          ),
+        ),
+      BocJiraPreviewAttachment: (payload) =>
+        Effect.promise(() =>
+          reads.run("attachment", payload.requestId, async (signal) => {
+            const auth = storedAuth(runtime, signal)
+            return auth.ok ? previewJiraAttachment(auth, payload) : auth
+          }),
+        ),
+      BocJiraDownloadAttachment: (payload) =>
+        Effect.promise(async () => {
+          const auth = storedAuth(runtime)
+          if (!auth.ok) return auth
+          if (!runtime.saveAttachment) return failJira("network")
+          const result = await fetchJiraAttachment(auth, payload)
+          if (!result.ok) return result
+          return runtime.saveAttachment(result.attachment.filename, result.response).catch(async () => {
+            await result.response.body?.cancel().catch(() => undefined)
+            return failJira("network")
+          })
+        }),
       BocJiraListComments: (payload) =>
         Effect.promise(() =>
           reads.run("comments", payload.requestId, async (signal) => {
@@ -276,10 +307,10 @@ export async function getIssue(
   reads: JiraReadCoordinator,
   payload: JiraIssueKeyInput,
 ): Promise<JiraIssueResult> {
-  return reads.run("issue", payload.requestId, (signal) => {
+  return reads.run("issue", payload.requestId, async (signal) => {
     const auth = storedAuth(runtime, signal)
     if (!auth.ok) return Promise.resolve(auth)
-    return fetchJiraIssue(auth, payload.issueKey)
+    return fetchJiraIssue(auth, payload.issueKey, await fetchStoryPointFieldIds(auth))
   })
 }
 

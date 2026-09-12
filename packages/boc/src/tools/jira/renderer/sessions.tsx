@@ -19,7 +19,12 @@ import {
   type JiraSessionDifficulty,
 } from "../domain/sessions"
 
-export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: number; t: BocTranslator }) {
+export function JiraIssueSessions(props: {
+  issue: JiraIssueDetail
+  boardId: number
+  t: BocTranslator
+  onNavigate?: () => void
+}) {
   const host = useBocHost()
   const desktop = useBocDesktop()
   const [form, setForm] = createStore({
@@ -63,6 +68,7 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
         model: jiraSessionModel(form.models[form.difficulty].model),
         target: project,
       })
+      .then(() => props.onNavigate?.())
       .catch((error: unknown) => {
         setForm("error", error instanceof Error ? error.message : props.t("boc.jira.sessions.startFailed"))
       })
@@ -71,8 +77,11 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
 
   return (
     <Show when={host.sessions}>
-      <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
-        <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.sessions.title")}</h3>
+      <section
+        aria-label={props.t("boc.jira.ticket.sessions")}
+        class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
+      >
+        <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.ticket.sessions")}</h3>
         <SplitButton data-boc-jira-session-start>
           <SplitButtonAction disabled={disabled()} aria-busy={form.busy} onClick={() => void start()}>
             <Show when={form.busy}>
@@ -160,7 +169,7 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
         <For each={sessions()?.links}>
           {(link) => (
             <Button
-              class="w-full min-w-0 justify-between gap-2"
+              class="!h-auto !w-full !min-w-0 !justify-start !py-2 !whitespace-normal"
               size="small"
               variant="ghost-muted"
               onClick={() => {
@@ -168,12 +177,18 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
                 setForm("error", "")
                 void host.sessions
                   ?.open(link.server, link.sessionID)
+                  .then(() => props.onNavigate?.())
                   .catch(() => setForm("error", props.t("boc.jira.sessions.unavailable")))
               }}
             >
-              <span class="truncate">{link.title}</span>
-              <span class="shrink-0 text-v2-text-text-faint">
-                {new Date(link.createdAt).toLocaleString(host.locale())}
+              <Icon name="speech-bubble" class="shrink-0" />
+              <span class="flex min-w-0 flex-1 flex-col gap-1 text-start">
+                <bdi dir="auto" class="truncate">
+                  {link.title}
+                </bdi>
+                <span class="text-[12px] text-v2-text-text-faint">
+                  {new Date(link.createdAt).toLocaleString(host.locale())}
+                </span>
               </span>
             </Button>
           )}

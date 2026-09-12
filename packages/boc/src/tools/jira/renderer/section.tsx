@@ -8,6 +8,7 @@ import type { BocTranslator } from "../../../renderer/i18n"
 export function JiraSection(props: {
   t: BocTranslator
   title: string
+  icon?: JSX.Element
   count?: string
   loading: boolean
   online: boolean
@@ -17,7 +18,8 @@ export function JiraSection(props: {
   return (
     <section aria-label={props.title} class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4">
       <div class="flex h-6 items-center gap-2">
-        <h3 class="min-w-0 flex-1 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
+        <h3 class="flex min-w-0 flex-1 items-center gap-1.5 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
+          {props.icon}
           {props.title}
         </h3>
         <span class="text-[12px] text-v2-text-text-faint">{props.count}</span>
