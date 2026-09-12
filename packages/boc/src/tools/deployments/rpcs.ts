@@ -50,6 +50,8 @@ export const DeploymentSettings = Schema.Struct({
   applicationLabelKey: DeploymentLabelKey,
   applicationLabelValue: DeploymentLabelValue,
   notificationsEnabled: Schema.Boolean,
+  siteUsername: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(256))),
+  sitePassword: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(4096))),
 })
 export type DeploymentSettings = typeof DeploymentSettings.Type
 

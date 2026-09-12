@@ -654,7 +654,8 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       const normalized = normalizeDeploymentSettings(settings)
       const failure = validateDeploymentSettings(normalized)
       if (failure) return failure
-      runtime.store.writeSettings(normalized)
+      if (runtime.store.writeSettings(normalized) === false)
+        return deploymentFailure("invalid-input", { context: { field: "sitePassword" } })
       invalidate()
       const result = await listSystems({ requestId: "settings", refresh: true })
       return {

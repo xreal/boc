@@ -1,6 +1,7 @@
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { onMount } from "solid-js"
+import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import {
   DeploymentDialog,
@@ -8,15 +9,19 @@ import {
   deploymentFailure,
   deploymentSystemFixtures,
   createFixtureDeploymentApi,
+  deploymentWorkflowTableFixtures,
+  DeploymentSettingsDialog,
+  type DeploymentSettings,
 } from "@boc/extensions/deployments/preview"
 
-type Scenario = "default" | "slow" | "retry" | "expired"
+type Scenario = "default" | "slow" | "retry" | "expired" | "many"
 
 function wait(milliseconds: number) {
   return new Promise((resolve) => setTimeout(resolve, milliseconds))
 }
 
 function scenarioApi(scenario: Scenario): DeploymentDialogApi {
+  if (scenario === "many") return createFixtureDeploymentApi(deploymentWorkflowTableFixtures)
   const fixture = createFixtureDeploymentApi()
   if (scenario === "default") return fixture
 
@@ -81,6 +86,7 @@ export default {
 }
 
 export const Default = { args: { initialRef: "SHOP-617" } }
+export const WorkflowTable = { args: { scenario: "many" } }
 export const Reset = { args: { kind: "reset" } }
 export const SlowPreparation = { args: { scenario: "slow" } }
 export const Retry = { args: { scenario: "retry" } }
@@ -89,3 +95,31 @@ export const NarrowRtl = {
   args: { initialRef: "SHOP-617" },
   globals: { direction: "rtl", locale: "en", theme: "dark" },
 }
+
+function DeploymentSettingsPreview() {
+  const dialog = useDialog()
+  const language = useLanguage()
+  const [settings, setSettings] = createStore<DeploymentSettings>({
+    applicationLabelKey: "app",
+    applicationLabelValue: "shop",
+    notificationsEnabled: true,
+  })
+  const readiness = { fleetReady: true, deploymentReady: true, capabilities: [] }
+  const open = () =>
+    dialog.show(() => (
+      <DeploymentSettingsDialog
+        api={{
+          saveSettings: async (next) => ({ ok: true, settings: next, readiness }),
+          checkReadiness: async () => readiness,
+        }}
+        locale={language.locale}
+        settings={settings}
+        readiness={readiness}
+        onSaved={(next) => setSettings(next)}
+      />
+    ))
+  onMount(open)
+  return <Button onClick={open}>Open deployment settings</Button>
+}
+
+export const Settings = { render: () => <DeploymentSettingsPreview /> }

@@ -10,8 +10,10 @@ import { isBlockingDeploymentOperation, type DeploymentOperationState } from "..
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { DeploymentRowDetails } from "./row-details"
 import { autoSyncOffMenuVisible, redeployMenuVisible } from "./action-visibility"
-import type { DeploymentCacheRunSnapshot } from "../rpcs"
+import type { DeploymentCacheRunSnapshot, DeploymentSettings } from "../rpcs"
 import { DeploymentProgress } from "./operation-progress"
+import { deploymentSiteUrl } from "../domain/site-url"
+import { DEPLOYMENT_GITHUB_REPOSITORY } from "../domain/github"
 
 export function DeploymentSystemsTable(props: {
   t: BocTranslator
@@ -27,6 +29,8 @@ export function DeploymentSystemsTable(props: {
   cacheRuns?: Record<string, DeploymentCacheRunSnapshot | undefined>
   now: number
   openExternal: (url: string) => void
+  jiraOrigin?: string
+  settings?: DeploymentSettings
 }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-auto">
@@ -73,21 +77,39 @@ export function DeploymentSystemsTable(props: {
                           icon={<Icon name={expanded() ? "chevron-down" : "chevron-right"} />}
                           onClick={() => props.onToggleDetails(system.environment)}
                         />
-                        <span class={`${availabilityTextTone(system.availability)} whitespace-nowrap tabular-nums`}>
-                          {system.name}
-                        </span>
+                        <DeploymentLink
+                          href={deploymentSiteUrl(system.environment, props.settings)}
+                          text={system.name}
+                          class={`${availabilityTextTone(system.availability)} whitespace-nowrap tabular-nums`}
+                          openExternal={props.openExternal}
+                        />
                       </span>
                     </td>
                     <td data-deployment-column="branch" class="border-b border-v2-border-border-muted px-3">
-                      <span class="block max-w-[22rem] truncate font-mono text-[12px]" title={system.branch}>
-                        {system.branch ?? "—"}
-                      </span>
+                      <DeploymentLink
+                        href={
+                          system.branch
+                            ? `https://github.com/${DEPLOYMENT_GITHUB_REPOSITORY}/tree/${encodeURIComponent(system.branch)}`
+                            : undefined
+                        }
+                        text={system.branch ?? "—"}
+                        class="block max-w-[22rem] truncate font-mono text-[12px]"
+                        openExternal={props.openExternal}
+                      />
                     </td>
                     <td
                       data-deployment-column="ticket"
                       class="border-b border-v2-border-border-muted px-3 font-mono text-[12px]"
                     >
-                      {system.ticketKey ?? "—"}
+                      <DeploymentLink
+                        href={
+                          system.ticketKey && props.jiraOrigin
+                            ? `${props.jiraOrigin}/browse/${encodeURIComponent(system.ticketKey)}`
+                            : undefined
+                        }
+                        text={system.ticketKey ?? "—"}
+                        openExternal={props.openExternal}
+                      />
                     </td>
                     <td data-deployment-column="sync" class="border-b border-v2-border-border-muted px-3">
                       <StatusText
@@ -146,6 +168,35 @@ export function DeploymentSystemsTable(props: {
         </tbody>
       </table>
     </div>
+  )
+}
+
+function DeploymentLink(props: { href?: string; text: string; class?: string; openExternal: (url: string) => void }) {
+  return (
+    <Show
+      when={props.href}
+      fallback={
+        <span class={props.class} title={props.text}>
+          <bdi dir="ltr">{props.text}</bdi>
+        </span>
+      }
+    >
+      {(href) => (
+        <a
+          href={href()}
+          target="_blank"
+          rel="noreferrer"
+          class={`deployment-system-link ${props.class ?? ""}`}
+          title={props.text}
+          onClick={(event) => {
+            event.preventDefault()
+            props.openExternal(href())
+          }}
+        >
+          <bdi dir="ltr">{props.text}</bdi>
+        </a>
+      )}
+    </Show>
   )
 }
 

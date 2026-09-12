@@ -1,7 +1,7 @@
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Icon } from "@opencode/ui/icon"
-import { createSignal, onCleanup, onMount, Show } from "solid-js"
+import { createResource, createSignal, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocScreenProps } from "../../../registry"
 import { useBocDesktop } from "../../../renderer/desktop"
@@ -29,6 +29,7 @@ import { AutoSyncOffDialog } from "./auto-sync-dialog"
 import { CacheDialog } from "./cache-dialog"
 import { DEPLOYMENT_ACTIONS_URL } from "../domain/github"
 import { deploymentSshCommand } from "../domain/admin-server"
+import { parseJiraCloudSite } from "../../jira/domain/site"
 
 export default function DeploymentsScreen(props: BocScreenProps) {
   const desktop = useBocDesktop()
@@ -61,6 +62,12 @@ export default function DeploymentsScreen(props: BocScreenProps) {
   })
 
   if (!desktop) return null
+
+  const [jiraOrigin] = createResource(async () => {
+    const connection = await desktop.jira.getConnectionStatus().catch(() => undefined)
+    if (!connection || connection.status === "not-configured" || !connection.site) return
+    return parseJiraCloudSite(connection.site)?.origin
+  })
 
   const requests = createLatestDeploymentRequest({
     cancel: (requestId) => void desktop.deployments.cancelSystemsRead({ requestId }).catch(() => undefined),
@@ -453,6 +460,8 @@ export default function DeploymentsScreen(props: BocScreenProps) {
             systems={filtered()}
             now={now()}
             openExternal={(url) => props.host.openExternal(url)}
+            jiraOrigin={jiraOrigin()}
+            settings={view.settings}
             expanded={view.expanded}
             onToggleDetails={(environment) =>
               setView("expanded", view.expanded === environment ? undefined : environment)

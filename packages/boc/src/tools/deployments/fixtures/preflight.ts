@@ -1,9 +1,12 @@
 import type { DeploymentDialogApi } from "../renderer/deploy-preflight"
 import type { DeploymentPreparedPlan } from "../rpcs"
 import { normalizeDeploymentWorkflowInputs, resetDeploymentWorkflowInputs } from "../domain/workflows"
+import type { DeploymentWorkflowTarget } from "../domain/workflows"
 import { deploymentBranchFixtures, deploymentWorkflowFixtures } from "./github"
 
-export function createFixtureDeploymentApi(): DeploymentDialogApi {
+export function createFixtureDeploymentApi(
+  targets: readonly DeploymentWorkflowTarget[] = deploymentWorkflowFixtures,
+): DeploymentDialogApi {
   const plans = new Map<string, DeploymentPreparedPlan>()
   const prepare = (plan: Omit<DeploymentPreparedPlan, "preflightId" | "expiresAt">) => {
     const prepared = {
@@ -37,14 +40,14 @@ export function createFixtureDeploymentApi(): DeploymentDialogApi {
       ok: true,
       branches: deploymentBranchFixtures.filter((branch) => branch.toLowerCase().includes(query.trim().toLowerCase())),
     }),
-    listWorkflowTargets: async () => ({ ok: true, targets: deploymentWorkflowFixtures }),
+    listWorkflowTargets: async () => ({ ok: true, targets }),
     prepareDeployment: async (draft) =>
       prepare({
         kind: draft.expectedBranch === undefined ? "deploy" : "redeploy",
         environment: draft.environment,
         ref: draft.ref,
         workflows: draft.workflows.map((workflow) => {
-          const target = deploymentWorkflowFixtures.find((target) => target.filename === workflow.filename)
+          const target = targets.find((target) => target.filename === workflow.filename)
           return {
             filename: workflow.filename,
             name: target?.name ?? workflow.filename,

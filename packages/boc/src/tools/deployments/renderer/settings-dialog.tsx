@@ -12,7 +12,7 @@ import type { DeploymentFailure, DeploymentReadiness, DeploymentSettings } from 
 import { DeploymentReadinessSummary } from "./readiness-panel"
 
 export function DeploymentSettingsDialog(props: {
-  api: BocDesktopAPI["deployments"]
+  api: Pick<BocDesktopAPI["deployments"], "saveSettings" | "checkReadiness">
   locale: () => string
   settings: DeploymentSettings
   readiness: DeploymentReadiness
@@ -25,6 +25,8 @@ export function DeploymentSettingsDialog(props: {
     applicationLabelKey: props.settings.applicationLabelKey,
     applicationLabelValue: props.settings.applicationLabelValue,
     notificationsEnabled: props.settings.notificationsEnabled,
+    siteUsername: props.settings.siteUsername ?? "",
+    sitePassword: props.settings.sitePassword ?? "",
     readiness: props.readiness,
     busy: false as false | "save" | "retry",
     failure: undefined as DeploymentFailure | undefined,
@@ -39,7 +41,9 @@ export function DeploymentSettingsDialog(props: {
     form.argoProject !== (form.savedSettings.argoProject ?? "") ||
     form.applicationLabelKey !== form.savedSettings.applicationLabelKey ||
     form.applicationLabelValue !== form.savedSettings.applicationLabelValue ||
-    form.notificationsEnabled !== form.savedSettings.notificationsEnabled
+    form.notificationsEnabled !== form.savedSettings.notificationsEnabled ||
+    form.siteUsername !== (form.savedSettings.siteUsername ?? "") ||
+    form.sitePassword !== (form.savedSettings.sitePassword ?? "")
 
   const save = async () => {
     if (form.busy) return
@@ -51,6 +55,8 @@ export function DeploymentSettingsDialog(props: {
         applicationLabelKey: form.applicationLabelKey,
         applicationLabelValue: form.applicationLabelValue,
         notificationsEnabled: form.notificationsEnabled,
+        siteUsername: form.siteUsername,
+        sitePassword: form.sitePassword,
       })
       .catch(() => undefined)
     if (!result) {
@@ -72,6 +78,8 @@ export function DeploymentSettingsDialog(props: {
       applicationLabelKey: result.settings.applicationLabelKey,
       applicationLabelValue: result.settings.applicationLabelValue,
       notificationsEnabled: result.settings.notificationsEnabled,
+      siteUsername: result.settings.siteUsername ?? "",
+      sitePassword: result.settings.sitePassword ?? "",
     })
     props.onSaved(result.settings, result.readiness)
   }
@@ -137,6 +145,41 @@ export function DeploymentSettingsDialog(props: {
           />
           <Field.Prefix>{t("boc.deployments.settings.devenv.help")}</Field.Prefix>
         </Field>
+
+        <section class="flex flex-col gap-3 rounded-md border border-v2-border-border-muted p-3">
+          <h2 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
+            {t("boc.deployments.settings.site.title")}
+          </h2>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Field>
+              <Field.Label>{t("boc.deployments.settings.site.username")}</Field.Label>
+              <TextInput
+                class="!w-full"
+                name="deployment-site-username"
+                autocomplete="off"
+                spellcheck={false}
+                value={form.siteUsername}
+                disabled={form.busy !== false}
+                onInput={(event) => setForm("siteUsername", event.currentTarget.value)}
+              />
+            </Field>
+            <Field>
+              <Field.Label>{t("boc.deployments.settings.site.password")}</Field.Label>
+              <TextInput
+                class="!w-full"
+                name="deployment-site-password"
+                type="password"
+                autocomplete="new-password"
+                value={form.sitePassword}
+                disabled={form.busy !== false}
+                onInput={(event) => setForm("sitePassword", event.currentTarget.value)}
+              />
+            </Field>
+          </div>
+          <p class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
+            {t("boc.deployments.settings.site.help")}
+          </p>
+        </section>
 
         <div class="flex items-center justify-between gap-4 rounded-md border border-v2-border-border-muted px-3 py-2.5">
           <div>
@@ -227,6 +270,7 @@ export function DeploymentSettingsDialog(props: {
 }
 
 function settingsFailureMessage(t: ReturnType<typeof createBocTranslator>, failure: DeploymentFailure) {
+  if (failure.context?.field === "sitePassword") return t("boc.deployments.settings.site.encryptionUnavailable")
   if (failure.category === "unsafe-target") return t("boc.deployments.settings.failure.unsafe")
   return t("boc.deployments.settings.failure.invalid")
 }
