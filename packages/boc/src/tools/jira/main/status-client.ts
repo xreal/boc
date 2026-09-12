@@ -6,8 +6,7 @@ import {
   mapJiraIssueStatus,
 } from "../domain/status"
 import type { JiraIssueStatusesResult } from "../rpcs"
-import { decodeUnknownJson, jiraRequest } from "./client"
-import type { JiraAuth } from "./board-client"
+import { decodeUnknownJson, jiraRequest, type JiraAuth } from "./client"
 
 export async function fetchJiraIssueStatuses(
   auth: JiraAuth,
