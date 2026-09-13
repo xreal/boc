@@ -16,7 +16,7 @@ const decodeOperations = Schema.decodeUnknownOption(Schema.Array(DeploymentOpera
 
 export type DeploymentStore = {
   readSettings(): unknown
-  writeSettings(settings: DeploymentSettings): void
+  writeSettings(settings: DeploymentSettings): void | false
   readOperations(): unknown
   writeOperations(operations: readonly DeploymentOperationSummary[]): void
 }
@@ -41,6 +41,8 @@ export function normalizeDeploymentSettings(settings: DeploymentSettings): Deplo
     applicationLabelKey: settings.applicationLabelKey.trim(),
     applicationLabelValue: settings.applicationLabelValue.trim(),
     notificationsEnabled: settings.notificationsEnabled,
+    ...(settings.siteUsername?.trim() ? { siteUsername: settings.siteUsername.trim() } : {}),
+    ...(settings.sitePassword ? { sitePassword: settings.sitePassword } : {}),
   }
 }
 

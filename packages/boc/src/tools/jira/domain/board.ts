@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { adfToMarkdown } from "./adf"
+import { compact } from "./compact"
 
 export { adfToMarkdown, adfToPlainText, safeHttpUrl } from "./adf"
 
@@ -57,23 +57,6 @@ export const JiraBoardIssue = Schema.Struct({
   url: Schema.String,
 })
 export type JiraBoardIssue = typeof JiraBoardIssue.Type
-
-export const JiraIssueDetail = Schema.Struct({
-  id: Schema.String,
-  key: Schema.String,
-  summary: Schema.String,
-  description: Schema.optionalKey(Schema.String),
-  statusName: Schema.optionalKey(Schema.String),
-  assigneeName: Schema.optionalKey(Schema.String),
-  reporterName: Schema.optionalKey(Schema.String),
-  issueTypeName: Schema.optionalKey(Schema.String),
-  priorityName: Schema.optionalKey(Schema.String),
-  labels: Schema.Array(Schema.String),
-  createdAt: Schema.optionalKey(Schema.String),
-  updatedAt: Schema.optionalKey(Schema.String),
-  url: Schema.String,
-})
-export type JiraIssueDetail = typeof JiraIssueDetail.Type
 
 export const JiraBoardView = Schema.Struct({
   id: Schema.Number,
@@ -239,28 +222,6 @@ export function mapJiraBoardIssue(
     createdAt: fields ? text(fields.created) : undefined,
     updatedAt: fields ? text(fields.updated) : undefined,
     url: issueBrowseUrl(browseOrigin, key),
-  })
-}
-
-export function mapJiraIssueDetail(raw: unknown, browseOrigin: string): JiraIssueDetail | undefined {
-  const issue = mapJiraBoardIssue(raw, browseOrigin)
-  if (!issue || !isRecord(raw)) return
-  const fields = isRecord(raw.fields) ? raw.fields : undefined
-  const reporter = fields && isRecord(fields.reporter) ? fields.reporter : undefined
-  return compact({
-    id: issue.id,
-    key: issue.key,
-    summary: issue.summary,
-    description: fields ? adfToMarkdown(fields.description) : undefined,
-    statusName: issue.statusName,
-    assigneeName: issue.assigneeName,
-    reporterName: reporter ? text(reporter.displayName) : undefined,
-    issueTypeName: issue.issueTypeName,
-    priorityName: issue.priorityName,
-    labels: issue.labels,
-    createdAt: issue.createdAt,
-    updatedAt: issue.updatedAt,
-    url: issue.url,
   })
 }
 
@@ -546,10 +507,6 @@ function isSubtaskIssueType(issueType: Record<string, unknown> | undefined) {
 function isSubtaskTypeName(name: string | undefined) {
   if (!name) return false
   return name.toLowerCase().replace(/[\s_-]+/g, "") === "subtask"
-}
-
-function compact<T extends Record<string, unknown>>(value: T): T {
-  return Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as T
 }
 
 function stringList(value: unknown) {

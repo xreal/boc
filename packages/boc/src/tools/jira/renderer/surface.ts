@@ -28,7 +28,7 @@ export function jiraBoardSurface(input: {
   filtered: readonly JiraBoardIssue[]
   hasIssueFilters?: boolean
 }): JiraBoardSurface {
-  if (!input.online) return "offline"
+  if (!input.online && !input.board) return "offline"
   if (!input.connection || input.loading) return "loading"
   if (input.connection.status === "not-configured") return "not-configured"
   if (input.connection.status === "encryption-unavailable") return "encryption-unavailable"

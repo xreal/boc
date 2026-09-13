@@ -11,7 +11,8 @@
     "./desktop/renderer": "./src/desktop/renderer/api.ts",
     "./environments/server": "./src/environments/index.ts",
     "./controls": "./src/tools/controls/host.ts",
-    "./deployments/preview": "./src/tools/deployments/preview.ts"
+    "./deployments/preview": "./src/tools/deployments/preview.ts",
+    "./jira/preview": "./src/tools/jira/preview.ts"
   },
   "scripts": {
     "test:components": "playwright test --config playwright.components.config.ts",

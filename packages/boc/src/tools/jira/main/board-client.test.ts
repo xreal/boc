@@ -1,14 +1,9 @@
 import { describe, expect, test } from "bun:test"
-import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchJiraIssue } from "./board-client"
+import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards } from "./board-client"
+import { fetchJiraIssue } from "./issue-client"
 import { parseJiraCloudSite } from "../domain/site"
 import { containsSecret } from "../domain/errors"
-import {
-  TOKEN_FIXTURE,
-  EMAIL_FIXTURE,
-  fetchScript,
-  jsonResponse,
-  rateLimitResponse,
-} from "../fixtures/http"
+import { TOKEN_FIXTURE, EMAIL_FIXTURE, fetchScript, jsonResponse, rateLimitResponse } from "../fixtures/http"
 import {
   boardConfigurationResponse,
   boardListResponse,
@@ -91,7 +86,17 @@ describe("Jira board client", () => {
     expect(bodies[0]).toEqual({
       jql: "filter = 1001 AND sprint = 37",
       maxResults: 100,
-      fields: ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated", "customfield_10016"],
+      fields: [
+        "summary",
+        "status",
+        "assignee",
+        "issuetype",
+        "priority",
+        "labels",
+        "created",
+        "updated",
+        "customfield_10016",
+      ],
     })
     expect(result.issues[0]).toMatchObject({
       key: "PLAT-1",
@@ -114,9 +119,19 @@ describe("Jira board client", () => {
         summary: "Render the Jira board",
         description: "Show the board columns.",
         statusName: "To Do",
-        assigneeName: "Mia Krystof",
-        reporterName: "Ada Lovelace",
+        assignee: {
+          accountId: "account-owner",
+          displayName: "Mia Krystof",
+          avatarUrl:
+            "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
+        },
+        reporter: { accountId: "account-reporter", displayName: "Ada Lovelace" },
+        subtasks: [],
+        links: [],
+        attachments: [],
         issueTypeName: "Story",
+        issueTypeIconUrl:
+          "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
         priorityName: "Medium",
         labels: ["board"],
         createdAt: "2026-09-01T00:00:00.000Z",
@@ -127,11 +142,7 @@ describe("Jira board client", () => {
   })
 
   test("normalizes a rate-limited board request without leaking the token", async () => {
-    const result = await fetchJiraBoards(
-      auth(
-        fetchScript(() => rateLimitResponse(5)),
-      ),
-    )
+    const result = await fetchJiraBoards(auth(fetchScript(() => rateLimitResponse(5))))
     expect(result).toEqual({ ok: false, category: "rate-limit", retryAfterSeconds: 5 })
     expect(containsSecret(JSON.stringify(result), [TOKEN_FIXTURE])).toBe(false)
   })

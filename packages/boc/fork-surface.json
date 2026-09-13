@@ -18,6 +18,10 @@
   ],
   "approved": [
     {
+      "path": "packages/ui/src/components/popover.tsx",
+      "reason": "Expose the optional Kobalte autofocus hook for the Jira assignee search field"
+    },
+    {
       "path": "packages/storybook/.storybook/mocks/app/context/layout.ts",
       "reason": "Supply the current route to the real settings-surface provider used by Boc environment stories"
     },

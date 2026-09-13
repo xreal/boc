@@ -3,6 +3,7 @@ import { Icon } from "@opencode/ui/icon"
 import { For, Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { DeploymentCapabilityStatus, DeploymentReadiness } from "../rpcs"
+import { DeploymentInfo } from "./info-tooltip"
 
 const checkGroups = [
   {
@@ -66,7 +67,7 @@ export function DeploymentReadinessPanel(props: {
 
 export function DeploymentReadinessSummary(props: { t: BocTranslator; readiness: DeploymentReadiness }) {
   return (
-    <div class="flex flex-col gap-4" data-boc-deployments-readiness-summary>
+    <div class="flex flex-col gap-2" data-boc-deployments-readiness-summary>
       <For each={checkGroups}>
         {(group) => {
           const checks = () =>
@@ -75,14 +76,18 @@ export function DeploymentReadinessSummary(props: { t: BocTranslator; readiness:
             )
           const ready = () =>
             checks().length === group.capabilities.length && checks().every((check) => check.status === "available")
+          const title = () => props.t(`boc.deployments.readiness.group.${group.id}`)
           return (
             <section class="overflow-hidden rounded-md border border-v2-border-border-muted bg-v2-background-bg-base">
-              <div class="flex flex-wrap items-baseline justify-between gap-2 border-b border-v2-border-border-muted px-3 py-2.5">
-                <h3 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">
-                  {props.t(`boc.deployments.readiness.group.${group.id}`)}
-                </h3>
+              <div class="flex items-center gap-1 px-3 py-2.5">
+                <h3 class="text-[13px] leading-[var(--line-height-compact)] [font-weight:530]">{title()}</h3>
+                <DeploymentInfo
+                  t={props.t}
+                  topic={title()}
+                  value={props.t(`boc.deployments.readiness.group.${group.id}.help`)}
+                />
                 <span
-                  class="text-[12px] leading-[var(--line-height-compact)]"
+                  class="ms-auto shrink-0 text-[12px] leading-[var(--line-height-compact)]"
                   classList={{
                     "text-v2-state-fg-success": ready(),
                     "text-v2-state-fg-warning": !ready() && group.id !== "optional",
@@ -94,17 +99,16 @@ export function DeploymentReadinessSummary(props: { t: BocTranslator; readiness:
                       : group.id === "optional"
                         ? "boc.deployments.readiness.optional"
                         : "boc.deployments.readiness.required",
-                  )}
+                    )}
                 </span>
-                <p class="w-full text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-base">
-                  {props.t(`boc.deployments.readiness.group.${group.id}.help`)}
-                </p>
               </div>
-              <ul class="divide-y divide-v2-border-border-muted">
-                <For each={checks().filter((check) => check.status === "unavailable")}>
-                  {(check) => <DeploymentCheck t={props.t} check={check} optional={group.id === "optional"} />}
-                </For>
-              </ul>
+              <Show when={checks().some((check) => check.status === "unavailable")}>
+                <ul class="divide-y divide-v2-border-border-muted border-t border-v2-border-border-muted">
+                  <For each={checks().filter((check) => check.status === "unavailable")}>
+                    {(check) => <DeploymentCheck t={props.t} check={check} optional={group.id === "optional"} />}
+                  </For>
+                </ul>
+              </Show>
               <Show when={checks().some((check) => check.status !== "unavailable")}>
                 <details class="border-t border-v2-border-border-muted">
                   <summary class="cursor-pointer px-3 py-2 text-[12px] leading-[var(--line-height-compact)] focus-visible:outline-2 focus-visible:outline-offset-[-2px]">
@@ -121,9 +125,6 @@ export function DeploymentReadinessSummary(props: { t: BocTranslator; readiness:
           )
         }}
       </For>
-      <p class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-base">
-        {props.t("boc.deployments.readiness.pendingHelp")}
-      </p>
     </div>
   )
 }

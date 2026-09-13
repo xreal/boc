@@ -6,6 +6,7 @@ import { DeploymentOperationDetails } from "./operation-progress"
 export function DeploymentRowDetails(props: {
   t: BocTranslator
   system: DeploymentSystem
+  ticketStatus?: string
   openExternal: (url: string) => void
 }) {
   const value = (content?: string) => content || props.t("boc.deployments.table.noValue")
@@ -19,6 +20,7 @@ export function DeploymentRowDetails(props: {
       <Detail label={props.t("boc.deployments.details.application")} value={props.system.app} />
       <Detail label={props.t("boc.deployments.table.branch")} value={value(props.system.branch)} />
       <Detail label={props.t("boc.deployments.table.ticket")} value={value(props.system.ticketKey)} />
+      <Detail label={props.t("boc.deployments.table.ticketStatus")} value={value(props.ticketStatus)} />
       <Detail
         label={props.t("boc.deployments.table.sync")}
         value={props.t(`boc.deployments.sync.${props.system.sync}`)}

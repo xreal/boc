@@ -11,6 +11,7 @@ import {
   JiraRpcs,
 } from "./rpcs"
 import { TOKEN_FIXTURE } from "./fixtures/http"
+import { mapJiraIssueDetail } from "./domain/issue"
 
 const schemas = [
   JiraConnectionStatus,
@@ -23,6 +24,35 @@ const schemas = [
 ]
 
 describe("Jira RPC success schemas", () => {
+  test("mapped tickets serialize when optional fields and related-ticket metadata are absent", () => {
+    const related = { key: "PLAT-2", fields: { summary: "Related ticket" } }
+    for (const context of [
+      {},
+      {
+        parent: related,
+        subtasks: [related],
+        issuelinks: [{ id: "1", type: { inward: "is blocked by", outward: "blocks" }, outwardIssue: related }],
+        customfield_10016: 0,
+      },
+    ]) {
+      const issue = mapJiraIssueDetail(
+        {
+          id: "10001",
+          key: "PLAT-1",
+          fields: { summary: "Ticket without optional metadata", assignee: null, ...context },
+        },
+        "https://acme.atlassian.net",
+        ["customfield_10016"],
+      )
+      expect(issue).toBeDefined()
+      if (!issue) throw new Error("Expected mapped ticket")
+      const result = { ok: true as const, issue }
+      const encoded = Schema.encodeUnknownSync(JiraIssueResult)(result)
+      expect(Schema.decodeUnknownSync(JiraIssueResult)(encoded)).toEqual(result)
+      expect(issue?.storyPoints).toBe(context.customfield_10016)
+    }
+  })
+
   test("do not name or keep an API token", () => {
     const status = Option.getOrUndefined(
       Schema.decodeUnknownOption(JiraConnectionStatus)({
@@ -65,7 +95,11 @@ describe("Jira RPC success schemas", () => {
         id: "10001",
         key: "PLAT-1",
         summary: "Safe summary",
+        assignee: null,
         labels: [],
+        subtasks: [],
+        links: [],
+        attachments: [],
         url: "https://acme.atlassian.net/browse/PLAT-1",
         token: TOKEN_FIXTURE,
         Authorization: `Basic ${TOKEN_FIXTURE}`,
@@ -79,7 +113,11 @@ describe("Jira RPC success schemas", () => {
         id: "10001",
         key: "PLAT-1",
         summary: "Safe summary",
+        assignee: null,
         labels: [],
+        subtasks: [],
+        links: [],
+        attachments: [],
         url: "https://acme.atlassian.net/browse/PLAT-1",
       },
     })
@@ -88,6 +126,14 @@ describe("Jira RPC success schemas", () => {
 
   test("registers connection and read-only board operations", () => {
     expect([...JiraRpcs.requests.keys()]).toEqual([
+      "BocJiraListBranches",
+      "BocJiraPreviewAttachment",
+      "BocJiraDownloadAttachment",
+      "BocJiraListComments",
+      "BocJiraSearchAssignees",
+      "BocJiraAssignIssue",
+      "BocJiraListPullRequests",
+      "BocJiraCancelIssueResourceRead",
       "BocJiraGetSessionInstructions",
       "BocJiraSaveSessionInstructions",
       "BocJiraListSessionLinks",
@@ -101,6 +147,7 @@ describe("Jira RPC success schemas", () => {
       "BocJiraGetBoard",
       "BocJiraListIssues",
       "BocJiraGetIssue",
+      "BocJiraListIssueStatuses",
       "BocJiraCancelBoardRead",
       "BocJiraCancelIssueRead",
       "BocJiraGetPreferences",

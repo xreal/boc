@@ -1,7 +1,10 @@
 import Store from "electron-store"
-import { app, safeStorage } from "electron"
+import { app, dialog, safeStorage } from "electron"
+import path from "node:path"
+import { saveJiraAttachment } from "./attachment-download"
 import { createJiraHandlers, type JiraRuntime } from "./handlers"
 import { JIRA_STORE_NAME } from "./store"
+import { createDeploymentCommandRunner } from "../../deployments/main/command-runner"
 
 let file: Store | undefined
 
@@ -17,6 +20,17 @@ function getStore() {
 }
 
 const electronJiraRuntime: JiraRuntime = {
+  async saveAttachment(filename, response) {
+    const chosen = await dialog.showSaveDialog({
+      defaultPath: path.join(app.getPath("downloads"), path.basename(filename.replaceAll("\\", "/"))),
+    })
+    if (chosen.canceled || !chosen.filePath) {
+      await response.body?.cancel()
+      return { ok: true, saved: false }
+    }
+    return saveJiraAttachment(response, chosen.filePath)
+  },
+  run: createDeploymentCommandRunner(),
   store: {
     readSessionInstructions: () => getStore().get("sessionInstructions"),
     writeSessionInstructions: (value) => getStore().set("sessionInstructions", value),

@@ -46,10 +46,13 @@ import {
   type GithubWorkflowTarget,
 } from "./github-cli"
 import {
+  autoSyncEntrypoint,
   autoSyncCapability,
   createDeploymentReadiness,
+  resolveDevenvRoot,
   validateDeploymentSettings,
   type DeploymentFileExists,
+  type DeploymentFindDevenvRoot,
 } from "./readiness"
 import {
   normalizeDeploymentSettings,
@@ -71,6 +74,7 @@ export type DeploymentRuntime = {
   now?: () => number
   createId?: () => string
   fileExists?: DeploymentFileExists
+  findDevenvRoot?: DeploymentFindDevenvRoot
   runCache?: (environment: AllowedDevEnvironment, onUpdate: (snapshot: CacheRunSnapshot) => void) => void
   notifyFinished?: (operation: DeploymentOperationSummary) => void
 }
@@ -214,6 +218,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
               ...(readiness.deploymentReady ? (["deploy", "reset", ...redeploy] as const) : []),
               ...autoSync,
               ...(!isReservedDevEnvironment(system.environment) && runtime.runCache ? (["clear-cache"] as const) : []),
+              ...(!isReservedDevEnvironment(system.environment) ? (["ssh"] as const) : []),
             ]
           : []
       return {
@@ -227,7 +232,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
   const readFresh = async (settings: DeploymentSettings, targetGeneration: number, signal: AbortSignal) => {
     const [argoResult, autoSync, githubResult] = await Promise.all([
       readArgoFleet(argo, settings, signal),
-      autoSyncCapability(settings, runtime.fileExists),
+      autoSyncCapability(settings, runtime.fileExists, runtime.findDevenvRoot),
       githubReadiness(github, signal),
     ])
     const readiness = createDeploymentReadiness({
@@ -652,7 +657,8 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       const normalized = normalizeDeploymentSettings(settings)
       const failure = validateDeploymentSettings(normalized)
       if (failure) return failure
-      runtime.store.writeSettings(normalized)
+      if (runtime.store.writeSettings(normalized) === false)
+        return deploymentFailure("invalid-input", { context: { field: "sitePassword" } })
       invalidate()
       const result = await listSystems({ requestId: "settings", refresh: true })
       return {
@@ -767,11 +773,18 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
       changingAutoSync.add(input.environment)
       try {
         const settings = readDeploymentSettings(runtime.store)
-        const capability = await autoSyncCapability(settings, runtime.fileExists)
-        if (capability.status !== "available" || !settings.devenvPath) {
-          return deploymentFailure(capability.failure ?? "not-found", {
+        const devenvPath = await resolveDevenvRoot(settings, runtime.findDevenvRoot)
+        if (!devenvPath) {
+          return deploymentFailure("invalid-input", {
             capability: "bf_deploy_auto_sync",
-            context: capability.context,
+            context: { field: "devenvPath" },
+          })
+        }
+        const entrypoint = await autoSyncEntrypoint(devenvPath, runtime.fileExists)
+        if (!entrypoint) {
+          return deploymentFailure("not-found", {
+            capability: "bf_deploy_auto_sync",
+            context: { field: "devenvPath" },
           })
         }
         const target = await verifyArgoDevTarget(argo, settings)
@@ -816,7 +829,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
         const result = await runtime.run({
           executable: "python3",
           args: [
-            path.join(settings.devenvPath, "src", "tools", "bf-deploy", "__main__.py"),
+            entrypoint,
             "argo",
             "--auto-sync",
             "off",
@@ -825,7 +838,7 @@ export function createDeploymentService(runtime: DeploymentRuntime) {
             "--deployment",
             "shop",
           ],
-          cwd: path.join(settings.devenvPath, "src"),
+          cwd: path.join(devenvPath, "src"),
         })
         if (!result.ok) return deploymentCommandFailure(result, "bf_deploy_auto_sync")
         changingAutoSync.delete(input.environment)

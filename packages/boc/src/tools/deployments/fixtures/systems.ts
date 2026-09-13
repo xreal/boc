@@ -90,3 +90,10 @@ export const deploymentSystemSources = [
 export const deploymentSystemFixtures = deploymentSystemSources.map((source) =>
   deriveDeploymentSystem(source, DEPLOYMENT_FIXTURE_NOW),
 )
+
+export const deploymentTicketStatusFixtures: Readonly<Record<string, string>> = {
+  "SHOP-617": "Open",
+  "OPS-88": "In progress",
+  "SHOP-421": "In progress",
+  "SHOP-318": "Done",
+}

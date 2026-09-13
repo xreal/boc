@@ -108,6 +108,7 @@ export const issueSearchIssue = {
     summary: "Render the Jira board",
     status: { id: "10000", name: "To Do" },
     assignee: {
+      accountId: "account-owner",
       displayName: "Mia Krystof",
       avatarUrls: {
         "24x24":
@@ -154,7 +155,7 @@ export const issueDetailFixture = {
   key: "PLAT-1",
   fields: {
     ...issueSearchIssue.fields,
-    reporter: { displayName: "Ada Lovelace" },
+    reporter: { accountId: "account-reporter", displayName: "Ada Lovelace" },
     description: {
       type: "doc",
       version: 1,

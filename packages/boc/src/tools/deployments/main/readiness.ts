@@ -1,4 +1,5 @@
-import { access } from "node:fs/promises"
+import { constants } from "node:fs"
+import { access, realpath } from "node:fs/promises"
 import path from "node:path"
 import {
   DEPLOYMENT_CAPABILITIES,
@@ -26,6 +27,7 @@ const deploymentCapabilities = [
 ] as const satisfies readonly DeploymentCapability[]
 
 export type DeploymentFileExists = (file: string) => Promise<boolean>
+export type DeploymentFindDevenvRoot = () => Promise<string | undefined>
 
 export function createDeploymentReadiness(
   statuses: Partial<Record<DeploymentCapability, Omit<DeploymentCapabilityStatus, "capability">>>,
@@ -85,8 +87,10 @@ export function validateDeploymentSettings(settings: DeploymentSettings): Deploy
 export async function autoSyncCapability(
   settings: DeploymentSettings,
   fileExists: DeploymentFileExists = deploymentFileExists,
+  findDevenvRoot?: DeploymentFindDevenvRoot,
 ): Promise<DeploymentCapabilityStatus> {
-  if (!settings.devenvPath) {
+  const devenvRoot = await resolveDevenvRoot(settings, findDevenvRoot)
+  if (!devenvRoot) {
     return {
       capability: "bf_deploy_auto_sync",
       status: "unavailable",
@@ -94,9 +98,7 @@ export async function autoSyncCapability(
       context: { field: "devenvPath" },
     }
   }
-  const root = path.join(settings.devenvPath, "src", "tools", "bf-deploy")
-  const required = [path.join(root, "__main__.py"), path.join(root, "src", "bf_deploy.py")]
-  if ((await Promise.all(required.map(fileExists))).every(Boolean)) {
+  if (await autoSyncEntrypoint(devenvRoot, fileExists)) {
     return { capability: "bf_deploy_auto_sync", status: "available" }
   }
   return {
@@ -105,6 +107,50 @@ export async function autoSyncCapability(
     failure: "not-found",
     context: { field: "devenvPath" },
   }
+}
+
+export async function autoSyncEntrypoint(
+  devenvRoot: string,
+  fileExists: DeploymentFileExists = deploymentFileExists,
+) {
+  const roots = [
+    path.join(devenvRoot, "src", "platform", "tools", "bf-deploy"),
+    path.join(devenvRoot, "src", "tools", "bf-deploy"),
+  ]
+  const entrypoints = await Promise.all(
+    roots.map(async (root) =>
+      (await Promise.all([path.join(root, "__main__.py"), path.join(root, "src", "bf_deploy.py")].map(fileExists)))
+        .every(Boolean)
+        ? path.join(root, "__main__.py")
+        : undefined,
+    ),
+  )
+  return entrypoints.find((entrypoint): entrypoint is string => entrypoint !== undefined)
+}
+
+export function resolveDevenvRoot(settings: DeploymentSettings, findDevenvRoot?: DeploymentFindDevenvRoot) {
+  if (settings.devenvPath || !findDevenvRoot) return Promise.resolve(settings.devenvPath)
+  return Promise.resolve().then(findDevenvRoot).catch(() => undefined)
+}
+
+export async function findInstalledDevenvRoot(environment: NodeJS.ProcessEnv = process.env) {
+  const executable = (
+    await Promise.all(
+      (environment.PATH ?? "")
+        .split(path.delimiter)
+        .filter(Boolean)
+        .map(async (directory) => {
+          const candidate = path.join(directory, "devenv")
+          return access(candidate, constants.X_OK).then(
+            () => candidate,
+            () => undefined,
+          )
+        }),
+    )
+  ).find((candidate): candidate is string => candidate !== undefined)
+  if (!executable) return undefined
+  const resolved = await realpath(executable).catch(() => undefined)
+  return resolved ? path.dirname(resolved) : undefined
 }
 
 function identifiesUnsafeTarget(value: string) {

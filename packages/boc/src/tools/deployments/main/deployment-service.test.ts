@@ -41,7 +41,7 @@ describe("deployment fleet service", () => {
     const after = await service.listSystems({ requestId: "after", refresh: false })
     expect(after).toMatchObject({
       ok: true,
-      systems: [{ operation: { state: "success" }, allowedActions: ["clear-cache"] }],
+      systems: [{ operation: { state: "success" }, allowedActions: ["clear-cache", "ssh"] }],
     })
     expect(lists).toBe(2)
     await service.listSystems({ requestId: "cached", refresh: false })
@@ -254,6 +254,22 @@ describe("deployment fleet service", () => {
       "unavailable",
     )
   })
+
+  test("offers SSH only for non-reserved systems", async () => {
+    const service = createDeploymentService({
+      store: memoryDeploymentStore(),
+      platform: "linux",
+      run: healthyRunner(() => application("02", "20")),
+    })
+    const result = await service.listSystems({ requestId: "ssh-actions", refresh: true })
+    expect(result).toMatchObject({
+      ok: true,
+      systems: [
+        { environment: "02", allowedActions: ["ssh"] },
+        { environment: "20", allowedActions: [] },
+      ],
+    })
+  })
 })
 
 function healthyRunner(list: () => string | DeploymentCommandResult | Promise<string>): DeploymentCommandRunner {
@@ -276,14 +292,14 @@ function isApplicationList(command: DeploymentCommand) {
   return command.executable === "argocd" && command.args[0] === "app" && !command.args.includes("--help")
 }
 
-function application(environment: string) {
-  return JSON.stringify([
-    {
+function application(...environments: string[]) {
+  return JSON.stringify(
+    environments.map((environment) => ({
       metadata: { name: `shop-dev-${environment}`, labels: { app: "shop", environment } },
       spec: { destination: { namespace: environment }, source: { targetRevision: "master" } },
       status: { sync: { status: "Synced" }, health: { status: "Healthy" } },
-    },
-  ])
+    })),
+  )
 }
 
 function commandFailure(stderr: string): DeploymentCommandResult {

@@ -201,14 +201,17 @@ export function createDeploymentPreflight(input: {
     void loadTargets()
   }
 
-  const toggleWorkflow = (filename: string, checked: boolean) => {
+  const selectWorkflows = (filenames: readonly string[]) => {
     if (reset || state.status === "submitting") return
     setState(
       "selected",
-      checked ? [...new Set([...state.selected, filename])] : state.selected.filter((item) => item !== filename),
+      [...new Set(filenames)].filter((filename) => state.targets.some((target) => target.filename === filename)),
     )
     schedulePreparation()
   }
+
+  const toggleWorkflow = (filename: string, checked: boolean) =>
+    selectWorkflows(checked ? [...state.selected, filename] : state.selected.filter((item) => item !== filename))
 
   const setInput = (filename: string, name: string, value: DeploymentWorkflowInputValue) => {
     if (reset || state.status === "submitting") return
@@ -217,10 +220,10 @@ export function createDeploymentPreflight(input: {
   }
 
   const dispatch = async () => {
-    if (state.status !== "ready" || !state.plan || disposed) return
+    if (state.status !== "ready" || !state.plan || disposed) return undefined
     if (Date.parse(state.plan.expiresAt) <= Date.now()) {
       setState("status", "expired")
-      return
+      return undefined
     }
     clearTimeout(expiryTimer)
     setState({ status: "submitting", failure: undefined })
@@ -230,7 +233,7 @@ export function createDeploymentPreflight(input: {
     if (!result.ok) {
       // Dispatch outcomes may be uncertain. Never replay a mutation automatically.
       if (!disposed) setState({ status: "failed", failure: result, plan: undefined })
-      return
+      return undefined
     }
     return result.operation
   }

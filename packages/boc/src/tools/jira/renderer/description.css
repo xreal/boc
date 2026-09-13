@@ -46,7 +46,33 @@
 }
 
 [data-boc-jira-markdown] strong {
-  font-weight: 530;
+  font-weight: 700;
+}
+
+/* These are document emoji artwork colors, independent of the application's theme. */
+[data-boc-jira-markdown] [data-jira-emoji] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.3em;
+  block-size: 1.3em;
+  vertical-align: -0.15em;
+  font-family: sans-serif;
+  font-weight: 700;
+  font-style: normal;
+  line-height: 1;
+}
+
+[data-boc-jira-markdown] [data-jira-emoji="check-mark"] {
+  color: #172b00;
+  background: #6b991d;
+  border-radius: 50%;
+}
+
+[data-boc-jira-markdown] [data-jira-emoji="information"] {
+  color: #fff;
+  background: #388ec3;
+  border-radius: 0.15em;
 }
 
 [data-boc-jira-markdown] em {
@@ -61,7 +87,7 @@
 
 [data-boc-jira-markdown] ul,
 [data-boc-jira-markdown] ol {
-  padding-left: 1.5em;
+  padding-inline-start: 1.5em;
   list-style-position: outside;
 }
 
@@ -86,9 +112,9 @@
 }
 
 [data-boc-jira-markdown] blockquote {
-  margin-left: 0;
-  padding-left: 0.75em;
-  border-left: 2px solid var(--v2-border-border-muted);
+  margin-inline-start: 0;
+  padding-inline-start: 0.75em;
+  border-inline-start: 2px solid var(--v2-border-border-muted);
   color: var(--v2-text-text-muted);
 }
 
@@ -135,7 +161,7 @@
 [data-boc-jira-markdown] th,
 [data-boc-jira-markdown] td {
   padding: 0.35em 0.5em;
-  text-align: left;
+  text-align: start;
   border-bottom: 0.5px solid var(--v2-border-border-muted);
 }
 

@@ -3,6 +3,14 @@ import { BocDesktopRpcs } from "@boc/extensions/desktop/shared"
 import { DesktopRpcs } from "../shared/ipc-rpc"
 
 const jiraTags = [
+  "BocJiraListBranches",
+  "BocJiraPreviewAttachment",
+  "BocJiraDownloadAttachment",
+  "BocJiraListComments",
+  "BocJiraSearchAssignees",
+  "BocJiraAssignIssue",
+  "BocJiraListPullRequests",
+  "BocJiraCancelIssueResourceRead",
   "BocJiraGetSessionInstructions",
   "BocJiraSaveSessionInstructions",
   "BocJiraListSessionLinks",
@@ -16,6 +24,7 @@ const jiraTags = [
   "BocJiraGetBoard",
   "BocJiraListIssues",
   "BocJiraGetIssue",
+  "BocJiraListIssueStatuses",
   "BocJiraCancelBoardRead",
   "BocJiraCancelIssueRead",
   "BocJiraGetPreferences",
@@ -37,10 +46,10 @@ const deploymentTags = [
   "BocDeploymentsPrepareReset",
   "BocDeploymentsDispatchPreparedReset",
   "BocDeploymentsRedeployBranch",
-    "BocDeploymentsSetAutoSync",
-    "BocDeploymentsGetCacheRun",
-    "BocDeploymentsStartCacheRun",
-    "BocDeploymentsResolveCacheRun",
+  "BocDeploymentsSetAutoSync",
+  "BocDeploymentsGetCacheRun",
+  "BocDeploymentsStartCacheRun",
+  "BocDeploymentsResolveCacheRun",
 ] as const
 
 test("merges BOC RPCs into the desktop RPC group", () => {

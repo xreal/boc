@@ -10,12 +10,16 @@ import { isBlockingDeploymentOperation, type DeploymentOperationState } from "..
 import { formatDeploymentAge, type DeploymentSystem } from "../domain/systems"
 import { DeploymentRowDetails } from "./row-details"
 import { autoSyncOffMenuVisible, redeployMenuVisible } from "./action-visibility"
-import type { DeploymentCacheRunSnapshot } from "../rpcs"
+import type { DeploymentCacheRunSnapshot, DeploymentSettings } from "../rpcs"
 import { DeploymentProgress } from "./operation-progress"
+import { deploymentSiteUrl } from "../domain/site-url"
+import { DEPLOYMENT_GITHUB_REPOSITORY } from "../domain/github"
+import { StatusText, statusIcon, syncTone, healthTone, type StatusTone } from "./system-status"
 
 export function DeploymentSystemsTable(props: {
   t: BocTranslator
   systems: readonly DeploymentSystem[]
+  jiraTicketStatuses?: Readonly<Record<string, string>>
   expanded?: string
   onToggleDetails: (environment: string) => void
   onDeploy?: (system: DeploymentSystem) => void
@@ -23,9 +27,12 @@ export function DeploymentSystemsTable(props: {
   onRedeploy?: (system: DeploymentSystem) => void
   onTurnAutoSyncOff?: (system: DeploymentSystem) => void
   onClearCache?: (system: DeploymentSystem) => void
+  onOpenSsh?: (system: DeploymentSystem) => void
   cacheRuns?: Record<string, DeploymentCacheRunSnapshot | undefined>
   now: number
   openExternal: (url: string) => void
+  jiraOrigin?: string
+  settings?: DeploymentSettings
 }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-auto">
@@ -36,6 +43,7 @@ export function DeploymentSystemsTable(props: {
             <ColumnHeader column="system" label={props.t("boc.deployments.table.system")} />
             <ColumnHeader column="branch" label={props.t("boc.deployments.table.branch")} />
             <ColumnHeader column="ticket" label={props.t("boc.deployments.table.ticket")} />
+            <ColumnHeader column="ticket-status" label={props.t("boc.deployments.table.ticketStatus")} />
             <ColumnHeader column="sync" label={props.t("boc.deployments.table.sync")} />
             <ColumnHeader column="health" label={props.t("boc.deployments.table.health")} />
             <ColumnHeader column="age" label={props.t("boc.deployments.table.age")} />
@@ -48,6 +56,7 @@ export function DeploymentSystemsTable(props: {
           <For each={props.systems}>
             {(system) => {
               const expanded = () => props.expanded === system.environment
+              const ticketStatus = () => props.jiraTicketStatuses?.[system.ticketKey?.toUpperCase() ?? ""]
               return (
                 <>
                   <tr class="group h-11 bg-v2-background-bg-base hover:bg-v2-background-bg-layer-01">
@@ -72,33 +81,54 @@ export function DeploymentSystemsTable(props: {
                           icon={<Icon name={expanded() ? "chevron-down" : "chevron-right"} />}
                           onClick={() => props.onToggleDetails(system.environment)}
                         />
-                        <span class={`${availabilityTextTone(system.availability)} whitespace-nowrap tabular-nums`}>
-                          {system.name}
-                        </span>
+                        <DeploymentLink
+                          href={deploymentSiteUrl(system.environment, props.settings)}
+                          text={system.name}
+                          class={`${availabilityTextTone(system.availability)} whitespace-nowrap tabular-nums`}
+                          openExternal={props.openExternal}
+                        />
                       </span>
                     </td>
                     <td data-deployment-column="branch" class="border-b border-v2-border-border-muted px-3">
-                      <span class="block max-w-[22rem] truncate font-mono text-[12px]" title={system.branch}>
-                        {system.branch ?? "—"}
-                      </span>
+                      <DeploymentLink
+                        href={
+                          system.branch
+                            ? `https://github.com/${DEPLOYMENT_GITHUB_REPOSITORY}/tree/${encodeURIComponent(system.branch)}`
+                            : undefined
+                        }
+                        text={system.branch ?? "—"}
+                        class="block max-w-[22rem] truncate font-mono text-[12px]"
+                        openExternal={props.openExternal}
+                      />
                     </td>
                     <td
                       data-deployment-column="ticket"
                       class="border-b border-v2-border-border-muted px-3 font-mono text-[12px]"
                     >
-                      {system.ticketKey ?? "—"}
+                      <DeploymentLink
+                        href={
+                          system.ticketKey && props.jiraOrigin
+                            ? `${props.jiraOrigin}/browse/${encodeURIComponent(system.ticketKey)}`
+                            : undefined
+                        }
+                        text={system.ticketKey ?? "—"}
+                        openExternal={props.openExternal}
+                      />
+                    </td>
+                    <td data-deployment-column="ticket-status" class="border-b border-v2-border-border-muted px-3">
+                      <StatusText label={ticketStatus() ?? "—"} tone={jiraTicketStatusTone(ticketStatus())} />
                     </td>
                     <td data-deployment-column="sync" class="border-b border-v2-border-border-muted px-3">
                       <StatusText
                         label={props.t(`boc.deployments.sync.${system.sync}`)}
-                        tone={
-                          system.sync === "synced" ? "success" : system.sync === "out-of-sync" ? "warning" : "muted"
-                        }
+                        icon={statusIcon(syncTone(system.sync))}
+                        tone={syncTone(system.sync)}
                       />
                     </td>
                     <td data-deployment-column="health" class="border-b border-v2-border-border-muted px-3">
                       <StatusText
                         label={props.t(`boc.deployments.health.${system.health}`)}
+                        icon={statusIcon(healthTone(system.health))}
                         tone={healthTone(system.health)}
                       />
                     </td>
@@ -126,14 +156,20 @@ export function DeploymentSystemsTable(props: {
                         onRedeploy={props.onRedeploy}
                         onTurnAutoSyncOff={props.onTurnAutoSyncOff}
                         onClearCache={props.onClearCache}
+                        onOpenSsh={props.onOpenSsh}
                         cacheRun={props.cacheRuns?.[system.environment]}
                       />
                     </td>
                   </tr>
                   <Show when={expanded()}>
                     <tr>
-                      <td colspan="9" class="border-b border-v2-border-border-muted p-0">
-                        <DeploymentRowDetails t={props.t} system={system} openExternal={props.openExternal} />
+                      <td colspan="10" class="border-b border-v2-border-border-muted p-0">
+                        <DeploymentRowDetails
+                          t={props.t}
+                          system={system}
+                          ticketStatus={ticketStatus()}
+                          openExternal={props.openExternal}
+                        />
                       </td>
                     </tr>
                   </Show>
@@ -147,6 +183,35 @@ export function DeploymentSystemsTable(props: {
   )
 }
 
+function DeploymentLink(props: { href?: string; text: string; class?: string; openExternal: (url: string) => void }) {
+  return (
+    <Show
+      when={props.href}
+      fallback={
+        <span class={props.class} title={props.text}>
+          <bdi dir="ltr">{props.text}</bdi>
+        </span>
+      }
+    >
+      {(href) => (
+        <a
+          href={href()}
+          target="_blank"
+          rel="noreferrer"
+          class={`deployment-system-link ${props.class ?? ""}`}
+          title={props.text}
+          onClick={(event) => {
+            event.preventDefault()
+            props.openExternal(href())
+          }}
+        >
+          <bdi dir="ltr">{props.text}</bdi>
+        </a>
+      )}
+    </Show>
+  )
+}
+
 export function DeploymentSkeleton(props: { t: BocTranslator }) {
   return (
     <div data-boc-deployments-table class="min-h-0 flex-1 overflow-hidden" role="status" aria-live="polite">
@@ -157,6 +222,7 @@ export function DeploymentSkeleton(props: { t: BocTranslator }) {
             <ColumnHeader column="system" label={props.t("boc.deployments.table.system")} />
             <ColumnHeader column="branch" label={props.t("boc.deployments.table.branch")} />
             <ColumnHeader column="ticket" label={props.t("boc.deployments.table.ticket")} />
+            <ColumnHeader column="ticket-status" label={props.t("boc.deployments.table.ticketStatus")} />
             <ColumnHeader column="sync" label={props.t("boc.deployments.table.sync")} />
             <ColumnHeader column="health" label={props.t("boc.deployments.table.health")} />
             <ColumnHeader column="age" label={props.t("boc.deployments.table.age")} />
@@ -169,7 +235,20 @@ export function DeploymentSkeleton(props: { t: BocTranslator }) {
           <For each={[0, 1, 2, 3, 4, 5]}>
             {() => (
               <tr class="h-11">
-                <For each={["system", "branch", "ticket", "sync", "health", "age", "auto-sync", "state", "actions"]}>
+                <For
+                  each={[
+                    "system",
+                    "branch",
+                    "ticket",
+                    "ticket-status",
+                    "sync",
+                    "health",
+                    "age",
+                    "auto-sync",
+                    "state",
+                    "actions",
+                  ]}
+                >
                   {(column) => (
                     <td data-deployment-column={column} class="border-b border-v2-border-border-muted px-3">
                       <span class="block h-2.5 w-3/4 animate-pulse rounded-sm bg-v2-background-bg-layer-02 motion-reduce:animate-none" />
@@ -225,6 +304,7 @@ function SystemActions(props: {
   onRedeploy?: (system: DeploymentSystem) => void
   onTurnAutoSyncOff?: (system: DeploymentSystem) => void
   onClearCache?: (system: DeploymentSystem) => void
+  onOpenSsh?: (system: DeploymentSystem) => void
   cacheRun?: DeploymentCacheRunSnapshot
 }) {
   const canDeploy = () => props.system.allowedActions?.includes("deploy") === true
@@ -305,7 +385,15 @@ function SystemActions(props: {
             >
               {props.t("boc.deployments.action.clearCache")}
             </Menu.Item>
-            <Menu.Item disabled badge={props.t("boc.deployments.action.unavailable.short")}>
+            <Menu.Item
+              disabled={!props.onOpenSsh || !props.system.allowedActions?.includes("ssh")}
+              badge={
+                props.onOpenSsh && props.system.allowedActions?.includes("ssh")
+                  ? undefined
+                  : props.t("boc.deployments.action.unavailable.short")
+              }
+              onSelect={() => props.onOpenSsh?.(props.system)}
+            >
               {props.t("boc.deployments.action.openSsh")}
             </Menu.Item>
           </Menu.Content>
@@ -315,26 +403,13 @@ function SystemActions(props: {
   )
 }
 
-function StatusText(props: { label: string; tone: "success" | "warning" | "danger" | "muted" }) {
-  return (
-    <span
-      classList={{
-        "text-v2-state-fg-success": props.tone === "success",
-        "text-v2-state-fg-warning": props.tone === "warning",
-        "text-v2-state-fg-danger": props.tone === "danger",
-        "text-v2-text-text-muted": props.tone === "muted",
-      }}
-    >
-      {props.label}
-    </span>
-  )
-}
-
-function healthTone(health: DeploymentSystem["health"]): "success" | "warning" | "danger" | "muted" {
-  if (health === "healthy") return "success"
-  if (health === "progressing" || health === "suspended") return "warning"
-  if (health === "degraded" || health === "missing") return "danger"
-  return "muted"
+export function jiraTicketStatusTone(status?: string): StatusTone {
+  const normalized = status?.trim().toLowerCase()
+  if (!normalized || normalized === "n/a") return "muted"
+  if (["done", "finished", "fertig", "erledigt", "awaiting go live"].includes(normalized)) return "info"
+  if (["closed", "resolved"].includes(normalized)) return "success"
+  if (["blocked", "rejected", "cancelled", "canceled"].includes(normalized)) return "danger"
+  return "warning"
 }
 
 function availabilityTextTone(availability: DeploymentSystem["availability"]) {

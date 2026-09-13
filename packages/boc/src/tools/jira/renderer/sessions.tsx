@@ -1,10 +1,15 @@
 import { Button } from "@opencode/ui/button"
+import { Icon } from "@opencode/ui/icon"
+import { Loader } from "@opencode/ui/loader"
+import { Menu } from "@opencode/ui/menu"
+import { SplitButton, SplitButtonAction, SplitButtonMenuTrigger } from "@opencode/ui/split-button"
+import "./sessions.css"
 import { createEffect, createResource, For, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useBocDesktop } from "../../../renderer/desktop"
 import { useBocHost } from "../../../renderer/host"
 import type { BocTranslator } from "../../../renderer/i18n"
-import type { JiraIssueDetail } from "../domain/board"
+import type { JiraIssueDetail } from "../domain/issue"
 import { JiraSessionInstructionFields } from "./session-instructions"
 import {
   defaultJiraSessionInstructions,
@@ -14,7 +19,12 @@ import {
   type JiraSessionDifficulty,
 } from "../domain/sessions"
 
-export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: number; t: BocTranslator }) {
+export function JiraIssueSessions(props: {
+  issue: JiraIssueDetail
+  boardId: number
+  t: BocTranslator
+  onNavigate?: () => void
+}) {
   const host = useBocHost()
   const desktop = useBocDesktop()
   const [form, setForm] = createStore({
@@ -58,6 +68,7 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
         model: jiraSessionModel(form.models[form.difficulty].model),
         target: project,
       })
+      .then(() => props.onNavigate?.())
       .catch((error: unknown) => {
         setForm("error", error instanceof Error ? error.message : props.t("boc.jira.sessions.startFailed"))
       })
@@ -66,33 +77,59 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
 
   return (
     <Show when={host.sessions}>
-      <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
-        <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.sessions.title")}</h3>
-        <div class="flex flex-col gap-1">
-          <span class="text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
-            {props.t("boc.jira.sessions.difficulty")}
-          </span>
-          <div role="radiogroup" aria-label={props.t("boc.jira.sessions.difficulty")} class="flex flex-wrap gap-1">
-            <For each={jiraSessionDifficulties}>
-              {(difficulty) => (
-                <Button
-                  size="small"
-                  variant={form.difficulty === difficulty ? "neutral" : "ghost-muted"}
-                  role="radio"
-                  aria-checked={form.difficulty === difficulty}
-                  disabled={disabled()}
-                  onClick={() => setForm("difficulty", difficulty)}
-                >
-                  {props.t(`boc.jira.sessions.difficulty.${difficulty}`)}
-                </Button>
-              )}
-            </For>
-          </div>
-          <span class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-faint">
-            {form.models[form.difficulty].model}
-          </span>
-        </div>
-        <details>
+      <section
+        aria-label={props.t("boc.jira.ticket.sessions")}
+        class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
+      >
+        <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.ticket.sessions")}</h3>
+        <SplitButton data-boc-jira-session-start>
+          <SplitButtonAction disabled={disabled()} aria-busy={form.busy} onClick={() => void start()}>
+            <Show when={form.busy}>
+              <Loader class="size-3" />
+            </Show>
+            {props.t("boc.jira.sessions.start")}
+          </SplitButtonAction>
+          <Menu placement="bottom-end" gutter={4}>
+            <Menu.Trigger
+              as={SplitButtonMenuTrigger}
+              disabled={disabled()}
+              aria-label={props.t("boc.jira.sessions.difficulty.select", {
+                difficulty: props.t(`boc.jira.sessions.difficulty.${form.difficulty}`),
+              })}
+            >
+              {props.t(`boc.jira.sessions.difficulty.${form.difficulty}`)}
+              <Icon name="chevron-down" size="small" />
+            </Menu.Trigger>
+            <Menu.Portal>
+              <Menu.Content class="min-w-56 max-w-[calc(100vw-2rem)]">
+                <Menu.Group>
+                  <Menu.GroupLabel>{props.t("boc.jira.sessions.difficulty")}</Menu.GroupLabel>
+                  <Menu.RadioGroup
+                    value={form.difficulty}
+                    onChange={(value) => {
+                      const difficulty = jiraSessionDifficulties.find((difficulty) => difficulty === value)
+                      if (difficulty) setForm("difficulty", difficulty)
+                    }}
+                  >
+                    <For each={jiraSessionDifficulties}>
+                      {(difficulty) => (
+                        <Menu.RadioItem value={difficulty} closeOnSelect class="!h-auto !py-2">
+                          <span class="flex min-w-0 flex-col gap-0.5">
+                            <span>{props.t(`boc.jira.sessions.difficulty.${difficulty}`)}</span>
+                            <bdi dir="ltr" class="truncate text-[12px] text-v2-text-text-faint">
+                              {form.models[difficulty].model}
+                            </bdi>
+                          </span>
+                        </Menu.RadioItem>
+                      )}
+                    </For>
+                  </Menu.RadioGroup>
+                </Menu.Group>
+              </Menu.Content>
+            </Menu.Portal>
+          </Menu>
+        </SplitButton>
+        <details class="text-[12px] leading-[var(--line-height-compact)]">
           <summary class="cursor-pointer text-v2-text-text-muted">{props.t("boc.jira.sessions.instructions")}</summary>
           <JiraSessionInstructionFields
             t={props.t}
@@ -101,10 +138,6 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
             onChange={(field, value) => setForm(field, value)}
           />
         </details>
-        <Button size="small" variant="neutral" disabled={disabled()} onClick={() => void start()}>
-          {props.t("boc.jira.sessions.start")}
-        </Button>
-        <p class="text-[12px] text-v2-text-text-faint">{props.t("boc.jira.sessions.review")}</p>
         <Show when={!preferences.loading && !target()}>
           <p role="alert">{props.t("boc.jira.sessions.projectRequired")}</p>
           <Show when={!preferences()}>
@@ -136,7 +169,7 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
         <For each={sessions()?.links}>
           {(link) => (
             <Button
-              class="w-full min-w-0 justify-between gap-2"
+              class="!h-auto !w-full !min-w-0 !justify-start !py-2 !whitespace-normal"
               size="small"
               variant="ghost-muted"
               onClick={() => {
@@ -144,12 +177,18 @@ export function JiraIssueSessions(props: { issue: JiraIssueDetail; boardId: numb
                 setForm("error", "")
                 void host.sessions
                   ?.open(link.server, link.sessionID)
+                  .then(() => props.onNavigate?.())
                   .catch(() => setForm("error", props.t("boc.jira.sessions.unavailable")))
               }}
             >
-              <span class="truncate">{link.title}</span>
-              <span class="shrink-0 text-v2-text-text-faint">
-                {new Date(link.createdAt).toLocaleString(host.locale())}
+              <Icon name="speech-bubble" class="shrink-0" />
+              <span class="flex min-w-0 flex-1 flex-col gap-1 text-start">
+                <bdi dir="auto" class="truncate">
+                  {link.title}
+                </bdi>
+                <span class="text-[12px] text-v2-text-text-faint">
+                  {new Date(link.createdAt).toLocaleString(host.locale())}
+                </span>
               </span>
             </Button>
           )}

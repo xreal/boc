@@ -18,6 +18,7 @@ export interface PopoverProps<T extends ValidComponent = "div">
   classList?: ComponentProps<"div">["classList"]
   style?: ComponentProps<"div">["style"]
   portal?: boolean
+  onOpenAutoFocus?: ComponentProps<typeof Kobalte.Content>["onOpenAutoFocus"]
 }
 
 export function Popover<T extends ValidComponent = "div">(props: PopoverProps<T>) {
@@ -37,6 +38,7 @@ export function Popover<T extends ValidComponent = "div">(props: PopoverProps<T>
     "defaultOpen",
     "onOpenChange",
     "modal",
+    "onOpenAutoFocus",
   ])
 
   const [state, setState] = createStore({
@@ -106,6 +108,7 @@ export function Popover<T extends ValidComponent = "div">(props: PopoverProps<T>
     <Kobalte.Content
       ref={(el: HTMLElement | undefined) => setState("contentRef", el)}
       data-component="popover-content"
+      onOpenAutoFocus={local.onOpenAutoFocus}
       classList={{
         ...local.classList,
         [local.class ?? ""]: !!local.class,

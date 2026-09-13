@@ -96,7 +96,12 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
         }),
       )({ ok: true, boards: [] })
     }
-    if (tag === "BocJiraGetBoard" || tag === "BocJiraListIssues" || tag === "BocJiraGetIssue") {
+    if (
+      tag === "BocJiraGetBoard" ||
+      tag === "BocJiraListIssues" ||
+      tag === "BocJiraGetIssue" ||
+      tag === "BocJiraListIssueStatuses"
+    ) {
       return Schema.decodeUnknownSync(
         Schema.Struct({
           ok: Schema.Literal(false),
@@ -157,6 +162,10 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     ok: false,
     category: "auth",
   })
+  await expect(api.jira.listIssueStatuses({ requestId: "issue-statuses", issueKeys: ["PLAT-1"] })).resolves.toEqual({
+    ok: false,
+    category: "auth",
+  })
   await expect(api.jira.cancelBoardRead({ requestId: "board" })).resolves.toBeUndefined()
   await expect(api.jira.cancelIssueRead({ requestId: "issue" })).resolves.toBeUndefined()
   await expect(api.jira.getPreferences()).resolves.toEqual({ savedBoards: [] })
@@ -170,6 +179,7 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     "BocJiraGetBoard",
     "BocJiraListIssues",
     "BocJiraGetIssue",
+    "BocJiraListIssueStatuses",
     "BocJiraCancelBoardRead",
     "BocJiraCancelIssueRead",
     "BocJiraGetPreferences",

@@ -1,16 +1,25 @@
-export function adfToMarkdown(value: unknown): string | undefined {
+import { adfEmoji, replaceEmojiShortcodes } from "./emoji"
+import type { JiraAttachment } from "./issue"
+
+export function adfToMarkdown(value: unknown, attachments: readonly JiraAttachment[] = []): string | undefined {
   if (typeof value === "string") {
     const trimmed = value.trim()
     if (!trimmed) return
     return trimmed
   }
-  const markdown = renderBlock(value).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+  const markdown = renderBlock(attachments.length ? resolveFileMedia(value, attachments) : value)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
   if (!markdown) return
   return markdown
 }
 
 export function adfToPlainText(value: unknown): string | undefined {
-  const text = collectPlain(value).replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim()
+  const text = collectPlain(value)
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim()
   if (!text) return
   return text
 }
@@ -38,7 +47,10 @@ function renderBlock(value: unknown, tight = false): string {
   if (type === "blockquote" || type === "panel") {
     const inner = renderBlock(content).trim()
     if (!inner) return ""
-    return `${inner.split("\n").map((line) => `> ${line}`).join("\n")}\n\n`
+    return `${inner
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n")}\n\n`
   }
   if (type === "codeBlock") {
     const language = text(attrs?.language) ?? ""
@@ -74,7 +86,7 @@ function renderBlock(value: unknown, tight = false): string {
   if (type === "mediaInline") return mediaMarkdown(value, true)
   if (type === "hardBreak") return "\n"
   if (type === "mention") return mention(attrs)
-  if (type === "emoji") return text(attrs?.text) ?? text(attrs?.shortName) ?? ""
+  if (type === "emoji") return escapeMarkdown(adfEmoji(attrs))
   if (type === "inlineCard" || type === "blockCard" || type === "embedCard") return card(attrs)
   if (type === "status") {
     const label = text(attrs?.text)
@@ -93,7 +105,7 @@ function renderInline(value: unknown): string {
   if (value.type === "mention") return mention(isRecord(value.attrs) ? value.attrs : undefined)
   if (value.type === "emoji") {
     const attrs = isRecord(value.attrs) ? value.attrs : undefined
-    return text(attrs?.text) ?? text(attrs?.shortName) ?? ""
+    return escapeMarkdown(adfEmoji(attrs))
   }
   if (value.type === "inlineCard") return card(isRecord(value.attrs) ? value.attrs : undefined)
   if (value.type === "mediaInline" || value.type === "image" || value.type === "media") {
@@ -177,6 +189,11 @@ function mediaMarkdown(node: Record<string, unknown>, inline: boolean) {
   const attrs = isRecord(node.attrs) ? node.attrs : undefined
   const marks = Array.isArray(node.marks) ? node.marks.filter(isRecord) : []
   const alt = text(attrs?.alt) ?? text(attrs?.title) ?? mediaFileName(attrs) ?? "Image"
+  const attachmentId = text(attrs?.bocAttachmentId)
+  if (attachmentId && /^\d+$/.test(attachmentId)) {
+    const link = `[${escapeMarkdown(alt)}](#jira-attachment-${attachmentId})`
+    return inline ? link : `${link}\n\n`
+  }
   const url = safeHttpUrl(text(attrs?.url) ?? text(attrs?.src)) ?? linkHref(marks)
   if (url) {
     const image = `![${escapeMarkdown(alt)}](${url})`
@@ -184,6 +201,20 @@ function mediaMarkdown(node: Record<string, unknown>, inline: boolean) {
   }
   const label = `*${escapeMarkdown(alt)}*`
   return inline ? label : `${label}\n\n`
+}
+
+function resolveFileMedia(value: unknown, attachments: readonly JiraAttachment[]): unknown {
+  if (Array.isArray(value)) return value.map((node) => resolveFileMedia(node, attachments))
+  if (!isRecord(value)) return value
+  const attrs = isRecord(value.attrs) ? value.attrs : undefined
+  if (["media", "mediaInline", "image"].includes(String(value.type)) && attrs && !attrs.url && !attrs.src) {
+    const name = mediaFileName(attrs) ?? text(attrs.alt) ?? text(attrs.title)
+    // Media UUIDs and REST attachment IDs differ. Only resolve exact IDs or unambiguous filenames.
+    const matches = attachments.filter((attachment) => attachment.id === attrs.id || attachment.filename === name)
+    if (matches.length === 1)
+      return { ...value, attrs: { ...attrs, bocAttachmentId: matches[0]?.id, alt: name ?? matches[0]?.filename } }
+  }
+  return Array.isArray(value.content) ? { ...value, content: resolveFileMedia(value.content, attachments) } : value
 }
 
 function mediaFileName(attrs: Record<string, unknown> | undefined) {
@@ -194,12 +225,16 @@ function mediaFileName(attrs: Record<string, unknown> | undefined) {
 function applyMarks(raw: string, marks: unknown) {
   const list = Array.isArray(marks) ? marks.filter(isRecord) : []
   if (list.some((mark) => mark.type === "code")) return `\`${raw.replace(/`/g, "\\`")}\``
-  let result = escapeMarkdown(raw)
+  let result = escapeMarkdown(replaceEmojiShortcodes(raw))
   if (list.some((mark) => mark.type === "strong")) result = `**${result}**`
   if (list.some((mark) => mark.type === "em")) result = `*${result}*`
   if (list.some((mark) => mark.type === "strike")) result = `~~${result}~~`
   const href = linkHref(list)
   if (href) result = `[${result}](${href})`
+  const colorMark = list.find((mark) => mark.type === "textColor")
+  const color = isRecord(colorMark?.attrs) ? text(colorMark.attrs.color) : undefined
+  // Markdown has no text-color mark; retain it as a narrowly supported inline span.
+  if (color && /^#[\da-f]{6}$/i.test(color)) result = `<span style="color:${color}">${result}</span>`
   return result
 }
 
@@ -236,8 +271,10 @@ function collectPlain(value: unknown): string {
   if (Array.isArray(value)) return value.map(collectPlain).join("")
   if (!isRecord(value)) return ""
   if (typeof value.text === "string") return value.text
+  if (value.type === "emoji") return adfEmoji(isRecord(value.attrs) ? value.attrs : undefined)
   const inner = Array.isArray(value.content) ? value.content.map(collectPlain).join("") : ""
-  if (value.type === "paragraph" || value.type === "heading" || value.type === "blockquote") return inner ? `${inner}\n\n` : ""
+  if (value.type === "paragraph" || value.type === "heading" || value.type === "blockquote")
+    return inner ? `${inner}\n\n` : ""
   if (value.type === "listItem") return inner ? `${inner}\n` : ""
   if (value.type === "hardBreak") return "\n"
   return inner
