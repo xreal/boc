@@ -58,7 +58,12 @@ test("prepares a pull request review from the saved template and linked ticket",
 
 test("keeps the suggested review concise and read-only", () => {
   expect(defaultJiraSessionInstructions.review).toContain("Write in plain, easy-to-understand English.")
+  expect(defaultJiraSessionInstructions.review).toContain("Lead with findings and skip the preamble.")
   expect(defaultJiraSessionInstructions.review).toContain("Keep each finding brief")
+  expect(defaultJiraSessionInstructions.review).toContain(
+    "For a complex finding, add the smallest useful visual beside it",
+  )
+  expect(defaultJiraSessionInstructions.review).toContain("Skip visuals when plain text is clearer.")
   expect(defaultJiraSessionInstructions.review).toEndWith("Do not modify code, commit, or push!")
 })
 
