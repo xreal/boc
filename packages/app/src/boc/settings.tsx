@@ -7,10 +7,9 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { Persistence } from "@/runtime/persistence/schema"
 import { Persist, persisted } from "@/runtime/persistence/storage"
 import { ServerConnection } from "@/runtime/server/registry"
-import { useGlobal } from "@/runtime/server/runtime"
+import { useServer } from "@/runtime/server/current"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
-import { InlineServerSelect } from "@/settings/server-select"
 import { SettingsServerDataScope } from "@/settings/server-scope"
 import { displayName } from "@/shell/layout/helpers"
 import { pathKey } from "@/workspaces/path-key"
@@ -24,21 +23,14 @@ const preferences = Persistence.struct({
 export function BocSettings(props: { directory?: string }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
-  const global = useGlobal()
+  const server = useServer()
   const [saved, setSaved, , ready] = persisted(Persist.window("boc.settings"), preferences, { projects: {} })
-  const server = global.settings.server.selected
   const projects = createMemo(() => {
-    const selected = server()
-    if (!selected) return []
-    return global
-      .ensureServerCtx(selected)
-      .projects.list()
-      .filter((project) => project.id && project.id !== "global")
+    return server.ctx.projects.list().filter((project) => project.id && project.id !== "global")
   })
   const project = createMemo(() => {
-    const selected = server()
-    if (!selected || !ready()) return
-    const remembered = saved.projects[ServerConnection.key(selected)]
+    if (!ready()) return
+    const remembered = saved.projects[server.key]
     const directory = props.directory
     return (
       projects().find((item) => pathKey(item.worktree) === remembered) ??
@@ -46,10 +38,9 @@ export function BocSettings(props: { directory?: string }) {
     )
   })
   const selection = createMemo(() => {
-    const selectedServer = server()
     const selectedProject = project()
-    if (!selectedServer || !selectedProject) return
-    return { server: selectedServer, project: selectedProject }
+    if (!selectedProject) return
+    return { server: server.conn, project: selectedProject }
   })
 
   return (
@@ -62,7 +53,6 @@ export function BocSettings(props: { directory?: string }) {
               {t("boc.settings.description")}
             </span>
           </div>
-          <InlineServerSelect />
         </div>
       </div>
 
@@ -78,11 +68,10 @@ export function BocSettings(props: { directory?: string }) {
                 value={(item) => pathKey(item.worktree)}
                 label={displayName}
                 placeholder={t("boc.settings.project.select")}
-                disabled={!ready() || !server() || projects().length === 0}
+                disabled={!ready() || projects().length === 0}
                 onSelect={(item) => {
-                  const selected = server()
-                  if (!selected || !item) return
-                  setSaved("projects", ServerConnection.key(selected), pathKey(item.worktree))
+                  if (!item) return
+                  setSaved("projects", server.key, pathKey(item.worktree))
                 }}
               />
             </SettingsRow>

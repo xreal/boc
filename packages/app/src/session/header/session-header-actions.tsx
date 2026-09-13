@@ -7,6 +7,7 @@ import { useCommand } from "@/shell/commands/command"
 import { reviewTooltipKeybind } from "@/shell/commands/tooltip-keybind"
 import { useLanguage } from "@/runtime/i18n/language"
 import { useSessionLayout } from "@/session/session-layout"
+import { BocEnvironmentSessionControl } from "@/boc/environments/session"
 
 export function SessionReviewToggle() {
   const command = useCommand()
@@ -14,15 +15,18 @@ export function SessionReviewToggle() {
   const { view } = useSessionLayout()
 
   return (
-    <SessionHeaderActions
-      state={{
-        reviewLabel: language.t("command.review.toggle"),
-        reviewKeybind: reviewTooltipKeybind(command),
-        reviewVisible: true,
-        reviewOpened: view().reviewPanel.opened(),
-        onReviewToggle: () => view().reviewPanel.toggle(),
-      }}
-    />
+    <>
+      <BocEnvironmentSessionControl />
+      <SessionHeaderActions
+        state={{
+          reviewLabel: language.t("command.review.toggle"),
+          reviewKeybind: reviewTooltipKeybind(command),
+          reviewVisible: true,
+          reviewOpened: view().reviewPanel.opened(),
+          onReviewToggle: () => view().reviewPanel.toggle(),
+        }}
+      />
+    </>
   )
 }
 

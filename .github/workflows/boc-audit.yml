@@ -19,9 +19,9 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
-      - name: Fetch upstream beta
+      - name: Fetch upstream V2
         run: |
           git remote add upstream https://github.com/anomalyco/opencode.git
-          git fetch upstream beta
+          git fetch upstream v2
       - name: Audit fork surface
         run: bun packages/boc/scripts/audit-fork-surface.ts

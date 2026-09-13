@@ -7,7 +7,7 @@ type ForkSurface = {
 
 const root = path.resolve(import.meta.dir, "../../..")
 const surface = (await Bun.file(path.join(import.meta.dir, "../fork-surface.json")).json()) as ForkSurface
-const base = await git(["merge-base", "HEAD", "upstream/beta"], "Fetch upstream/beta before running the BOC audit.")
+const base = await git(["merge-base", "HEAD", "upstream/v2"], "Fetch upstream/v2 before running the BOC audit.")
 const changed = new Set(
   (
     await Promise.all([

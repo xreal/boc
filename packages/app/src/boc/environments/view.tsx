@@ -492,7 +492,7 @@ function createEnvironmentActions(input: {
   }
   const settings = () => {
     dialog.close()
-    settingsSurface.open("boc")
+    settingsSurface.openServer(ServerConnection.key(input.target.server), "boc")
   }
   const retry = async (action: NonNullable<ReturnType<typeof retryableEnvironmentAction>>) => {
     if (action === "remove") return remove()

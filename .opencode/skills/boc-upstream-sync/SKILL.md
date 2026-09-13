@@ -1,11 +1,11 @@
 ---
 name: boc-upstream-sync
-description: Review, merge, and verify upstream/beta changes in the Boc fork. Use for upstream pulls, syncs, merge rehearsals, conflict resolution, or compatibility audits; prioritize core, app, and desktop impact.
+description: Review, merge, and verify upstream/v2 changes in the Boc fork. Use for upstream pulls, syncs, merge rehearsals, conflict resolution, or compatibility audits; prioritize core, app, and desktop impact.
 ---
 
 # Sync Boc with upstream
 
-Keep `boc-beta` close to `upstream/beta` while preserving the smallest supported Boc integration surface.
+Keep `boc-beta` close to `upstream/v2` while preserving the smallest supported Boc integration surface.
 
 ## Boundaries
 
@@ -16,8 +16,8 @@ Keep `boc-beta` close to `upstream/beta` while preserving the smallest supported
 
 ## Inspect before merging
 
-1. Confirm the branch, remotes, status, and merge base. Fetch `upstream/beta`.
-2. Review the full incoming range with `git log HEAD..upstream/beta` and `git diff HEAD...upstream/beta`; do not rely on conflicts alone.
+1. Confirm the branch, remotes, status, and merge base. Fetch `upstream/v2`.
+2. Review the full incoming range with `git log HEAD..upstream/v2` and `git diff HEAD...upstream/v2`; do not rely on conflicts alone.
 3. Treat `fix(core):`, `fix(app):`, and `fix(desktop):` commits as high-priority signals. Inspect every incoming change under those packages even when its commit scope differs.
 4. Match incoming paths and symbols against `BOC_FORK.md`, the approved surface, and imports in fork-owned code. Inspect callers, types, defaults, provider order, build config, and generated clients.
 5. Give TUI-only changes lower priority, but follow any shared core, protocol, schema, client, UI, or server impact.
@@ -25,7 +25,7 @@ Keep `boc-beta` close to `upstream/beta` while preserving the smallest supported
 
 ## Merge and adapt
 
-- Follow the repository workflow: merge `upstream/beta` into `boc-beta`; do not squash or rewrite upstream history.
+- Follow the repository workflow: merge `upstream/v2` into `boc-beta`; do not squash or rewrite upstream history.
 - Resolve each conflict by understanding both sides. Keep upstream behavior intact and reapply only the narrow Boc registration, channel case, or strategy hook; never choose whole-file ours/theirs blindly.
 - Fix merge-caused type, test, build, runtime-boundary, and generated-client issues within scope. When upstream provides a better seam, migrate the fork-owned bridge and remove the obsolete touch.
 - Keep Boc product names and behavior out of upstream files unless the integration map explicitly records a channel-specific exception.

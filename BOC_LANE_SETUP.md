@@ -15,7 +15,7 @@ lane --version
 Install the tested plugin revision globally:
 
 ```sh
-opencode2 plugin add git+https://github.com/anomalyco/opencode-plugin-lane.git#cb007ac5ef18770b170b17027cfab9f6346d50d50eca
+opencode plugin add git+https://github.com/anomalyco/opencode-plugin-lane.git#cb007ac5ef18770b170b17027cfab9f6346d50d50eca
 ```
 
 Configure the plugin in the backend's global `opencode.jsonc`. If the command already created an entry, edit that entry instead of adding a duplicate:

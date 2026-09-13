@@ -62,8 +62,8 @@
       "reason": "Select Lane for Boc checkout creation and notify the Boc session-link bridge after successful session creation"
     },
     {
-      "path": "packages/app/src/session/header/session-header.tsx",
-      "reason": "Mount the Boc environment control inside the existing right titlebar slot"
+      "path": "packages/app/src/session/header/session-header-actions.tsx",
+      "reason": "Mount the Boc environment control beside the existing session header actions"
     },
     {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
@@ -83,7 +83,19 @@
     },
     {
       "path": "packages/app/src/settings/shell.tsx",
-      "reason": "Register one Boc settings section for development environment preferences"
+      "reason": "Register the Boc section in upstream's server-aware settings navigation"
+    },
+    {
+      "path": "packages/app/src/settings/surface.tsx",
+      "reason": "Recognize Boc as a server-aware settings destination"
+    },
+    {
+      "path": "packages/app/src/settings/pages.ts",
+      "reason": "Assign the Boc settings destination its existing semantic icon"
+    },
+    {
+      "path": "packages/app/src/settings/search-index.ts",
+      "reason": "Exclude the independently indexed Boc destination from upstream settings entries"
     },
     {
       "path": "packages/app/src/shell/state/layout.tsx",

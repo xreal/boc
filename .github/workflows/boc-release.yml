@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  BOC_SERVER_VERSION: 0.0.0-beta-19234
+  BOC_SERVER_VERSION: 2.0.3
 
 concurrency:
   group: boc-release
@@ -60,10 +60,10 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
 
-      - name: Fetch upstream beta
+      - name: Fetch upstream V2
         run: |
           git remote add upstream https://github.com/anomalyco/opencode.git
-          git fetch upstream beta
+          git fetch upstream v2
 
       - name: Type-check Boc package
         working-directory: packages/boc

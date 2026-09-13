@@ -22,6 +22,7 @@
 - `BOC_FORK.md` is the maintained map of implemented fork capabilities, upstream-owned seams, and upstream APIs Boc relies on. Read it before changing a fork integration or syncing upstream, and update it in the same commit whenever those facts change.
 - Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
 - Boc releases accept only the Boc application version. Keep `BOC_SERVER_VERSION` in `.github/workflows/boc-release.yml` pinned to the exact compatible official server version and update that pin during upstream syncs, not during routine Boc releases.
+- Since the stable V2 launch, `boc-beta` tracks `upstream/v2` despite its historical branch name and the older beta-tracking notes above. Sync with `git fetch upstream v2 && git merge upstream/v2`; Boc application versions remain independent from the pinned compatible official server version.
 
 
 ---
@@ -38,9 +39,9 @@
 
 ## Live V2 TUI Testing
 
-- Run `bun run dev:live` from a development worktree to test its TUI against the currently elected `opencode2` background server and live sessions.
+- Run `bun run dev:live` from a development worktree to test its TUI against the currently elected `opencode` background server and live sessions.
 - Pass a directory after the script when needed, for example `bun run dev:live /path/to/project`.
-- The script discovers the server with `opencode2 service status`, injects its private local credential from `opencode2 service get password`, and uses the `dev` TUI storage channel so tabs and other client-local state match the installed client.
+- The script discovers the server with `opencode service status`, injects its private local credential from `opencode service get password`, and uses the `dev` TUI storage channel so tabs and other client-local state match the installed client.
 - Prefer `dev:live` over plain `bun run dev` for this workflow. An implicit managed-service connection may replace the live server when the worktree client version differs; explicit `--server` warns and continues without replacing it.
 
 ## V2 TUI Stories

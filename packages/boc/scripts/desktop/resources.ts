@@ -12,7 +12,7 @@ export async function prepareBocIcons(local: boolean) {
 
 export async function stageBocCli(root: string) {
   const cli = getCurrentCli()
-  const filename = cli.os === "win32" ? "opencode2.exe" : "opencode2"
+  const filename = cli.os === "win32" ? "opencode.exe" : "opencode"
   const destination = path.join(desktopDirectory, "resources", cli.os === "win32" ? "opencode-cli.exe" : "opencode-cli")
   await mkdir(path.dirname(destination), { recursive: true })
   await copyFile(path.join(root, cli.package.replace("@opencode/", ""), "bin", filename), destination)

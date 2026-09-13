@@ -11,12 +11,14 @@ import type { RelativePath } from "@opencode/schema/schema"
 import type { Brand } from "effect"
 import type { Model } from "@opencode/schema/model"
 import type { DateTime } from "effect"
+import type { Permission } from "@opencode/schema/permission"
 import type { SessionMessage } from "@opencode/schema/session-message"
 import type { SessionInbox } from "@opencode/schema/session-inbox"
 import type { PromptInput } from "@opencode/schema/prompt-input"
 import type { AgentAttachment } from "@opencode/schema/prompt"
 import type { Skill } from "@opencode/schema/skill"
 import type { Event } from "@opencode/schema/event"
+import type { FileDiff } from "@opencode/schema/file-diff"
 import type { InstructionEntry } from "@opencode/schema/instruction-entry"
 import type { Schema } from "effect"
 import type { EventLog } from "@opencode/schema/event-log"
@@ -26,7 +28,6 @@ import type { Integration } from "@opencode/schema/integration"
 import type { Form } from "@opencode/schema/form"
 import type { Mcp } from "@opencode/schema/mcp"
 import type { Credential } from "@opencode/schema/credential"
-import type { Permission } from "@opencode/schema/permission"
 import type { PermissionSaved } from "@opencode/schema/permission-saved"
 import type { FileSystem } from "@opencode/schema/filesystem"
 import type { Command } from "@opencode/schema/command"
@@ -36,7 +37,6 @@ import type { PtyTicket } from "@opencode/schema/pty-ticket"
 import type { Reference } from "@opencode/schema/reference"
 import type { Worktree } from "@opencode/schema/worktree"
 import type { Vcs } from "@opencode/schema/vcs"
-import type { FileDiff } from "@opencode/schema/file-diff"
 import type { WebSearch } from "@opencode/schema/websearch"
 import type { Config } from "@opencode/schema/config"
 
@@ -209,6 +209,7 @@ export type SessionCreateInput = {
   readonly model?: Model.Ref | undefined
   readonly location?: Location.Ref | undefined
   readonly metadata?: Session.Metadata | undefined
+  readonly permissions?: Permission.Ruleset | undefined
 }
 export type SessionCreateOutput = Session.Info
 export type SessionCreateOperation<E = never> = (input?: SessionCreateInput) => Effect.Effect<SessionCreateOutput, E>
@@ -360,6 +361,15 @@ export type SessionContextInput = { readonly sessionID: Session.ID }
 export type SessionContextOutput = ReadonlyArray<SessionMessage.Info>
 export type SessionContextOperation<E = never> = (input: SessionContextInput) => Effect.Effect<SessionContextOutput, E>
 
+export type SessionDiffInput = {
+  readonly sessionID: Session.ID
+  readonly from?: SessionMessage.ID | undefined
+  readonly to?: SessionMessage.ID | undefined
+  readonly context?: number | undefined
+}
+export type SessionDiffOutput = ReadonlyArray<FileDiff.Info>
+export type SessionDiffOperation<E = never> = (input: SessionDiffInput) => Effect.Effect<SessionDiffOutput, E>
+
 export type SessionInboxListInput = { readonly sessionID: Session.ID }
 export type SessionInboxListOutput = ReadonlyArray<SessionInbox.Info>
 export type SessionInboxListOperation<E = never> = (
@@ -437,6 +447,7 @@ export type SessionLogOutput =
             readonly agent?: Agent.ID | undefined
             readonly model?: Model.Ref | undefined
             readonly metadata?: Session.Metadata | undefined
+            readonly permissions?: Permission.Ruleset | undefined
             readonly version: string
           }
         }
@@ -488,6 +499,15 @@ export type SessionLogOutput =
           readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
           readonly location?: Location.Ref | undefined
           readonly data: { readonly sessionID: Session.ID; readonly title: string }
+        }
+      | {
+          readonly id: Event.ID
+          readonly created: number
+          readonly metadata?: { readonly [x: string]: unknown } | undefined
+          readonly type: "session.permissions.updated"
+          readonly durable: { readonly aggregateID: string; readonly seq: Event.Seq; readonly version: Event.Version }
+          readonly location?: Location.Ref | undefined
+          readonly data: { readonly sessionID: Session.ID; readonly permissions: Permission.Ruleset }
         }
       | {
           readonly id: Event.ID
@@ -1139,6 +1159,7 @@ export interface SessionApi<E = never> {
     readonly commit: SessionRevertCommitOperation<E>
   }
   readonly context: SessionContextOperation<E>
+  readonly diff: SessionDiffOperation<E>
   readonly inbox: {
     readonly list: SessionInboxListOperation<E>
     readonly cancel: SessionInboxCancelOperation<E>
@@ -1585,6 +1606,12 @@ export type PermissionReplyOperation<E = never> = (
   input: PermissionReplyInput,
 ) => Effect.Effect<PermissionReplyOutput, E>
 
+export type PermissionRulesInput = { readonly sessionID: Session.ID; readonly permissions: Permission.Ruleset }
+export type PermissionRulesOutput = void
+export type PermissionRulesOperation<E = never> = (
+  input: PermissionRulesInput,
+) => Effect.Effect<PermissionRulesOutput, E>
+
 export interface PermissionApi<E = never> {
   readonly request: { readonly list: PermissionRequestListOperation<E> }
   readonly saved: { readonly list: PermissionSavedListOperation<E>; readonly remove: PermissionSavedRemoveOperation<E> }
@@ -1592,6 +1619,7 @@ export interface PermissionApi<E = never> {
   readonly list: PermissionListOperation<E>
   readonly get: PermissionGetOperation<E>
   readonly reply: PermissionReplyOperation<E>
+  readonly rules: PermissionRulesOperation<E>
 }
 
 export type FileListInput = {
@@ -2128,8 +2156,30 @@ export type ConfigGetInput = {
 export type ConfigGetOutput = ReadonlyArray<Config.Entry>
 export type ConfigGetOperation<E = never> = (input?: ConfigGetInput) => Effect.Effect<ConfigGetOutput, E>
 
+export type ConfigPreferencesOutput = Config.Preferences
+export type ConfigPreferencesOperation<E = never> = () => Effect.Effect<ConfigPreferencesOutput, E>
+
+export type ConfigUpdatePreferencesInput = {
+  readonly shell?: string | null | undefined
+  readonly websearch?: false | { readonly provider: "random" | WebSearch.ID } | null | undefined
+}
+export type ConfigUpdatePreferencesOutput = Config.Preferences
+export type ConfigUpdatePreferencesOperation<E = never> = (
+  input?: ConfigUpdatePreferencesInput,
+) => Effect.Effect<ConfigUpdatePreferencesOutput, E>
+
+export type ConfigShellsOutput = ReadonlyArray<{
+  readonly path: string
+  readonly name: string
+  readonly acceptable: boolean
+}>
+export type ConfigShellsOperation<E = never> = () => Effect.Effect<ConfigShellsOutput, E>
+
 export interface ConfigApi<E = never> {
   readonly get: ConfigGetOperation<E>
+  readonly preferences: ConfigPreferencesOperation<E>
+  readonly updatePreferences: ConfigUpdatePreferencesOperation<E>
+  readonly shells: ConfigShellsOperation<E>
 }
 
 export interface AppApi<E = never> {

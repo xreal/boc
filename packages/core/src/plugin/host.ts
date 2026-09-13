@@ -405,6 +405,7 @@ export const make = Effect.fn("PluginHost.make")(function* (
                 : Effect.fail(new Error(`Permission request not found: ${input.requestID}`)),
             ),
           ),
+      rules: sessions.setPermissions,
     },
     plugin: {
       list: () => response(plugin.list()),
@@ -510,6 +511,8 @@ export const make = Effect.fn("PluginHost.make")(function* (
           title: input?.title,
           agent: input?.agent,
           model: input?.model,
+          metadata: input?.metadata,
+          permissions: input?.permissions,
           location:
             input?.location ?? Location.Ref.make({ directory: location.directory, workspaceID: location.workspaceID }),
         }),

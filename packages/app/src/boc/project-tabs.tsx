@@ -5,7 +5,6 @@ import { createBocTranslator } from "@boc/extensions/renderer"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
-import { useDialog } from "@opencode/ui/context/dialog"
 import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useGlobal } from "@/runtime/server/runtime"
 import { ServerConnection, serverName } from "@/runtime/server/registry"
@@ -21,6 +20,7 @@ import { Persist, persisted } from "@/runtime/persistence/storage"
 import { Persistence } from "@/runtime/persistence/schema"
 import { adjacentTabKey } from "@/shell/titlebar/tab-order"
 import { fileManagerApp } from "@/home/projects/file-manager"
+import { useSettingsSurface } from "@/settings/surface"
 import { BocWorktreeRing } from "./environments/worktree-ring"
 import "./project-tabs.css"
 
@@ -50,7 +50,7 @@ export function createBocProjectTabs(input: {
   const tabs = useTabs()
   const language = useLanguage()
   const platform = usePlatform()
-  const dialog = useDialog()
+  const settings = useSettingsSurface()
   const [state, setState] = persisted(Persist.window("boc.project-tabs"), preferences, { order: [], collapsed: {} })
   const projects = createMemo(() => {
     if (!input.enabled()) return new Map<string, ProjectGroup>()
@@ -165,8 +165,9 @@ export function createBocProjectTabs(input: {
     const server = group.connection
     const project = group.project
     if (!server || !project) return
-    void import("@/settings/workspaces/project-dialog").then(({ DialogEditProject }) => {
-      void dialog.show(() => <DialogEditProject server={server} project={project} />)
+    settings.openProject({
+      server: ServerConnection.key(server),
+      project: project.worktree,
     })
   }
 
