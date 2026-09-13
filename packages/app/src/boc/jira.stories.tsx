@@ -35,6 +35,7 @@ function JiraPreview(props: { scenario?: JiraFixtureScenario; sessions?: boolean
     external: "",
     changes: 0,
     started: "",
+    startedPrompt: "",
     opened: "",
     modalOpen: true,
     history: [] as string[],
@@ -133,6 +134,7 @@ function JiraPreview(props: { scenario?: JiraFixtureScenario; sessions?: boolean
               projects: () => [{ ...project, label: "Fixture project" }],
               start: async (input) => {
                 setView("started", `${input.model.providerID}/${input.model.modelID}`)
+                setView("startedPrompt", input.prompt)
               },
               open: async (_server, sessionID) => {
                 setView("opened", sessionID)
@@ -191,6 +193,9 @@ function JiraPreview(props: { scenario?: JiraFixtureScenario; sessions?: boolean
               <p aria-label="Assignment calls">{view.changes}</p>
               <Show when={props.sessions}>
                 <p aria-label="Started model">{view.started}</p>
+                <p aria-label="Started prompt" class="sr-only">
+                  {view.startedPrompt}
+                </p>
               </Show>
               <p aria-label="Opened URL" class="break-all">
                 {view.external}

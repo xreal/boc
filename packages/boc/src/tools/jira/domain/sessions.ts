@@ -24,6 +24,7 @@ export type JiraSessionModels = typeof JiraSessionModels.Type
 export const JiraSessionInstructions = Schema.Struct({
   before: Schema.String,
   after: Schema.String,
+  review: Schema.String,
   modelDefaultsVersion: Schema.Number,
   models: JiraSessionModels,
 })
@@ -35,6 +36,7 @@ export const JIRA_SESSION_MODEL_DEFAULTS_VERSION = 1
 export const defaultJiraSessionInstructions: JiraSessionInstructions = {
   before: jiraEnglish["boc.jira.sessions.defaults.before"],
   after: jiraEnglish["boc.jira.sessions.defaults.after"],
+  review: jiraEnglish["boc.jira.sessions.defaults.review"],
   modelDefaultsVersion: JIRA_SESSION_MODEL_DEFAULTS_VERSION,
   models: {
     low: { model: "github-copilot/gpt-5.6-luna#xhigh", preserveOnUpdate: false },
@@ -43,12 +45,21 @@ export const defaultJiraSessionInstructions: JiraSessionInstructions = {
   },
 }
 
+const PreviousJiraSessionInstructions = Schema.Struct({
+  before: Schema.String,
+  after: Schema.String,
+  modelDefaultsVersion: Schema.Number,
+  models: JiraSessionModels,
+})
 const LegacyJiraSessionInstructions = Schema.Struct({ before: Schema.String, after: Schema.String })
 const decodeSessionInstructions = Schema.decodeUnknownOption(JiraSessionInstructions)
+const decodePreviousSessionInstructions = Schema.decodeUnknownOption(PreviousJiraSessionInstructions)
 const decodeLegacySessionInstructions = Schema.decodeUnknownOption(LegacyJiraSessionInstructions)
 
 export function normalizeJiraSessionInstructions(input: unknown): JiraSessionInstructions {
-  const stored = Option.getOrUndefined(decodeSessionInstructions(input))
+  const current = Option.getOrUndefined(decodeSessionInstructions(input))
+  const previous = Option.getOrUndefined(decodePreviousSessionInstructions(input))
+  const stored = current ?? (previous ? { ...previous, review: defaultJiraSessionInstructions.review } : undefined)
   if (!stored) {
     const legacy = Option.getOrUndefined(decodeLegacySessionInstructions(input))
     return legacy ? { ...defaultJiraSessionInstructions, ...legacy } : defaultJiraSessionInstructions
@@ -97,6 +108,23 @@ export function jiraSessionPrompt(
   after: string,
 ) {
   return [before.trim(), `${issue.key}: ${issue.summary}`, issue.url, issue.description?.trim(), after.trim()]
+    .filter(Boolean)
+    .join("\n\n")
+}
+
+export function jiraPullRequestReviewPrompt(
+  issue: { key: string; summary: string; url: string; description?: string },
+  pullRequest: { number: number; title: string; url: string; headRefName: string },
+  template: string,
+) {
+  return [
+    template.trim(),
+    `## ${jiraEnglish["boc.jira.sessions.review.pullRequest"]}\n\n#${pullRequest.number}: ${pullRequest.title}\n\n${pullRequest.url}\n\n${jiraEnglish["boc.jira.sessions.review.sourceBranch"]}: ${pullRequest.headRefName}`,
+    `## ${jiraEnglish["boc.jira.sessions.review.ticket"]}\n\n${issue.key}: ${issue.summary}\n\n${issue.url}`,
+    issue.description?.trim()
+      ? `## ${jiraEnglish["boc.jira.sessions.review.ticketDescription"]}\n\n${issue.description.trim()}`
+      : undefined,
+  ]
     .filter(Boolean)
     .join("\n\n")
 }

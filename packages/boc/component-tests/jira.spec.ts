@@ -131,6 +131,22 @@ story("modal start hands off to the composer and close restores the opener focus
   await expect(page.getByRole("button", { name: "Open ticket", exact: true })).toBeFocused()
 })
 
+story(
+  "pull requests offer one review action that starts a session with the saved template",
+  async ({ mount, page }) => {
+    await mount("boc-jira--sessions")
+    const pullRequests = page.getByRole("region", { name: "Pull requests", exact: true })
+    await expect(pullRequests.getByRole("button", { name: "Review", exact: true })).toHaveCount(4)
+    await expect(pullRequests.getByRole("button", { name: "Light review", exact: true })).toHaveCount(0)
+    await expect(pullRequests.getByRole("button", { name: "Deep review", exact: true })).toHaveCount(0)
+    await pullRequests.getByRole("button", { name: "Review", exact: true }).first().click()
+    await expect(page.getByLabel("Started model")).toContainText("gemini-3.8-flash")
+    await expect(page.getByLabel("Started prompt")).toContainText("Review the pull request below.")
+    await expect(page.getByLabel("Started prompt")).toContainText("https://github.com/example/shop/pull/101")
+    await expect(page.getByLabel("Started prompt")).toContainText("https://example.atlassian.net/browse/SHOP-617")
+  },
+)
+
 story("narrow RTL has a direct workspace jump and no horizontal overflow", async ({ mount, page }, testInfo) => {
   await page.setViewportSize({ width: 540, height: 900 })
   await mount("boc-jira--long-ticket", { globals: { direction: "rtl", locale: "ar", theme: "light" } })

@@ -3,6 +3,7 @@ import {
   defaultJiraSessionInstructions,
   jiraSessionModel,
   jiraSessionPrompt,
+  jiraPullRequestReviewPrompt,
   normalizeJiraSessionInstructions,
 } from "./sessions"
 
@@ -33,11 +34,49 @@ test("handles tickets without a description or optional instructions", () => {
   ).toBe("APP-42: Fix checkout\n\nhttps://example.atlassian.net/browse/APP-42")
 })
 
+test("prepares a pull request review from the saved template and linked ticket", () => {
+  expect(
+    jiraPullRequestReviewPrompt(
+      {
+        key: "APP-42",
+        summary: "Fix checkout",
+        url: "https://example.atlassian.net/browse/APP-42",
+        description: "Keep saved carts intact.",
+      },
+      {
+        number: 17,
+        title: "Preserve saved carts",
+        url: "https://github.com/example/shop/pull/17",
+        headRefName: "APP-42-saved-carts",
+      },
+      "  Find actionable regressions only.  ",
+    ),
+  ).toBe(
+    "Find actionable regressions only.\n\n## Pull request\n\n#17: Preserve saved carts\n\nhttps://github.com/example/shop/pull/17\n\nSource branch: APP-42-saved-carts\n\n## Jira ticket\n\nAPP-42: Fix checkout\n\nhttps://example.atlassian.net/browse/APP-42\n\n## Ticket description\n\nKeep saved carts intact.",
+  )
+})
+
 test("uses the shipped difficulty models for legacy prompt defaults", () => {
   expect(normalizeJiraSessionInstructions({ before: "Before", after: "After" })).toEqual({
     ...defaultJiraSessionInstructions,
     before: "Before",
     after: "After",
+  })
+})
+
+test("adds the suggested review prompt to previously saved session settings", () => {
+  const previous = {
+    before: "Custom before",
+    after: defaultJiraSessionInstructions.after,
+    modelDefaultsVersion: defaultJiraSessionInstructions.modelDefaultsVersion,
+    models: {
+      ...defaultJiraSessionInstructions.models,
+      default: { model: "custom/reviewer", preserveOnUpdate: true },
+    },
+  }
+  expect(normalizeJiraSessionInstructions(previous)).toEqual({
+    ...previous,
+    review: defaultJiraSessionInstructions.review,
   })
 })
 

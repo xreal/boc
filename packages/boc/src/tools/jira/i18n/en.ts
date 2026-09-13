@@ -80,10 +80,11 @@ export const jiraEnglish = {
   "boc.jira.assignee.unknown":
     "The assignment outcome could not be confirmed. Check the current assignee in Jira before making another change.",
   "boc.jira.pr.title": "Pull requests",
-  "boc.jira.pr.lightReview": "Light review",
-  "boc.jira.pr.deepReview": "Deep review",
-  "boc.jira.pr.lightReview.hint": "Review the diff without checking out the branch. Coming soon.",
-  "boc.jira.pr.deepReview.hint": "Review in a dedicated worktree. Coming soon.",
+  "boc.jira.pr.startReview": "Review",
+  "boc.jira.pr.startReview.hint": "Start a new session with the saved review prompt and Medium model.",
+  "boc.jira.pr.startReview.busy": "Preparing the review session…",
+  "boc.jira.pr.startReview.failed": "Could not prepare the review session.",
+  "boc.jira.pr.startReview.title": "Review PR #{{number}}: {{title}}",
   "boc.jira.board.deployments.deployTo": "Deploy to {{system}}",
   "boc.jira.pr.count.one": "{{count}} pull request",
   "boc.jira.pr.count.other": "{{count}} pull requests",
@@ -120,6 +121,15 @@ export const jiraEnglish = {
     "Work on the Jira ticket below. First understand its requirements and the relevant code, then implement the simplest complete solution that follows the project's conventions.",
   "boc.jira.sessions.defaults.after":
     "Before finishing, review your changes and run the relevant linting, type checks, and tests; report the results and anything you could not verify. Do not commit or push without my explicit approval.",
+  "boc.jira.sessions.defaults.reviewLabel": "Pull request review",
+  "boc.jira.sessions.defaults.reviewDescription":
+    "Used when Review starts a new session from a pull request in a Jira ticket.",
+  "boc.jira.sessions.defaults.review":
+    "Review the pull request below. Inspect its complete diff against the base branch and enough surrounding code to verify behavior. Report only discrete, actionable problems introduced by the change—especially correctness, security, data loss, performance, compatibility, or maintainability risks the author would likely fix. Support every finding with code evidence; do not speculate, relitigate intentional changes, or flag minor style. Rank findings P0–P3, cite the narrowest relevant file and lines, and state the failing scenario and smallest sound fix. If nothing qualifies, say so. End with an overall verdict: correct or needs attention. Do not modify code, commit, or push.",
+  "boc.jira.sessions.review.pullRequest": "Pull request",
+  "boc.jira.sessions.review.sourceBranch": "Source branch",
+  "boc.jira.sessions.review.ticket": "Jira ticket",
+  "boc.jira.sessions.review.ticketDescription": "Ticket description",
   "boc.jira.sessions.defaults.save": "Save prompt defaults",
   "boc.jira.sessions.defaults.reset": "Use suggested text",
   "boc.jira.sessions.defaults.saved": "Prompt defaults saved.",

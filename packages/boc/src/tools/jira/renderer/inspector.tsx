@@ -335,11 +335,14 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
                 />
                 <JiraPullRequests
                   api={props.api}
+                  issue={issue()}
+                  boardId={props.boardId}
                   issueKey={props.issueKey}
                   t={props.t}
                   locale={props.locale}
                   online={props.online}
                   onOpenExternal={props.onOpenExternal}
+                  onNavigate={props.onClose}
                 />
                 <dl class="jira-ticket-properties jira-ticket-dates">
                   <Property label={props.t("boc.jira.board.inspector.created")}>

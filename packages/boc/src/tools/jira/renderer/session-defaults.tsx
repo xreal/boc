@@ -40,6 +40,7 @@ export function JiraSessionDefaultsSettings(props: {
       .saveSessionInstructions({
         before: form.before,
         after: form.after,
+        review: form.review,
         modelDefaultsVersion: form.modelDefaultsVersion,
         models: form.models,
       })
@@ -75,6 +76,17 @@ export function JiraSessionDefaultsSettings(props: {
             disabled={disabled()}
             onChange={(field, value) => setForm({ [field]: value, notice: "" })}
           />
+          <label class="flex flex-col gap-1 text-[13px] leading-[var(--line-height-base)]">
+            {props.t("boc.jira.sessions.defaults.reviewLabel")}
+            <span class="text-v2-text-text-muted">{props.t("boc.jira.sessions.defaults.reviewDescription")}</span>
+            <textarea
+              rows={8}
+              value={form.review}
+              disabled={disabled()}
+              onInput={(event) => setForm({ review: event.currentTarget.value, notice: "" })}
+              class="resize-y rounded border border-v2-border-border-base bg-v2-background-bg-base p-2 text-v2-text-text-base focus-visible:outline focus-visible:outline-2 focus-visible:outline-v2-border-border-focus disabled:opacity-50"
+            />
+          </label>
           {loadFailure()}
           <div class="flex flex-wrap gap-2">
             <Button
@@ -85,6 +97,7 @@ export function JiraSessionDefaultsSettings(props: {
                 setForm({
                   before: defaultJiraSessionInstructions.before,
                   after: defaultJiraSessionInstructions.after,
+                  review: defaultJiraSessionInstructions.review,
                   notice: "",
                 })
               }

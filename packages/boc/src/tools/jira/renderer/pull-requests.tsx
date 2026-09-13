@@ -2,9 +2,14 @@ import { Button } from "@opencode/ui/button"
 import { Icon } from "@opencode/ui/icon"
 import { Loader } from "@opencode/ui/loader"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { For, onMount, Show } from "solid-js"
+import { createResource, For, onMount, Show } from "solid-js"
+import { createStore } from "solid-js/store"
+import { useBocDesktop } from "../../../renderer/desktop"
+import { useBocHost } from "../../../renderer/host"
 import type { BocTranslator } from "../../../renderer/i18n"
+import type { JiraIssueDetail } from "../domain/issue"
 import type { JiraPullRequest, JiraPullRequestFailure } from "../domain/pull-request"
+import { jiraPullRequestReviewPrompt, jiraSessionModel } from "../domain/sessions"
 import type { JiraPullRequestsResult } from "../rpcs"
 import { createJiraResource, type JiraCollaborationApi } from "./resource"
 import { JiraSection } from "./section"
@@ -13,12 +18,30 @@ import "./pull-requests.css"
 
 export function JiraPullRequests(props: {
   api: JiraCollaborationApi
+  issue: JiraIssueDetail
+  boardId: number
   issueKey: string
   t: BocTranslator
   locale: string
   online: boolean
   onOpenExternal: (url: string) => void
+  onNavigate?: () => void
 }) {
+  const host = useBocHost()
+  const desktop = useBocDesktop()
+  const [review, setReview] = createStore({ busy: 0, error: "" })
+  const [defaults] = createResource(() => desktop?.jira.getSessionInstructions().catch(() => undefined))
+  const [preferences] = createResource(() => desktop?.jira.getPreferences().catch(() => undefined))
+  const target = () => preferences()?.projectTargets?.find((item) => item.boardId === props.boardId)
+  const reviewDisabled = () =>
+    !props.online || review.busy !== 0 || defaults.loading || preferences.loading || !defaults() || !target()
+  const reviewHint = () => {
+    if (!props.online) return props.t("boc.jira.collaboration.offline")
+    if (review.busy) return props.t("boc.jira.pr.startReview.busy")
+    if (!defaults.loading && !defaults()) return props.t("boc.jira.sessions.defaults.loadFailed")
+    if (!preferences.loading && !target()) return props.t("boc.jira.sessions.projectRequired")
+    return props.t("boc.jira.pr.startReview.hint")
+  }
   const resource = createJiraResource<Extract<JiraPullRequestsResult, { ok: true }>, JiraPullRequestFailure>({
     api: props.api,
     resource: "pull-requests",
@@ -32,6 +55,26 @@ export function JiraPullRequests(props: {
       },
       { ok: false, category: "network" },
     )
+  }
+  async function startReview(request: JiraPullRequest) {
+    const sessions = host.sessions
+    const instructions = defaults()
+    const project = target()
+    if (!sessions || !instructions || !project || reviewDisabled()) return
+    setReview({ busy: request.number, error: "" })
+    await sessions
+      .start({
+        issueUrl: props.issue.url,
+        title: props.t("boc.jira.pr.startReview.title", { number: request.number, title: request.title }),
+        prompt: jiraPullRequestReviewPrompt(props.issue, request, instructions.review),
+        model: jiraSessionModel(instructions.models.default.model),
+        target: project,
+      })
+      .then(() => props.onNavigate?.())
+      .catch((error: unknown) => {
+        setReview("error", error instanceof Error ? error.message : props.t("boc.jira.pr.startReview.failed"))
+      })
+      .finally(() => setReview("busy", 0))
   }
   onMount(() => void load())
   return (
@@ -137,26 +180,35 @@ export function JiraPullRequests(props: {
                   </span>
                 </span>
               </Button>
-              <div class="flex items-center gap-2 px-1 pb-1">
-                <Tooltip value={props.t("boc.jira.pr.lightReview.hint")}>
-                  <span>
-                    <Button size="small" variant="outline" disabled>
-                      {props.t("boc.jira.pr.lightReview")}
-                    </Button>
-                  </span>
-                </Tooltip>
-                <Tooltip value={props.t("boc.jira.pr.deepReview.hint")}>
-                  <span>
-                    <Button size="small" variant="outline" disabled>
-                      {props.t("boc.jira.pr.deepReview")}
-                    </Button>
-                  </span>
-                </Tooltip>
-              </div>
+              <Show when={host.sessions && desktop}>
+                <div class="flex items-center px-1 pb-1">
+                  <Tooltip value={reviewHint()}>
+                    <span>
+                      <Button
+                        size="small"
+                        variant="outline"
+                        disabled={reviewDisabled()}
+                        aria-busy={review.busy === request.number}
+                        onClick={() => void startReview(request)}
+                      >
+                        <Show when={review.busy === request.number}>
+                          <Loader class="size-3" />
+                        </Show>
+                        {props.t("boc.jira.pr.startReview")}
+                      </Button>
+                    </span>
+                  </Tooltip>
+                </div>
+              </Show>
             </div>
           )}
         </For>
       </div>
+      <Show when={review.error}>
+        <p role="alert" class="text-v2-state-fg-danger">
+          {review.error}
+        </p>
+      </Show>
       <Show when={resource.state.data?.requests.length === 0}>
         <p class="text-v2-text-text-muted">{props.t("boc.jira.pr.empty", { issue: props.issueKey })}</p>
       </Show>
