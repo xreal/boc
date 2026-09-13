@@ -105,6 +105,8 @@ The exact approved files and reasons live in `packages/boc/fork-surface.json`. T
 
 No upstream component is intentionally copied into Boc. When a conflict tempts a copy, first look for a bridge, registry, Effect `Layer`, plugin, RPC group, or channel branch.
 
+The fork's primary branch is `v2`, matching `upstream/v2`. GitHub repository settings keep the inherited upstream `publish` and `nix-hashes` workflows disabled: both treat a branch named `v2` as upstream's release line, while Boc owns publishing through `.github/workflows/boc-release.yml` and receives Nix hash updates through upstream syncs.
+
 The fork-added `server.boc.worktree` and `server.boc.environment` HTTP groups are retired without compatibility handlers. Boc clients use `api.rpc(BocEnvironmentRpc.Rpc)` from Schema's Boc namespace. Its registration identity is `boc.environments.v1`, with capability protocol 2 required by the desktop compatibility probe for container inventory/actions, log reads, and operation-terminal resize; it registers only on Boc backends, so ordinary upstream backends report a missing RPC. The former `boc.worktrees.v1` RPC is removed without a compatibility handler. Public client generation and its inventory assertion match the common upstream baseline.
 
 Environment RPC registrations delegate to the existing global backend and persistent PTYs; plugin disposal does not own operation locks or cancel its processes. Environment calls bind the checkout Location explicitly, and environment records retain their disk/handoff behavior.
