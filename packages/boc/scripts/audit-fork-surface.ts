@@ -7,7 +7,11 @@ type ForkSurface = {
 
 const root = path.resolve(import.meta.dir, "../../..")
 const surface = (await Bun.file(path.join(import.meta.dir, "../fork-surface.json")).json()) as ForkSurface
-const base = await git(["merge-base", "HEAD", "upstream/v2"], "Fetch upstream/v2 before running the BOC audit.")
+const upstreamMerge = await git(
+  ["log", "--first-parent", "--merges", "--grep=upstream", "--format=%H", "-1", "HEAD"],
+  "Merge an upstream checkpoint before running the BOC audit.",
+)
+const base = await git(["rev-parse", `${upstreamMerge.trim()}^2`])
 const changed = new Set(
   (
     await Promise.all([
