@@ -56,6 +56,12 @@ test("prepares a pull request review from the saved template and linked ticket",
   )
 })
 
+test("keeps the suggested review concise and read-only", () => {
+  expect(defaultJiraSessionInstructions.review).toContain("Write in plain, easy-to-understand English.")
+  expect(defaultJiraSessionInstructions.review).toContain("Keep each finding brief")
+  expect(defaultJiraSessionInstructions.review).toEndWith("Do not modify code, commit, or push!")
+})
+
 test("uses the shipped difficulty models for legacy prompt defaults", () => {
   expect(normalizeJiraSessionInstructions({ before: "Before", after: "After" })).toEqual({
     ...defaultJiraSessionInstructions,
