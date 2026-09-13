@@ -6,6 +6,7 @@ import { define } from "@opencode/plugin/effect/plugin"
 import { BocEnvironmentRpc } from "@opencode/schema/boc/environment-rpc"
 import { makeGlobalNode } from "@opencode/util/effect/app-node"
 import { Context, Effect, Layer } from "effect"
+import { registerEnvironmentAgent } from "./environments/agent"
 import { BocEnvironments, EnvironmentBackendService } from "./environments/runtime"
 
 export class Service extends Context.Service<Service, {}>()("@boc/BackendRpc") {}
@@ -25,6 +26,7 @@ export const node = makeGlobalNode({
           id: "boc.backend",
           effect: (context) =>
             Effect.gen(function* () {
+              yield* registerEnvironmentAgent(context, environments)
               yield* context.rpc.register(BocEnvironmentRpc.Rpc, {
                 info: () => Effect.succeed({ protocol: 2 as const }),
                 inspect: (input) => Effect.promise(() => environments.inspect(input.projectID, input.directory)),

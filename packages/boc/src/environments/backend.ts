@@ -25,6 +25,7 @@ import {
   type CommandRunner,
   type ContainerInspection,
   type DevenvInstallation,
+  type StackAssignment,
 } from "./devenv"
 import { createEnvironmentStore, type EnvironmentRecord, type EnvironmentRun } from "./store"
 
@@ -52,6 +53,7 @@ export type EnvironmentBackendOptions = {
 }
 
 export interface EnvironmentBackend {
+  readonly agentContext: (projectID: string, directory: string) => Promise<AgentEnvironment | undefined>
   readonly inspect: (projectID: string, directory: string) => Promise<State>
   readonly run: (input: {
     readonly projectID: string
@@ -72,6 +74,8 @@ export interface EnvironmentBackend {
     rows: number
   }) => Promise<boolean>
 }
+
+export type AgentEnvironment = Pick<StackAssignment, "stackID" | "host" | "url">
 
 type ActiveOperation = {
   cancelled: boolean
@@ -99,6 +103,25 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
       if (admissions.get(key) === settled) admissions.delete(key)
     })
     return result
+  }
+
+  const agentContext: EnvironmentBackend["agentContext"] = async (projectID, requestedDirectory) => {
+    if (!options.enabled) return undefined
+    if (process.platform !== "darwin" && process.platform !== "linux") return undefined
+    const directory = path.resolve(requestedDirectory)
+    const record = await store.read(projectID, directory)
+    if (!record?.assignment) return undefined
+    const checkout = await options.checkout(projectID, directory)
+    if (!checkout.available || !(await owns(record, checkout.checkout))) return undefined
+    const devenv = await installation()
+    if (!devenv) return undefined
+    const stack = inspectStack(devenv, checkout.checkout.directory, record.assignment)
+    if (stack.status !== "configured") return undefined
+    return {
+      stackID: stack.assignment.stackID,
+      host: stack.assignment.host,
+      url: stack.assignment.url,
+    }
   }
 
   const inspect = async (projectID: string, requestedDirectory: string, readiness = true): Promise<State> => {
@@ -335,7 +358,7 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
     )
   }
 
-  return { inspect, run, cancel, logs, resize }
+  return { agentContext, inspect, run, cancel, logs, resize }
 
   async function reconcile(record: EnvironmentRecord, devenv: DevenvInstallation) {
     const latest = record.latestRun

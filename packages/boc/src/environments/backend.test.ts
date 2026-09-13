@@ -13,6 +13,22 @@ afterEach(async () => {
 })
 
 describe("development environments", () => {
+  test("provides configured agent context without inspecting Docker or HTTP", async () => {
+    const fixture = await environmentFixture()
+    const backend = fixture.backend(fixture.registered)
+
+    expect(await backend.agentContext("project", fixture.checkout)).toBeUndefined()
+    await configure(fixture, backend)
+    const commandCount = fixture.commands.length
+
+    expect(await backend.agentContext("project", fixture.checkout)).toEqual({
+      stackID: "project",
+      host: "project.bergfreunde.de.localhost",
+      url: "https://project.bergfreunde.de.localhost/",
+    })
+    expect(fixture.commands).toHaveLength(commandCount)
+  })
+
   test("operates only on verified checkout containers and does not wait for whole-app readiness", async () => {
     const fixture = await environmentFixture()
     const backend = fixture.backend(fixture.registered)
