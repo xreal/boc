@@ -18,7 +18,7 @@ The `boc-releases` R2 bucket and its `boc-updates.bergdev.de` custom domain must
 
 Create an R2 API token with Object Read & Write access scoped only to `boc-releases`. Store its S3-compatible credentials in GitHub; never commit them or pass them as command-line arguments.
 
-Create a GitHub environment named `release` and restrict deployment branches to `boc-beta`. Add these environment values:
+Create a GitHub environment named `release` and restrict deployment branches to `v2`. Add these environment values:
 
 | Kind     | Name                                        | Purpose                                                     |
 | -------- | ------------------------------------------- | ----------------------------------------------------------- |
@@ -37,9 +37,9 @@ The workflow deliberately verifies macOS signing and notarization before anythin
 
 ## Create a release
 
-1. Finish and verify the intended commit on `boc-beta`.
+1. Finish and verify the intended commit on `v2`.
 2. Choose a new stable semantic version such as `0.1.0`. Prerelease versions are intentionally rejected because the desktop updater follows the stable `latest` channel.
-3. Open **Actions → Boc release → Run workflow**, select `boc-beta`, and enter the version without a leading `v`.
+3. Open **Actions → Boc release → Run workflow**, select `v2`, and enter the version without a leading `v`.
 4. Wait for all three desktop builds and the publish job. The initial release set is macOS Apple Silicon, Windows x64, and Linux x64 on GitHub-hosted runners. macOS Intel and Windows/Linux ARM are paused until they are needed.
 5. Confirm that the private GitHub Release `v<version>` is published and that the public update manifests return the same version:
 

@@ -23,6 +23,7 @@
 - Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
 - Boc releases accept only the Boc application version. Keep `BOC_SERVER_VERSION` in `.github/workflows/boc-release.yml` pinned to the exact compatible official server version and update that pin during upstream syncs, not during routine Boc releases.
 - Since the stable V2 launch, `boc-beta` tracks `upstream/v2` despite its historical branch name and the older beta-tracking notes above. Sync with `git fetch upstream v2 && git merge upstream/v2`; Boc application versions remain independent from the pinned compatible official server version.
+- The primary fork branch is now `v2` and tracks `upstream/v2`; this supersedes the historical `boc-beta` branch policies above. Work directly on `v2`, push only to `origin/v2`, and do not force-push it.
 
 
 ---

@@ -5,13 +5,13 @@ description: Review, merge, and verify upstream/v2 changes in the Boc fork. Use 
 
 # Sync Boc with upstream
 
-Keep `boc-beta` close to `upstream/v2` while preserving the smallest supported Boc integration surface.
+Keep `v2` close to `upstream/v2` while preserving the smallest supported Boc integration surface.
 
 ## Boundaries
 
 - Read `AGENTS.md`, `BOC_FORK.md`, `packages/boc/fork-surface.json`, and applicable package `AGENTS.md` files first.
 - A review-only request stops before merge, commit, or push. A requested sync includes in-scope compatibility fixes and verification.
-- Never push to `upstream`, rebase shared `boc-beta`, force-push, discard unrelated changes, or hide failures by weakening checks.
+- Never push to `upstream`, rebase shared `v2`, force-push, discard unrelated changes, or hide failures by weakening checks.
 - Preserve a dirty worktree. Use a scratch worktree for rehearsal; do not stash or overwrite user changes without explicit direction.
 
 ## Inspect before merging
@@ -25,7 +25,7 @@ Keep `boc-beta` close to `upstream/v2` while preserving the smallest supported B
 
 ## Merge and adapt
 
-- Follow the repository workflow: merge `upstream/v2` into `boc-beta`; do not squash or rewrite upstream history.
+- Follow the repository workflow: merge `upstream/v2` into `v2`; do not squash or rewrite upstream history.
 - Resolve each conflict by understanding both sides. Keep upstream behavior intact and reapply only the narrow Boc registration, channel case, or strategy hook; never choose whole-file ours/theirs blindly.
 - Fix merge-caused type, test, build, runtime-boundary, and generated-client issues within scope. When upstream provides a better seam, migrate the fork-owned bridge and remove the obsolete touch.
 - Keep Boc product names and behavior out of upstream files unless the integration map explicitly records a channel-specific exception.
@@ -41,4 +41,4 @@ Keep `boc-beta` close to `upstream/v2` while preserving the smallest supported B
 - Run focused core/server/client checks for touched APIs; build app/desktop for routing, IPC, channel, bundling, lazy-load, or resource changes.
 - Fix in-scope failures, then repeat affected checks. Stop for a product decision, unavailable secret/service, or unrelated pre-existing failure and report it precisely.
 - Summarize the upstream range, prioritized commits, conflicts, adaptations, retired seams, documentation changes, checks, and remaining manual smoke tests.
-- For a requested sync, make logical conventional commits and push only to `origin/boc-beta` after checks pass.
+- For a requested sync, make logical conventional commits and push only to `origin/v2` after checks pass.
