@@ -357,6 +357,11 @@ live.live("controls apply native configuration through real config plugins and f
             },
           }),
         )
+        await fs.mkdir(path.join(project, ".opencode", "agents"), { recursive: true })
+        await Bun.write(
+          path.join(project, ".opencode", "agents", "reviewer.md"),
+          "---\ndescription: Reviews changes\nmodel: example/reviewer\n---\nReview the current changes.\n",
+        )
       }).pipe(
         Effect.andThen(
           Effect.gen(function* () {
@@ -593,6 +598,25 @@ live.live("controls apply native configuration through real config plugins and f
                 disabled: false,
               },
             )
+
+            yield* client.setEnabled({ kind: "agent", id: "reviewer", enabled: false, expectedRevision: 6 })
+            yield* waitUntil(
+              "markdown agent disabled",
+              client.getState({}).pipe(
+                Effect.map((state) => {
+                  const reviewer = state.items.find((item) => item.kind === "agent" && item.id === "reviewer")
+                  return reviewer?.present === true && reviewer.effective === "disabled"
+                }),
+                Effect.orDie,
+              ),
+            )
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toBeUndefined()
+            yield* client.setEnabled({ kind: "agent", id: "reviewer", enabled: true, expectedRevision: 7 })
+            yield* waitUntil(
+              "markdown agent enabled",
+              agents.get(Agent.ID.make("reviewer")).pipe(Effect.map((agent) => agent !== undefined)),
+            )
+            expect(parse(yield* Effect.promise(() => Bun.file(projectConfig).text())).agents?.reviewer).toBeUndefined()
 
             yield* client.createSource({
               kind: "instruction",

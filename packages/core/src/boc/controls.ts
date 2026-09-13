@@ -217,9 +217,13 @@ export const Definition = define({
       inventory.skill.filter((item) => disabled("skill", item.id)).forEach((item) => editor.remove(item.id))
     })
     yield* ctx.agent.transform((editor) => {
+      inventory.agent = editor.list().map(agentCapability)
       Object.entries(defaults.policy.settings.agent)
         .filter(([, enabled]) => !enabled)
         .forEach(([id]) => editor.remove(id))
+      inventory.agent
+        .filter((item) => markdownAgent(item) && project.policy.settings.agent[item.id] === false)
+        .forEach((item) => editor.remove(item.id))
     })
     yield* ctx.tool.transform((editor) => {
       inventory.tool = editor.list().map((tool) => ({
@@ -326,18 +330,15 @@ export const Definition = define({
       const documents = (yield* config.entries()).filter((entry) => entry.type === "document")
       const defaultAgent = Config.latest(documents, "default_agent")
       const agents = yield* ctx.agent.list({})
-      inventory.agent = agents.data.map((agent) => ({
-        id: agent.id,
-        name: agent.name,
-        description: agent.description ?? "",
-        value: agent,
-        defaultEnabled: true,
-        source: sourceOf(agent),
-        mutable: true,
-        ...(defaultAgent === agent.id && agent.mode !== "subagent" ? { defaultAgent: true } : {}),
-        ...(agent.mode ? { agentMode: agent.mode } : {}),
-        ...(agent.model ? { model: formatModel(agent.model) } : {}),
-      }))
+      agents.data.forEach((agent) => {
+        const item = agentCapability(agent)
+        const index = inventory.agent.findIndex((current) => current.id === item.id)
+        if (index === -1) inventory.agent.push(item)
+        if (index !== -1) inventory.agent[index] = item
+      })
+      inventory.agent.forEach((agent) => {
+        agent.defaultAgent = defaultAgent === agent.id && agent.agentMode !== "subagent"
+      })
       const configuredAgents = new Map(
         documents.flatMap((document) =>
           Object.entries(document.info.agents ?? {}).map(
@@ -465,7 +466,7 @@ export const Definition = define({
             incomplete,
             status: statuses.get(item.id),
             provenance,
-            policyControlsNative: scope === "global",
+            policyControlsNative: scope === "global" || (kind === "agent" && markdownAgent(item)),
             globallyDisabled: scope === "project" && defaults.policy.settings[kind][item.id] === false,
           })
         })
@@ -683,13 +684,19 @@ export const Definition = define({
         const scope = target.scope ?? "project"
         if (scope === "global" && target.kind === "tool")
           return Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
-        if (target.kind === "agent") return mutateNative({ ...target, scope, kind: "agent", action: "set" }, call)
+        if (target.kind === "agent")
+          return scope === "project" && markdownAgent(inventory.agent.find((item) => item.id === target.id))
+            ? mutate({ ...target, scope, action: "set" }, call)
+            : mutateNative({ ...target, scope, kind: "agent", action: "set" }, call)
         if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "set" }, call)
         return mutate({ ...target, action: "set" }, call)
       },
       clearOverride: (target, call) => {
         const scope = target.scope ?? "project"
-        if (target.kind === "agent") return mutateNative({ ...target, scope, kind: "agent", action: "clear" }, call)
+        if (target.kind === "agent")
+          return scope === "project" && markdownAgent(inventory.agent.find((item) => item.id === target.id))
+            ? mutate({ ...target, scope, action: "clear" }, call)
+            : mutateNative({ ...target, scope, kind: "agent", action: "clear" }, call)
         if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "clear" }, call)
         return mutate({ ...target, action: "clear" }, call)
       },
@@ -891,6 +898,30 @@ function safeSourceName(name: string) {
 function formatModel(model: { providerID: string; id?: string; model?: string; variant?: string }) {
   const id = model.id ?? model.model
   return id ? `${model.providerID}/${id}${model.variant ? `#${model.variant}` : ""}` : model.providerID
+}
+
+function agentCapability(agent: {
+  id: string
+  name: string
+  description?: string
+  mode?: "primary" | "subagent" | "all"
+  model?: { providerID: string; id?: string; model?: string; variant?: string }
+}): Capability {
+  return {
+    id: agent.id,
+    name: agent.name,
+    description: agent.description ?? "",
+    value: agent,
+    defaultEnabled: true,
+    source: sourceOf(agent),
+    mutable: true,
+    ...(agent.mode ? { agentMode: agent.mode } : {}),
+    ...(agent.model ? { model: formatModel(agent.model) } : {}),
+  }
+}
+
+function markdownAgent(item: Capability | undefined) {
+  return item?.source?.toLowerCase().endsWith(".md") === true
 }
 
 function sourceOf(value: object) {
