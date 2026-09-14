@@ -1,6 +1,5 @@
 /* GitHub's status palette keeps repository states recognizable in both themes. */
-/* The shared ghost-muted button otherwise paints every nested icon gray. */
-.jira-pr [data-component="button-v2"] :is(.jira-pr-state, .jira-pr-review) [data-slot="icon-svg"] {
+.jira-pr :is(.jira-pr-state, .jira-pr-review) [data-slot="icon-svg"] {
   color: inherit;
 }
 
@@ -24,4 +23,18 @@
 .jira-pr + .jira-pr {
   border-block-start: 1px solid var(--v2-border-border-muted);
   padding-block-start: 6px;
+}
+
+.jira-pr-review-action[data-component="button-v2"] {
+  height: 22px;
+  padding-inline: 6px;
+  font-size: 11px;
+  line-height: var(--line-height-compact);
+}
+
+@media (pointer: coarse) {
+  .jira-pr-review-action[data-component="button-v2"] {
+    min-height: 32px;
+    padding-inline: 8px;
+  }
 }

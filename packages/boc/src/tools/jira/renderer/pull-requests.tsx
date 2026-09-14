@@ -127,66 +127,56 @@ export function JiraPullRequests(props: {
                 })}
                 onClick={() => props.onOpenExternal(request.url)}
               >
-                <span class="flex min-w-0 flex-1 flex-col gap-1 text-[13px] leading-[var(--line-height-compact)]">
-                  <span class="flex items-center gap-2">
-                    <bdi dir="auto" class="min-w-0 flex-1 truncate text-v2-text-text-base" title={request.title}>
-                      {request.title}
-                    </bdi>
-                    <Icon name="arrow-up-right" class="shrink-0" />
-                  </span>
-                  <span class="flex min-w-0 items-center gap-1.5 text-[12px] text-v2-text-text-faint">
-                    <Tooltip value={stateLabel(props.t, request)}>
-                      <span
-                        class="jira-pr-state inline-flex shrink-0 items-center gap-1"
-                        data-state={request.state === "OPEN" && request.isDraft ? "DRAFT" : request.state}
-                      >
-                        {stateLabel(props.t, request)}
-                      </span>
-                    </Tooltip>
-                    <bdi dir="auto" class="min-w-0 flex-1 truncate" title={request.author?.login}>
-                      {request.author?.login ?? props.t("boc.jira.collaboration.unknownAuthor")}
-                    </bdi>
-                    <Tooltip value={new Date(request.updatedAt).toLocaleString(props.locale)}>
-                      <time class="shrink-0" dateTime={request.updatedAt}>
-                        {jiraRelativeTime(request.updatedAt, props.locale)}
-                      </time>
-                    </Tooltip>
-                    <Show when={request.state === "OPEN" && request.reviewDecision}>
-                      <Tooltip value={reviewLabel(props.t, request)}>
-                        <span class="jira-pr-review inline-flex shrink-0" data-review={request.reviewDecision}>
-                          <Icon
-                            name={
-                              request.reviewDecision === "APPROVED"
-                                ? "circle-check"
-                                : request.reviewDecision === "CHANGES_REQUESTED"
-                                  ? "warning"
-                                  : "eye"
-                            }
-                            size="small"
-                          />
-                          <span class="sr-only">{reviewLabel(props.t, request)}</span>
-                        </span>
-                      </Tooltip>
-                    </Show>
-                    <Tooltip value={request.headRefName}>
-                      <span
-                        class="jira-pr-state inline-flex shrink-0"
-                        data-state={request.state === "OPEN" && request.isDraft ? "DRAFT" : request.state}
-                        aria-label={request.headRefName}
-                      >
-                        <Icon name="branch" size="small" />
-                      </span>
-                    </Tooltip>
-                  </span>
+                <span class="flex min-w-0 flex-1 items-center gap-2 text-[13px] leading-[var(--line-height-compact)]">
+                  <bdi dir="auto" class="min-w-0 flex-1 truncate text-v2-text-text-base" title={request.title}>
+                    {request.title}
+                  </bdi>
+                  <Icon name="arrow-up-right" class="shrink-0" />
                 </span>
               </Button>
-              <Show when={host.sessions && desktop}>
-                <div class="flex items-center justify-end px-1 pt-1 pb-1">
+              <div class="jira-pr-meta flex min-w-0 items-center gap-1.5 px-1 pb-1 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-faint">
+                <bdi dir="auto" class="min-w-0 flex-1 truncate" title={request.author?.login}>
+                  {request.author?.login ?? props.t("boc.jira.collaboration.unknownAuthor")}
+                </bdi>
+                <Tooltip value={new Date(request.updatedAt).toLocaleString(props.locale)}>
+                  <time class="shrink-0" dateTime={request.updatedAt}>
+                    {jiraRelativeTime(request.updatedAt, props.locale)}
+                  </time>
+                </Tooltip>
+                <Show when={request.state === "OPEN" && request.reviewDecision}>
+                  <Tooltip value={reviewLabel(props.t, request)}>
+                    <span class="jira-pr-review inline-flex shrink-0" data-review={request.reviewDecision}>
+                      <Icon
+                        name={
+                          request.reviewDecision === "APPROVED"
+                            ? "circle-check"
+                            : request.reviewDecision === "CHANGES_REQUESTED"
+                              ? "warning"
+                              : "eye"
+                        }
+                        size="small"
+                      />
+                      <span class="sr-only">{reviewLabel(props.t, request)}</span>
+                    </span>
+                  </Tooltip>
+                </Show>
+                <Tooltip value={stateLabel(props.t, request)}>
+                  <span
+                    class="jira-pr-state inline-flex shrink-0"
+                    data-state={request.state === "OPEN" && request.isDraft ? "DRAFT" : request.state}
+                    aria-label={stateLabel(props.t, request)}
+                    title={request.headRefName}
+                  >
+                    <Icon name="branch" size="small" />
+                  </span>
+                </Tooltip>
+                <Show when={host.sessions && desktop}>
                   <Tooltip value={reviewHint()}>
-                    <span>
+                    <span class="shrink-0">
                       <Button
                         size="small"
                         variant="neutral"
+                        class="jira-pr-review-action"
                         disabled={reviewDisabled()}
                         aria-busy={review.busy === request.number}
                         onClick={() => void startReview(request)}
@@ -198,8 +188,8 @@ export function JiraPullRequests(props: {
                       </Button>
                     </span>
                   </Tooltip>
-                </div>
-              </Show>
+                </Show>
+              </div>
             </div>
           )}
         </For>

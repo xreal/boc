@@ -334,7 +334,7 @@ story("PR states and external navigation remain usable in narrow RTL", async ({ 
   const inspector = page.getByRole("dialog")
   const prs = inspector.getByRole("region", { name: "Pull requests", exact: true })
   for (const state of ["Open", "Draft", "Merged", "Closed"])
-    await expect(prs.getByText(state, { exact: true })).toBeVisible()
+    await expect(prs.getByLabel(state, { exact: true })).toBeVisible()
   await prs.getByRole("button", { name: /Open pull request #101:/ }).click()
   await expect(page.getByLabel("Opened URL")).toHaveText("https://github.com/example/shop/pull/101")
   const bounds = await inspector.boundingBox()
