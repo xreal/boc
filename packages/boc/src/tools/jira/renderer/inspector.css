@@ -148,6 +148,7 @@
   min-width: 0;
 }
 .jira-ticket-dates {
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
   border-block-start: 1px solid var(--v2-border-border-muted);
   padding-block-start: 16px;
   color: var(--v2-text-text-muted);

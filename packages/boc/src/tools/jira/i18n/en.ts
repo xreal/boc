@@ -88,7 +88,7 @@ export const jiraEnglish = {
   "boc.jira.board.deployments.deployTo": "Deploy to {{system}}",
   "boc.jira.pr.count.one": "{{count}} pull request",
   "boc.jira.pr.count.other": "{{count}} pull requests",
-  "boc.jira.pr.empty": "No pull requests for {{issue}}-",
+  "boc.jira.pr.empty": "No pull requests for {{issue}}",
   "boc.jira.pr.search": "Open GitHub search",
   "boc.jira.pr.open": "Open",
   "boc.jira.pr.draft": "Draft",

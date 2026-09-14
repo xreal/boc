@@ -93,7 +93,7 @@ export function JiraAssignee(props: {
         triggerProps={{
           variant: "ghost-muted",
           size: "small",
-          class: "!w-fit !max-w-full self-start !justify-start !px-1",
+          class: "!w-fit !max-w-full self-start !justify-start !px-0",
           disabled: !props.online,
           "aria-disabled": mutation()?.pending,
           "aria-label": props.t("boc.jira.assignee.change"),
