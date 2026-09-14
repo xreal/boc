@@ -46,6 +46,26 @@
       "reason": "Append-only Boc fork guidance above the upstream boundary"
     },
     {
+      "path": ".github/workflows/test.yml",
+      "reason": "Run fork validation only on v2, cancel stale runs, and avoid allocating runners for disabled v2 E2E jobs"
+    },
+    {
+      "path": ".github/workflows/typecheck.yml",
+      "reason": "Run typechecking only on v2 and cancel stale push or pull request runs"
+    },
+    {
+      "path": ".github/workflows/deploy-files.yml",
+      "reason": "Keep the upstream file deployment workflow manual-only in the Boc fork"
+    },
+    {
+      "path": ".github/workflows/deploy-posts.yml",
+      "reason": "Keep the upstream posts deployment workflow manual-only in the Boc fork"
+    },
+    {
+      "path": ".github/workflows/deploy-www.yml",
+      "reason": "Keep the upstream website deployment workflow manual-only in the Boc fork"
+    },
+    {
       "path": "bun.lock",
       "reason": "Lock the BOC workspace and its app and desktop dependency edges"
     },

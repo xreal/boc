@@ -2,6 +2,8 @@ name: BOC fork surface audit
 
 on:
   pull_request:
+    branches:
+      - v2
   push:
     branches:
       - v2
