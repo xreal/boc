@@ -34,6 +34,7 @@ export type BocHost = {
   openExternal(url: string): void
   locale(): string
   platform: "web" | "desktop"
+  windowTopInset?: () => number
 }
 
 const BocHostContext = createContext<BocHost>()

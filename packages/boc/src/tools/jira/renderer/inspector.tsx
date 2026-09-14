@@ -11,6 +11,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { createEffect, For, on, onCleanup, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocTranslator } from "../../../renderer/i18n"
+import { useBocHost } from "../../../renderer/host"
 import type { JiraIssueDetail } from "../domain/issue"
 import type { JiraConnectionFailure } from "../rpcs"
 import type { DeploymentSystem } from "../../deployments/domain/systems"
@@ -58,6 +59,7 @@ type JiraIssueInspectorProps = {
 
 export function JiraIssueDialog(props: JiraIssueInspectorProps) {
   const dialog = useDialog()
+  const host = useBocHost()
   return (
     <Root
       open
@@ -67,7 +69,7 @@ export function JiraIssueDialog(props: JiraIssueInspectorProps) {
       }}
     >
       <Portal>
-        <div class="jira-ticket-modal">
+        <div class="jira-ticket-modal" style={{ "--jira-window-top-inset": `${host.windowTopInset?.() ?? 0}px` }}>
           <Overlay data-component="dialog-overlay" />
           <JiraDialog
             size="x-large"
@@ -160,33 +162,6 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
               )}
             </Show>
           </div>
-          <Show when={props.issue}>
-            {(issue) => (
-              <div class="jira-ticket-header-details">
-                <Show when={issue().priorityName}>
-                  {(priority) => (
-                    <span
-                      title={props.t("boc.jira.board.filters.priority")}
-                      class={jiraToneText[jiraPriorityTone(priority())]}
-                    >
-                      {priority()}
-                    </span>
-                  )}
-                </Show>
-                <Show when={issue().statusName}>
-                  <Badge>{issue().statusName}</Badge>
-                </Show>
-                <Show when={issue().storyPoints !== undefined}>
-                  <span
-                    title={props.t("boc.jira.ticket.storyPoints.label")}
-                    aria-label={props.t("boc.jira.ticket.storyPoints.label")}
-                  >
-                    {props.t("boc.jira.board.storyPoints", { count: issue().storyPoints ?? 0 })}
-                  </span>
-                </Show>
-              </div>
-            )}
-          </Show>
         </div>
         <Show when={props.issue}>
           <Button
@@ -194,9 +169,10 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
             class="jira-ticket-external"
             variant="ghost-muted"
             icon="arrow-up-right"
+            aria-label={props.t("boc.jira.board.openInJira")}
             onClick={() => props.issue && props.onOpenExternal(props.issue.url)}
           >
-            {props.t("boc.jira.board.openInJira")}
+            <span>{props.t("boc.jira.board.openInJira")}</span>
           </Button>
         </Show>
         <IconButton
@@ -296,6 +272,29 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
               </div>
               <div class="jira-ticket-work" ref={work} onScroll={scroll} aria-label={props.t("boc.jira.ticket.work")}>
                 <dl class="jira-ticket-properties" aria-label={props.t("boc.jira.board.inspector.properties")}>
+                  <Show when={issue().statusName}>
+                    <Property label={props.t("boc.jira.board.inspector.status")}>
+                      <Badge>{issue().statusName}</Badge>
+                    </Property>
+                  </Show>
+                  <Show when={issue().priorityName || issue().storyPoints !== undefined}>
+                    <Property label={props.t("boc.jira.board.filters.priority")}>
+                      <span class="jira-ticket-estimate">
+                        <Show when={issue().priorityName}>
+                          {(priority) => <span class={jiraToneText[jiraPriorityTone(priority())]}>{priority()}</span>}
+                        </Show>
+                        <Show when={issue().storyPoints !== undefined}>
+                          <span
+                            class="jira-ticket-points"
+                            title={props.t("boc.jira.ticket.storyPoints.label")}
+                            aria-label={props.t("boc.jira.ticket.storyPoints.label")}
+                          >
+                            {props.t("boc.jira.board.storyPoints", { count: issue().storyPoints ?? 0 })}
+                          </span>
+                        </Show>
+                      </span>
+                    </Property>
+                  </Show>
                   <Property label={props.t("boc.jira.board.filters.assignee")}>
                     <JiraAssignee
                       api={props.api}

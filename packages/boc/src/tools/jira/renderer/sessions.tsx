@@ -81,14 +81,13 @@ export function JiraIssueSessions(props: {
         aria-label={props.t("boc.jira.ticket.sessions")}
         class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
       >
-        <h3 class="flex items-center gap-1.5 text-[12px] text-v2-text-text-muted [font-weight:530]">
+        <h3 class="flex h-6 items-center gap-2 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
           {props.t("boc.jira.ticket.sessions")}
           <Show when={!sessions.loading && !sessions()?.failed && (sessions()?.links.length ?? 0) > 0}>
             <span
               aria-label={props.t.plural("boc.jira.sessions.count", sessions()?.links.length ?? 0)}
-              class="flex items-center gap-1 text-v2-text-text-faint"
+              class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-v2-icon-icon-accent/15 px-1.5 text-[11px] font-medium text-v2-icon-icon-accent"
             >
-              <Icon name="speech-bubble" size="small" />
               <span class="tabular-nums">{sessions()?.links.length}</span>
             </span>
           </Show>
@@ -140,8 +139,11 @@ export function JiraIssueSessions(props: {
             </Menu.Portal>
           </Menu>
         </SplitButton>
-        <details class="text-[12px] leading-[var(--line-height-compact)]">
-          <summary class="cursor-pointer text-v2-text-text-muted">{props.t("boc.jira.sessions.instructions")}</summary>
+        <details class="jira-session-instructions">
+          <summary>
+            <Icon name="chevron-right" size="small" />
+            {props.t("boc.jira.sessions.instructions")}
+          </summary>
           <JiraSessionInstructionFields
             t={props.t}
             value={form}
@@ -177,33 +179,34 @@ export function JiraIssueSessions(props: {
         <Show when={!sessions.loading && !sessions()?.failed && sessions()?.links.length === 0}>
           <p class="text-[12px] text-v2-text-text-faint">{props.t("boc.jira.sessions.empty")}</p>
         </Show>
-        <For each={sessions()?.links}>
-          {(link) => (
-            <Button
-              class="!h-auto !w-full !min-w-0 !justify-start !py-2 !whitespace-normal"
-              size="small"
-              variant="ghost-muted"
-              onClick={() => {
-                if (!link.sessionID) return
-                setForm("error", "")
-                void host.sessions
-                  ?.open(link.server, link.sessionID)
-                  .then(() => props.onNavigate?.())
-                  .catch(() => setForm("error", props.t("boc.jira.sessions.unavailable")))
-              }}
-            >
-              <Icon name="speech-bubble" class="shrink-0" />
-              <span class="flex min-w-0 flex-1 flex-col gap-1 text-start">
-                <bdi dir="auto" class="truncate">
-                  {link.title}
-                </bdi>
-                <span class="text-[12px] text-v2-text-text-faint">
-                  {new Date(link.createdAt).toLocaleString(host.locale())}
+        <div class="flex flex-col gap-1 empty:hidden">
+          <For each={sessions()?.links}>
+            {(link) => (
+              <Button
+                class="!h-auto !w-full !min-w-0 !justify-start !px-1 !py-1.5 !whitespace-normal"
+                size="small"
+                variant="ghost-muted"
+                onClick={() => {
+                  if (!link.sessionID) return
+                  setForm("error", "")
+                  void host.sessions
+                    ?.open(link.server, link.sessionID)
+                    .then(() => props.onNavigate?.())
+                    .catch(() => setForm("error", props.t("boc.jira.sessions.unavailable")))
+                }}
+              >
+                <span class="flex min-w-0 flex-1 flex-col gap-1 text-start">
+                  <bdi dir="auto" class="truncate">
+                    {link.title}
+                  </bdi>
+                  <span class="text-[12px] text-v2-text-text-faint">
+                    {new Date(link.createdAt).toLocaleString(host.locale())}
+                  </span>
                 </span>
-              </span>
-            </Button>
-          )}
-        </For>
+              </Button>
+            )}
+          </For>
+        </div>
       </section>
     </Show>
   )

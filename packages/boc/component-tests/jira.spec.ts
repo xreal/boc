@@ -1,7 +1,7 @@
 import { expect, story } from "../../storybook/playwright/story"
 
 story(
-  "header shows issue identity, priority and story points with icon-only title copying",
+  "compact header keeps identity and copying while properties show priority and story points",
   async ({ mount, page }) => {
     await page.context().grantPermissions(["clipboard-read", "clipboard-write"])
     await mount("boc-jira--modal")
@@ -11,14 +11,33 @@ story(
       "Keep product-gallery navigation consistent across layouts",
     )
     await expect(header.locator('[title="Story"]')).toBeVisible()
-    await expect(header.getByText("Medium", { exact: true })).toBeVisible()
-    await expect(header.getByLabel("Story points", { exact: true })).toHaveText("5 SP")
+    const properties = page.getByLabel("Properties", { exact: true })
+    await expect(properties.getByText("Medium", { exact: true })).toBeVisible()
+    await expect(properties.getByLabel("Story points", { exact: true })).toHaveText("5 SP")
     await expect(page.getByRole("button", { name: "Copy link", exact: true })).toHaveCount(0)
     await header.getByRole("button", { name: "Copy ticket key and title", exact: true }).click()
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
       "SHOP-617: Keep product-gallery navigation consistent across layouts",
     )
     await expect(page.locator(".jira-ticket-work")).toHaveCSS("width", "378px")
+  },
+)
+
+story(
+  "narrow desktop modal clears native window controls and keeps its close action reachable",
+  async ({ mount, page }) => {
+    await page.setViewportSize({ width: 390, height: 700 })
+    await mount("boc-jira--desktop-modal")
+    const modal = page.getByRole("dialog", { name: "SHOP-617", exact: true })
+    const bounds = await modal.boundingBox()
+    expect(bounds?.y).toBeGreaterThanOrEqual(36)
+    expect((bounds?.y ?? 0) + (bounds?.height ?? 0)).toBeLessThanOrEqual(700)
+    await expect(modal.getByRole("button", { name: "Open in Jira", exact: true })).toBeInViewport()
+    expect(
+      await page.locator(".jira-ticket-header").evaluate((element) => element.scrollWidth <= element.clientWidth),
+    ).toBe(true)
+    await modal.getByRole("button", { name: "Close issue", exact: true }).click()
+    await expect(modal).not.toBeVisible()
   },
 )
 
@@ -249,7 +268,7 @@ story("assigns a duplicate-name account by keyboard and restores trigger focus",
   await expect(search).toBeFocused()
   await search.fill("reviewer")
   await expect(page.getByRole("button", { name: /Platform developer reviewer@example.invalid/ })).toBeVisible()
-  await expect(page.getByRole("dialog").getByRole("status")).toBeEmpty()
+  await expect(page.getByRole("dialog").getByRole("status", { includeHidden: true })).toBeEmpty()
   await search.press("ArrowDown")
   await search.press("Enter")
   await expect(search).not.toBeVisible()
@@ -351,7 +370,9 @@ for (const mode of [
       await search.fill("team")
       const mixed = page.getByRole("button", { name: /فريق التطوير/ })
       await expect(mixed).toBeVisible()
-      await expect(page.getByRole("dialog", { name: "Change assignee" }).getByRole("status")).toBeEmpty()
+      await expect(
+        page.getByRole("dialog", { name: "Change assignee" }).getByRole("status", { includeHidden: true }),
+      ).toBeEmpty()
       const bounds = await search.boundingBox()
       expect(bounds?.x).toBeGreaterThanOrEqual(0)
       expect((bounds?.x ?? 0) + (bounds?.width ?? 0)).toBeLessThanOrEqual(width)

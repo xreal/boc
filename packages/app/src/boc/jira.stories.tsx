@@ -19,7 +19,13 @@ import {
   type JiraFixtureScenario,
 } from "@boc/extensions/jira/preview"
 
-function JiraPreview(props: { scenario?: JiraFixtureScenario; sessions?: boolean; modal?: boolean; long?: boolean }) {
+function JiraPreview(props: {
+  scenario?: JiraFixtureScenario
+  sessions?: boolean
+  modal?: boolean
+  long?: boolean
+  windowTopInset?: number
+}) {
   const language = useLanguage()
   const dialog = useDialog()
   const fixture = createJiraFixtureApi(props.scenario)
@@ -125,6 +131,7 @@ function JiraPreview(props: { scenario?: JiraFixtureScenario; sessions?: boolean
       value={{
         locale: language.locale,
         platform: "web",
+        windowTopInset: () => props.windowTopInset ?? 0,
         route: () => ({ type: "boc", id: "jira" }),
         location: () => ({ pathname: "/boc/jira", search: "" }),
         navigate: () => {},
@@ -223,6 +230,7 @@ export default { title: "Boc/Jira", id: "boc-jira", component: JiraPreview, para
 export const Default = {}
 export const Sessions = { args: { sessions: true } }
 export const Modal = { args: { sessions: true, modal: true } }
+export const DesktopModal = { args: { sessions: true, modal: true, windowTopInset: 36 } }
 export const LongTicket = { args: { sessions: true, modal: true, long: true } }
 export const Slow = { args: { scenario: "slow" } }
 export const Empty = { args: { scenario: "empty" } }

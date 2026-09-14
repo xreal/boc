@@ -181,12 +181,12 @@ export function JiraPullRequests(props: {
                 </span>
               </Button>
               <Show when={host.sessions && desktop}>
-                <div class="flex items-center px-1 pb-1">
+                <div class="flex items-center justify-end px-1 pt-1 pb-1">
                   <Tooltip value={reviewHint()}>
                     <span>
                       <Button
                         size="small"
-                        variant="outline"
+                        variant="neutral"
                         disabled={reviewDisabled()}
                         aria-busy={review.busy === request.number}
                         onClick={() => void startReview(request)}

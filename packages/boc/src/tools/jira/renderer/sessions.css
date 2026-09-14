@@ -7,6 +7,40 @@
   line-height: var(--line-height-compact);
 }
 
+.jira-session-instructions {
+  font-size: 12px;
+  line-height: var(--line-height-compact);
+}
+.jira-session-instructions summary {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  cursor: pointer;
+  color: var(--v2-text-text-muted);
+  list-style: none;
+  border-radius: 4px;
+}
+.jira-session-instructions summary::-webkit-details-marker {
+  display: none;
+}
+.jira-session-instructions summary:hover {
+  color: var(--v2-text-text-base);
+}
+.jira-session-instructions summary:focus-visible {
+  outline: 2px solid var(--v2-border-border-focus);
+  outline-offset: 2px;
+}
+.jira-session-instructions summary > [data-slot="icon-svg"] {
+  transform: rotate(0deg);
+}
+.jira-session-instructions summary:dir(rtl) > [data-slot="icon-svg"] {
+  transform: rotate(180deg);
+}
+.jira-session-instructions[open] summary > [data-slot="icon-svg"] {
+  transform: rotate(90deg);
+}
+
 [data-boc-jira-session-start] > button {
   width: auto;
   height: 100%;

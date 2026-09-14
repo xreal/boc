@@ -22,8 +22,8 @@ export function JiraIssueDeployments(props: {
   const hasSystems = () => Boolean(props.systems && props.systems.length > 0)
 
   return (
-    <section class="flex flex-col gap-2 border-t border-v2-border-border-muted pt-4">
-      <div class="flex items-center justify-between">
+    <section class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4">
+      <div class="flex h-6 items-center justify-between">
         <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
           {props.t("boc.jira.board.deployments.title")}
         </h3>

@@ -30,5 +30,12 @@ export function createBocHost(): BocHost {
     openExternal: platform.openExternal,
     locale: language.locale,
     platform: platform.platform,
+    windowTopInset: () => {
+      if (platform.platform !== "desktop" || platform.windowFullscreen?.()) return 0
+      const zoom = platform.webviewZoom?.() ?? 1
+      if (platform.os === "macos") return 36 / zoom
+      if (platform.os === "windows") return 44 / Math.min(zoom, 1)
+      return 0
+    },
   }
 }
