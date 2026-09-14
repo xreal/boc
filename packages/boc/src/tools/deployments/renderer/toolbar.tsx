@@ -3,6 +3,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { SegmentedControl, SegmentedControlItem } from "@opencode/ui/segmented-control"
 import { TextInput } from "@opencode/ui/text-input"
 import { Tooltip } from "@opencode/ui/tooltip"
+import { onCleanup, onMount } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { DeploymentAvailabilityFilter } from "./surface"
 
@@ -17,12 +18,28 @@ export function DeploymentsToolbar(props: {
   onRefresh: () => void
   onOpenSettings: () => void
 }) {
+  let searchInput: HTMLInputElement | undefined
+
+  onMount(() => {
+    const find = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "f") return
+      if (!searchInput?.isConnected || document.querySelector('dialog[open], [role="dialog"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      searchInput.focus()
+      searchInput.select()
+    }
+    window.addEventListener("keydown", find, { capture: true })
+    onCleanup(() => window.removeEventListener("keydown", find, { capture: true }))
+  })
+
   return (
     <div
       data-boc-deployments-toolbar
       class="flex shrink-0 flex-wrap items-center gap-2 border-b border-v2-border-border-muted px-4 py-2.5"
     >
       <TextInput
+        ref={searchInput}
         aria-label={props.t("boc.deployments.toolbar.search.label")}
         class="!w-[min(22rem,100%)]"
         name="deployment-system-search"

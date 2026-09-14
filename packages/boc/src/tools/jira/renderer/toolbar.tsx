@@ -5,7 +5,7 @@ import { Menu } from "@opencode/ui/menu"
 import { Select } from "@opencode/ui/select"
 import { TextInput } from "@opencode/ui/text-input"
 import { Tooltip } from "@opencode/ui/tooltip"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, For, onCleanup, onMount, Show } from "solid-js"
 import type { BocI18nKey, BocTranslator } from "../../../renderer/i18n"
 import { JIRA_UNASSIGNED, MAX_SAVED_JIRA_BOARDS, uniqueIssueNames } from "../domain/board"
 import type {
@@ -133,11 +133,26 @@ export function JiraBoardToolbar(props: {
   onFilter: (field: "assignee" | "issueType" | "priority", value?: string) => void
   onClearFilters: () => void
 }) {
+  let searchInput: HTMLInputElement | undefined
   const narrowed = () => Boolean(props.search || props.assignee || props.issueType || props.priority)
+
+  onMount(() => {
+    const find = (event: KeyboardEvent) => {
+      if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey || event.key.toLowerCase() !== "f") return
+      if (!searchInput?.isConnected || document.querySelector('dialog[open], [role="dialog"]')) return
+      event.preventDefault()
+      event.stopPropagation()
+      searchInput.focus()
+      searchInput.select()
+    }
+    window.addEventListener("keydown", find, { capture: true })
+    onCleanup(() => window.removeEventListener("keydown", find, { capture: true }))
+  })
 
   return (
     <div data-boc-board-toolbar class="flex shrink-0 flex-wrap items-center gap-2 px-4 py-2.5">
       <TextInput
+        ref={searchInput}
         aria-label={props.t("boc.jira.board.search.label")}
         class="!w-56"
         name="jira-board-search"
