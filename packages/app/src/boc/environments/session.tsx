@@ -5,7 +5,7 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { createMemo, Show } from "solid-js"
 import { EnvironmentTitlebarControl, environmentTarget } from "./view"
 
-export function BocEnvironmentSessionControl() {
+export function BocEnvironmentSessionControl(props: { compact?: boolean }) {
   const server = useServer()
   const data = useData()
   const platform = usePlatform()
@@ -24,5 +24,9 @@ export function BocEnvironmentSessionControl() {
       os: platform.os,
     }),
   )
-  return <Show when={target()} keyed>{(value) => <EnvironmentTitlebarControl target={value} />}</Show>
+  return (
+    <Show when={target()} keyed>
+      {(value) => <EnvironmentTitlebarControl target={value} compact={props.compact} />}
+    </Show>
+  )
 }

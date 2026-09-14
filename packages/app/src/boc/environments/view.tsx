@@ -71,7 +71,7 @@ export function useEnvironmentView(target: EnvironmentTarget) {
   return { platform, settings, resource }
 }
 
-export function EnvironmentTitlebarControl(props: { target: EnvironmentTarget }) {
+export function EnvironmentTitlebarControl(props: { target: EnvironmentTarget; compact?: boolean }) {
   const view = useEnvironmentView(props.target)
 
   return (
@@ -81,6 +81,7 @@ export function EnvironmentTitlebarControl(props: { target: EnvironmentTarget })
       settingsReady={view.settings.ready}
       enabled={() => view.settings.settings.enabled}
       domain={() => view.settings.settings.domain.trim() || undefined}
+      expandedLabel={props.compact ? false : undefined}
     />
   )
 }
@@ -91,10 +92,12 @@ export function EnvironmentControl(props: {
   settingsReady: () => boolean
   enabled: () => boolean
   domain: () => string | undefined
+  expandedLabel?: boolean
 }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const wide = createMediaQuery("(min-width: 1100px)")
+  const expandedLabel = () => props.expandedLabel ?? wide()
   const [menu, setMenu] = createStore({ open: false })
   let actionButton: HTMLButtonElement | undefined
 
@@ -124,7 +127,7 @@ export function EnvironmentControl(props: {
   }
 
   return (
-    <SplitButton class="mx-1" data-boc-environment-control data-expanded-label={wide()}>
+    <SplitButton class="mx-1" data-boc-environment-control data-expanded-label={expandedLabel()}>
       <Tooltip placement="bottom" value={label()} class="flex items-center">
         <SplitButtonAction
           ref={actionButton}
@@ -136,7 +139,7 @@ export function EnvironmentControl(props: {
           <Show when={intent() !== "checking" && !props.resource.state.acting} fallback={<EnvironmentSpinner />}>
             <Icon name={primaryIcon(intent())} size="small" />
           </Show>
-          <Show when={wide()}>
+          <Show when={expandedLabel()}>
             <span class="max-w-40 truncate">{label()}</span>
           </Show>
         </SplitButtonAction>

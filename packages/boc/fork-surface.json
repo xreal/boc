@@ -75,7 +75,7 @@
     },
     {
       "path": "packages/app/src/session/files/session-side-panel.tsx",
-      "reason": "Render the channel-aware Boc brand mark in the empty file panel"
+      "reason": "Render the channel-aware Boc brand mark and place the compact environment action in the open side-panel header"
     },
     {
       "path": "packages/app/src/workspaces/create.ts",

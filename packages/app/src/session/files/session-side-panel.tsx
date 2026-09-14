@@ -15,6 +15,7 @@ import { Tooltip } from "@opencode/ui/tooltip"
 import { Menu } from "@opencode/ui/menu"
 import type { FileDiffInfo } from "@opencode/client/promise"
 import { BocBrandMark } from "@/boc/brand-mark"
+import { BocEnvironmentSessionControl } from "@/boc/environments/session"
 
 import FileTree from "@/session/files/file-tree"
 import { normalizeFileTreeV2Path } from "@/session/files/file-tree-v2-model"
@@ -542,6 +543,9 @@ export function SessionSidePanel(props: {
                           onPointerDown={(event) => event.stopPropagation()}
                           onClick={(event) => event.stopPropagation()}
                         >
+                          <Show when={view().reviewPanel.opened()}>
+                            <BocEnvironmentSessionControl compact />
+                          </Show>
                           <OpenInAppButton directory={projectDirectory} />
                           <Show when={reviewVisible()}>
                             <div class="size-7 shrink-0" aria-hidden />

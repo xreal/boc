@@ -16,7 +16,9 @@ export function SessionReviewToggle() {
 
   return (
     <>
-      <BocEnvironmentSessionControl />
+      <Show when={!view().reviewPanel.opened()}>
+        <BocEnvironmentSessionControl />
+      </Show>
       <SessionHeaderActions
         state={{
           reviewLabel: language.t("command.review.toggle"),
