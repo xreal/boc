@@ -14,6 +14,7 @@ const jiraTags = [
   "BocJiraGetSessionInstructions",
   "BocJiraSaveSessionInstructions",
   "BocJiraListSessionLinks",
+  "BocJiraListSessionCounts",
   "BocJiraSaveSessionLink",
   "BocJiraPromoteSessionLink",
   "BocJiraGetConnectionStatus",
