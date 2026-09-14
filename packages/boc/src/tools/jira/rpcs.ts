@@ -319,6 +319,10 @@ export const BocJiraListSessionLinks = Rpc.make("BocJiraListSessionLinks", {
   success: Schema.Array(JiraSessionLink),
 })
 
+export const BocJiraListSessionCounts = Rpc.make("BocJiraListSessionCounts", {
+  success: Schema.Array(Schema.Struct({ issueUrl: Schema.String, count: Schema.Number })),
+})
+
 export const BocJiraSaveSessionLink = Rpc.make("BocJiraSaveSessionLink", {
   payload: JiraSessionLink,
   success: Schema.Void,
@@ -350,6 +354,7 @@ export const JiraRpcs = RpcGroup.make(
   BocJiraGetSessionInstructions,
   BocJiraSaveSessionInstructions,
   BocJiraListSessionLinks,
+  BocJiraListSessionCounts,
   BocJiraSaveSessionLink,
   BocJiraPromoteSessionLink,
   BocJiraGetConnectionStatus,

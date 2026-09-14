@@ -4,8 +4,6 @@ export const jiraEnglish = {
   "boc.jira.ticket.copied": "Copied",
   "boc.jira.ticket.copyFailed": "The ticket title could not be copied. Try again.",
   "boc.jira.ticket.storyPoints.label": "Story points",
-  "boc.jira.ticket.storyPoints.one": "{{count}} pt",
-  "boc.jira.ticket.storyPoints.other": "{{count}} pts",
   "boc.jira.ticket.parent": "Parent",
   "boc.jira.ticket.subtasks": "Subtasks",
   "boc.jira.ticket.completion": "{{completed}} / {{total}}",
@@ -118,9 +116,9 @@ export const jiraEnglish = {
   "boc.jira.sessions.defaults.description":
     "Applied to new ticket prompts. You can still edit or clear them for an individual ticket.",
   "boc.jira.sessions.defaults.before":
-    "Work on the Jira ticket below. First understand its requirements and the relevant code, then implement the simplest complete solution that follows the project's conventions.",
+    "Implement the Jira ticket below. Make the solution complete, simple, clean, modern, maintainable, and consistent with existing project patterns. Avoid unnecessary complexity and unrelated changes.\n------",
   "boc.jira.sessions.defaults.after":
-    "Before finishing, review your changes and run the relevant linting, type checks, and tests; report the results and anything you could not verify. Do not commit or push without my explicit approval.",
+    "------\nDo not commit or push without my approval!",
   "boc.jira.sessions.defaults.reviewLabel": "Pull request review",
   "boc.jira.sessions.defaults.reviewDescription":
     "Used when Review starts a new session from a pull request in a Jira ticket.",
@@ -137,6 +135,8 @@ export const jiraEnglish = {
   "boc.jira.sessions.defaults.saveFailed": "Could not save prompt defaults. Your edits are still here.",
 
   "boc.jira.sessions.title": "Sessions",
+  "boc.jira.sessions.count.one": "{{count}} session",
+  "boc.jira.sessions.count.other": "{{count}} sessions",
   "boc.jira.sessions.start": "Work on this ticket",
   "boc.jira.sessions.instructions": "Optional instructions",
   "boc.jira.sessions.before": "Before the ticket",

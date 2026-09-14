@@ -10,6 +10,7 @@ export function JiraBoardColumns(props: {
   locale: string
   groups: JiraColumnGroup[]
   selectedIssueKey?: string
+  sessionCounts: Readonly<Record<string, number>>
   deployedHosts?: (issueKey: string) => readonly string[] | undefined
   onSelectIssue: (issue: JiraBoardIssue, returnFocus: HTMLButtonElement) => void
   onOpenExternal: (url: string) => void
@@ -94,6 +95,7 @@ export function JiraBoardColumns(props: {
                         locale={props.locale}
                         index={cardIndex()}
                         selected={props.selectedIssueKey === issue.key}
+                        sessionCount={props.sessionCounts[issue.url]}
                         deployedHosts={props.deployedHosts?.(issue.key)}
                         onSelect={(returnFocus) => props.onSelectIssue(issue, returnFocus)}
                         onOpenExternal={props.onOpenExternal}

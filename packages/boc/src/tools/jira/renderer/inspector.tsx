@@ -181,7 +181,7 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
                     title={props.t("boc.jira.ticket.storyPoints.label")}
                     aria-label={props.t("boc.jira.ticket.storyPoints.label")}
                   >
-                    {props.t.plural("boc.jira.ticket.storyPoints", issue().storyPoints ?? 0)}
+                    {props.t("boc.jira.board.storyPoints", { count: issue().storyPoints ?? 0 })}
                   </span>
                 </Show>
               </div>

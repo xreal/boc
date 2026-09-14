@@ -66,6 +66,7 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
         invoke("BocJiraSaveSessionInstructions", input),
       listSessionLinks: (input: BocDesktopInvokeArgs<"BocJiraListSessionLinks">[0]) =>
         invoke("BocJiraListSessionLinks", input),
+      listSessionCounts: () => invoke("BocJiraListSessionCounts"),
       saveSessionLink: (input: BocDesktopInvokeArgs<"BocJiraSaveSessionLink">[0]) =>
         invoke("BocJiraSaveSessionLink", input),
       promoteSessionLink: (input: BocDesktopInvokeArgs<"BocJiraPromoteSessionLink">[0]) =>

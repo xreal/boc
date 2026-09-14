@@ -122,6 +122,16 @@ export function createJiraHandlers(runtime: JiraRuntime) {
         Effect.sync(() =>
           readSessionLinks(runtime.store).filter((link) => link.issueUrl === payload.issueUrl && link.sessionID),
         ),
+      BocJiraListSessionCounts: () =>
+        Effect.sync(() => {
+          const counts = readSessionLinks(runtime.store)
+            .filter((link) => link.sessionID)
+            .reduce(
+              (result, link) => result.set(link.issueUrl, (result.get(link.issueUrl) ?? 0) + 1),
+              new Map<string, number>(),
+            )
+          return [...counts].map(([issueUrl, count]) => ({ issueUrl, count }))
+        }),
       BocJiraSaveSessionLink: (payload) => Effect.sync(() => saveSessionLink(runtime.store, payload)),
       BocJiraPromoteSessionLink: (payload) => Effect.sync(() => promoteSessionLink(runtime.store, payload)),
       BocJiraGetConnectionStatus: () => Effect.sync(() => getConnectionStatus(runtime)),

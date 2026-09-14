@@ -81,7 +81,18 @@ export function JiraIssueSessions(props: {
         aria-label={props.t("boc.jira.ticket.sessions")}
         class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
       >
-        <h3 class="text-[12px] text-v2-text-text-muted [font-weight:530]">{props.t("boc.jira.ticket.sessions")}</h3>
+        <h3 class="flex items-center gap-1.5 text-[12px] text-v2-text-text-muted [font-weight:530]">
+          {props.t("boc.jira.ticket.sessions")}
+          <Show when={!sessions.loading && !sessions()?.failed && (sessions()?.links.length ?? 0) > 0}>
+            <span
+              aria-label={props.t.plural("boc.jira.sessions.count", sessions()?.links.length ?? 0)}
+              class="flex items-center gap-1 text-v2-text-text-faint"
+            >
+              <Icon name="speech-bubble" size="small" />
+              <span class="tabular-nums">{sessions()?.links.length}</span>
+            </span>
+          </Show>
+        </h3>
         <SplitButton data-boc-jira-session-start>
           <SplitButtonAction disabled={disabled()} aria-busy={form.busy} onClick={() => void start()}>
             <Show when={form.busy}>

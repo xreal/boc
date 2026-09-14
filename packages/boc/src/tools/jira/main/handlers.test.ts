@@ -387,7 +387,7 @@ test("keeps multiple ticket sessions across handler restarts and disconnects wit
   const jira = runtime()
   const issueUrl = `${SITE_FIXTURE}/browse/APP-42`
   const draft = { issueUrl, title: "APP-42: Fix checkout", draftID: "draft-1", server: "server-a", createdAt: 1 }
-  const links = await runJira(
+  const result = await runJira(
     jira,
     Effect.gen(function* () {
       const client = yield* RpcTest.makeClient(JiraRpcs)
@@ -411,12 +411,19 @@ test("keeps multiple ticket sessions across handler restarts and disconnects wit
       yield* client.BocJiraPromoteSessionLink({ draftID: "draft-3", server: "server-a", sessionID: "session-3" })
       yield* client.BocJiraSaveSessionLink({ ...draft, draftID: "abandoned" })
       yield* client.BocJiraPromoteSessionLink({ draftID: "unrelated", server: "server-a", sessionID: "unrelated" })
-      return yield* client.BocJiraListSessionLinks({ issueUrl })
+      return {
+        links: yield* client.BocJiraListSessionLinks({ issueUrl }),
+        counts: yield* client.BocJiraListSessionCounts(),
+      }
     }),
   )
-  expect(links).toEqual([
+  expect(result.links).toEqual([
     { ...draft, server: "server-b", sessionID: "session-1" },
     { ...draft, draftID: "draft-2", sessionID: "session-2", createdAt: 2 },
+  ])
+  expect(result.counts).toEqual([
+    { issueUrl, count: 2 },
+    { issueUrl: "https://other.atlassian.net/browse/APP-42", count: 1 },
   ])
   const restored = await runJira(
     jira,
@@ -426,7 +433,7 @@ test("keeps multiple ticket sessions across handler restarts and disconnects wit
       return yield* client.BocJiraListSessionLinks({ issueUrl })
     }),
   )
-  expect(restored).toEqual(links)
+  expect(restored).toEqual(result.links)
 })
 
 
@@ -440,8 +447,10 @@ test("persists prompt defaults independently of connection and board settings, i
   await runJira(jira, Effect.gen(function* () {
     const client = yield* RpcTest.makeClient(JiraRpcs)
     const defaults = yield* client.BocJiraGetSessionInstructions()
-    expect(defaults.before).toContain("Work on the Jira ticket below.")
-    expect(defaults.after).toContain("Do not commit or push without my explicit approval.")
+    expect(defaults.before).toBe(
+      "Implement the Jira ticket below. Make the solution complete, simple, clean, modern, maintainable, and consistent with existing project patterns. Avoid unnecessary complexity and unrelated changes.\n------",
+    )
+    expect(defaults.after).toBe("------\nDo not commit or push without my approval!")
     yield* client.BocJiraSaveSessionInstructions(custom)
   }))
   await runJira(jira, Effect.gen(function* () {

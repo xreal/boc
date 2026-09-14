@@ -137,6 +137,7 @@ describe("Jira RPC success schemas", () => {
       "BocJiraGetSessionInstructions",
       "BocJiraSaveSessionInstructions",
       "BocJiraListSessionLinks",
+      "BocJiraListSessionCounts",
       "BocJiraSaveSessionLink",
       "BocJiraPromoteSessionLink",
       "BocJiraGetConnectionStatus",

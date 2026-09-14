@@ -63,6 +63,7 @@ export default function JiraScreen(props: BocScreenProps) {
     selectedIssueKey: undefined as string | undefined,
     issue: undefined as JiraIssueDetail | undefined,
     issueFailure: undefined as JiraConnectionFailure | undefined,
+    sessionCounts: {} as Record<string, number>,
     loading: false as false | "workspace" | "board" | "issues" | "issue",
     failure: undefined as JiraConnectionFailure | undefined,
   })
@@ -173,6 +174,15 @@ export default function JiraScreen(props: BocScreenProps) {
       return
     }
     await loadBoard(selectedBoardId, { request, keepSprint: true, resetView: false })
+  }
+
+  const refreshSessionCounts = async () => {
+    const counts = await desktop.jira.listSessionCounts().catch(() => undefined)
+    if (!counts) return
+    setView(
+      "sessionCounts",
+      Object.fromEntries(counts.map((item) => [item.issueUrl, item.count])),
+    )
   }
 
   const loadBoard = async (boardId: number, options: BoardLoadOptions = {}) => {
@@ -308,6 +318,7 @@ export default function JiraScreen(props: BocScreenProps) {
   const closeInspector = () => {
     issueRequests.invalidate()
     setView({ selectedIssueKey: undefined, issue: undefined, issueFailure: undefined, history: [], loading: false })
+    void refreshSessionCounts()
   }
 
   const loadDeployments = async (force = false) => {
@@ -370,6 +381,7 @@ export default function JiraScreen(props: BocScreenProps) {
     window.addEventListener("online", syncOnline)
     window.addEventListener("offline", syncOnline)
     void bootstrap()
+    void refreshSessionCounts()
     void loadDeployments(false)
     const deploymentTimer = setInterval(() => {
       if (view.online) void loadDeployments(false)
@@ -437,6 +449,7 @@ export default function JiraScreen(props: BocScreenProps) {
             locale={props.host.locale()}
             groups={groups()}
             selectedIssueKey={view.selectedIssueKey}
+            sessionCounts={view.sessionCounts}
             deployedHosts={deployedHostsForIssue}
             onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
             onOpenExternal={(url) => props.host.openExternal(url)}

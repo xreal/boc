@@ -1,5 +1,6 @@
 import { JiraAvatar } from "./person"
 import { Badge } from "@opencode/ui/badge"
+import { Icon } from "@opencode/ui/icon"
 import { Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import { jiraIssueIsSubtask, type JiraBoardIssue } from "../domain/board"
@@ -13,6 +14,7 @@ export function JiraIssueCard(props: {
   locale: string
   index: number
   selected: boolean
+  sessionCount?: number
   deployedHosts?: readonly string[]
   onSelect: (returnFocus: HTMLButtonElement) => void
   onOpenExternal: (url: string) => void
@@ -64,6 +66,15 @@ export function JiraIssueCard(props: {
         <span class="flex w-full items-center gap-2 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted">
           <Show when={props.issue.storyPoints !== undefined}>
             <Badge>{props.t("boc.jira.board.storyPoints", { count: props.issue.storyPoints ?? 0 })}</Badge>
+          </Show>
+          <Show when={(props.sessionCount ?? 0) > 0}>
+            <span
+              aria-label={props.t.plural("boc.jira.sessions.count", props.sessionCount ?? 0)}
+              class="flex items-center gap-1 text-v2-text-text-faint"
+            >
+              <Icon name="speech-bubble" size="small" />
+              <span class="tabular-nums">{props.sessionCount}</span>
+            </span>
           </Show>
           <span class="ml-auto flex shrink-0 items-center gap-2">
             <Show when={jiraRelativeTime(props.issue.updatedAt, props.locale)}>

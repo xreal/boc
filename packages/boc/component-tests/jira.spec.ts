@@ -12,7 +12,7 @@ story(
     )
     await expect(header.locator('[title="Story"]')).toBeVisible()
     await expect(header.getByText("Medium", { exact: true })).toBeVisible()
-    await expect(header.getByLabel("Story points", { exact: true })).toHaveText("5 pts")
+    await expect(header.getByLabel("Story points", { exact: true })).toHaveText("5 SP")
     await expect(page.getByRole("button", { name: "Copy link", exact: true })).toHaveCount(0)
     await header.getByRole("button", { name: "Copy ticket key and title", exact: true }).click()
     expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(
@@ -31,6 +31,7 @@ story("modal keeps the working rail visible while reading a long ticket", async 
   await expect(
     modal.getByRole("region", { name: "Boc sessions" }).getByRole("button", { name: /Implement gallery navigation/ }),
   ).toBeVisible()
+  await expect(modal.getByLabel("2 sessions", { exact: true })).toBeVisible()
   const before = await start.boundingBox()
   await modal.getByRole("heading", { name: "Verification 15", exact: true }).scrollIntoViewIfNeeded()
   expect((await start.boundingBox())?.y).toBe(before?.y)
