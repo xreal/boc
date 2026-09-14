@@ -108,14 +108,16 @@ function JiraPreview(props: {
     onScroll: (position: { document: number; work: number }) => positions.set(view.selected, position),
     onClose: () => (props.modal ? setView("modalOpen", false) : setView("selected", "")),
     onOpenExternal: (url: string) => setView("external", url),
-    deployedSystems: deploymentSystemFixtures.filter((system) => system.ticketKey === "SHOP-617"),
-    onDeploy: () =>
+    deployedSystems:
+      props.scenario === "empty" ? [] : deploymentSystemFixtures.filter((system) => system.ticketKey === "SHOP-617"),
+    onDeploy: (branch: string) =>
       void dialog.push(() => (
         <Dialog>
           <DialogHeader>
             <DialogTitle>Fixture deployment</DialogTitle>
           </DialogHeader>
           <p class="p-4">Deployment remains local to this story.</p>
+          <p aria-label="Deployment branch">{branch}</p>
         </Dialog>
       )),
   }

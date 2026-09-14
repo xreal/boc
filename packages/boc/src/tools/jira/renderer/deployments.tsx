@@ -1,7 +1,3 @@
-import { Button } from "@opencode/ui/button"
-import { Icon } from "@opencode/ui/icon"
-import { IconButton } from "@opencode/ui/icon-button"
-import { Tooltip } from "@opencode/ui/tooltip"
 import { createResource, For, Show } from "solid-js"
 import { useBocDesktop } from "../../../renderer/desktop"
 import type { BocTranslator } from "../../../renderer/i18n"
@@ -14,7 +10,6 @@ export function JiraIssueDeployments(props: {
   t: BocTranslator
   locale: string
   systems?: readonly DeploymentSystem[]
-  onDeploy?: (system?: DeploymentSystem) => void
   onOpenExternal: (url: string) => void
 }) {
   const desktop = useBocDesktop()
@@ -22,26 +17,17 @@ export function JiraIssueDeployments(props: {
   const hasSystems = () => Boolean(props.systems && props.systems.length > 0)
 
   return (
-    <section class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4">
-      <div class="flex h-6 items-center justify-between">
-        <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
-          {props.t("boc.jira.board.deployments.title")}
-        </h3>
-        <Show when={props.onDeploy}>
-          <Button type="button" variant="neutral" size="small" onClick={() => props.onDeploy?.(props.systems?.[0])}>
-            {props.t("boc.jira.board.deployments.deploy")}
-          </Button>
-        </Show>
-      </div>
-
-      <Show
-        when={hasSystems()}
-        fallback={
-          <p class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-faint">
-            {props.t("boc.jira.board.deployments.empty")}
-          </p>
-        }
+    <Show when={hasSystems()}>
+      <section
+        aria-label={props.t("boc.jira.board.deployments.title")}
+        class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
       >
+        <div class="flex h-6 items-center justify-between">
+          <h3 class="text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
+            {props.t("boc.jira.board.deployments.title")}
+          </h3>
+        </div>
+
         <div class="flex flex-col gap-2">
           <For each={props.systems}>
             {(system) => (
@@ -51,13 +37,12 @@ export function JiraIssueDeployments(props: {
                 system={system}
                 siteUrl={deploymentSiteUrl(system.environment, settings())}
                 onOpenExternal={props.onOpenExternal}
-                onClick={props.onDeploy ? () => props.onDeploy?.(system) : undefined}
               />
             )}
           </For>
         </div>
-      </Show>
-    </section>
+      </section>
+    </Show>
   )
 }
 
@@ -67,7 +52,6 @@ function DeploymentSystemRow(props: {
   system: DeploymentSystem
   siteUrl: string
   onOpenExternal: (url: string) => void
-  onClick?: () => void
 }) {
   return (
     <div class="flex flex-col gap-1.5 px-1 py-1.5 text-start">
@@ -107,17 +91,6 @@ function DeploymentSystemRow(props: {
           <ClockIcon class="size-3.5 text-v2-text-text-faint" />
           <span>{deploymentAgeDisplay(props.system, props.locale, props.t)}</span>
         </span>
-        <Show when={props.onClick}>
-          <Tooltip value={props.t("boc.jira.board.deployments.deployTo", { system: props.system.name })}>
-            <IconButton
-              size="small"
-              variant="ghost-muted"
-              icon={<Icon name="arrow-right" />}
-              onClick={props.onClick}
-              aria-label={props.t("boc.jira.board.deployments.deployTo", { system: props.system.name })}
-            />
-          </Tooltip>
-        </Show>
       </div>
     </div>
   )

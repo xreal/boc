@@ -92,6 +92,18 @@ export function JiraIssueSessions(props: {
             </span>
           </Show>
         </h3>
+        <details class="jira-session-instructions">
+          <summary>
+            <Icon name="chevron-right" size="small" />
+            {props.t("boc.jira.sessions.instructions")}
+          </summary>
+          <JiraSessionInstructionFields
+            t={props.t}
+            value={form}
+            disabled={disabled()}
+            onChange={(field, value) => setForm(field, value)}
+          />
+        </details>
         <SplitButton data-boc-jira-session-start>
           <SplitButtonAction disabled={disabled()} aria-busy={form.busy} onClick={() => void start()}>
             <Show when={form.busy}>
@@ -139,18 +151,6 @@ export function JiraIssueSessions(props: {
             </Menu.Portal>
           </Menu>
         </SplitButton>
-        <details class="jira-session-instructions">
-          <summary>
-            <Icon name="chevron-right" size="small" />
-            {props.t("boc.jira.sessions.instructions")}
-          </summary>
-          <JiraSessionInstructionFields
-            t={props.t}
-            value={form}
-            disabled={disabled()}
-            onChange={(field, value) => setForm(field, value)}
-          />
-        </details>
         <Show when={!preferences.loading && !target()}>
           <p role="alert">{props.t("boc.jira.sessions.projectRequired")}</p>
           <Show when={!preferences()}>
@@ -199,9 +199,9 @@ export function JiraIssueSessions(props: {
                   <bdi dir="auto" class="truncate">
                     {link.title}
                   </bdi>
-                  <span class="text-[12px] text-v2-text-text-faint">
-                    {new Date(link.createdAt).toLocaleString(host.locale())}
-                  </span>
+                  <time dateTime={new Date(link.createdAt).toISOString()} class="text-[12px] text-v2-text-text-faint">
+                    {new Date(link.createdAt).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" })}
+                  </time>
                 </span>
               </Button>
             )}

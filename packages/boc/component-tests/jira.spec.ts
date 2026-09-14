@@ -48,7 +48,7 @@ story("modal keeps the working rail visible while reading a long ticket", async 
   const start = modal.getByRole("button", { name: "Work on this ticket", exact: true })
   await expect(start).toBeInViewport()
   await expect(
-    modal.getByRole("region", { name: "Boc sessions" }).getByRole("button", { name: /Implement gallery navigation/ }),
+    modal.getByRole("region", { name: "Agent Sessions" }).getByRole("button", { name: /Implement gallery navigation/ }),
   ).toBeVisible()
   await expect(modal.getByLabel("2 sessions", { exact: true })).toBeVisible()
   const before = await start.boundingBox()
@@ -128,17 +128,25 @@ story("workspace opens branches, returns from deployment and reopens a linked Bo
   await expect(page.getByLabel("Opened URL")).toHaveText(
     "https://github.com/example/shop/tree/SHOP-617-gallery-navigation",
   )
-  await page.getByRole("button", { name: "Deploy", exact: true }).click()
+  await expect(page.getByRole("region", { name: "Deployments", exact: true })).toBeVisible()
+  await branches.getByRole("button", { name: "Deploy branch SHOP-617-gallery-navigation", exact: true }).click()
   const deployment = page.getByRole("dialog", { name: "Fixture deployment" })
   await expect(deployment).toBeVisible()
+  await expect(deployment.getByLabel("Deployment branch")).toHaveText("SHOP-617-gallery-navigation")
   await page.keyboard.press("Escape")
   await expect(page.locator('[data-slot="dialog-content"]').filter({ hasText: "Fixture deployment" })).toHaveCount(0)
   await page
-    .getByRole("region", { name: "Boc sessions" })
+    .getByRole("region", { name: "Agent Sessions" })
     .getByRole("button", { name: /Implement gallery navigation/ })
     .click()
   await expect(page.getByLabel("Opened session")).toHaveText("session-1")
   await expect(page.getByRole("dialog")).toHaveCount(0)
+})
+
+story("tickets without deployments hide the deployment section", async ({ mount, page }) => {
+  await mount("boc-jira--empty")
+  await expect(page.getByRole("region", { name: "Branches", exact: true })).toBeVisible()
+  await expect(page.getByRole("region", { name: "Deployments", exact: true })).toHaveCount(0)
 })
 
 story("modal start hands off to the composer and close restores the opener focus", async ({ mount, page }) => {

@@ -357,17 +357,19 @@ export default function JiraScreen(props: BocScreenProps) {
     return systemsByTicketKey().get(issueKey.toUpperCase())
   }
 
-  const openDeploy = (system?: DeploymentSystem) => {
+  const openDeploy = (branch: string) => {
     const target =
-      system ?? view.deploymentSystems.find((entry) => entry.availability === "free") ?? view.deploymentSystems[0]
+      view.deploymentSystems.find((entry) => entry.branch === branch) ??
+      view.deploymentSystems.find((entry) => entry.availability === "free") ??
+      view.deploymentSystems[0]
     if (!target) return
     void dialog.push(() => (
       <DeploymentDialog
         api={desktop.deployments}
         locale={props.host.locale}
         system={target}
-        kind={target.branch ? "redeploy" : "deploy"}
-        initialRef={system ? undefined : view.selectedIssueKey}
+        kind={target.branch === branch ? "redeploy" : "deploy"}
+        initialRef={branch}
         onQueued={() => {
           void loadDeployments(true)
         }}

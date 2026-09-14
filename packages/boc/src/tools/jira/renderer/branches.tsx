@@ -15,6 +15,7 @@ export function JiraBranches(props: {
   online: boolean
   t: BocTranslator
   onOpenExternal: (url: string) => void
+  onDeploy?: (branch: string) => void
 }) {
   const [copy, setCopy] = createStore({ branch: "", failed: false })
   const copyBranch = (name: string) => {
@@ -57,7 +58,6 @@ export function JiraBranches(props: {
       <For each={resource.state.data?.branches}>
         {(branch) => (
           <div class="flex min-h-8 min-w-0 items-center gap-2">
-            <Icon name="branch" class="shrink-0 text-v2-text-text-muted" />
             <bdi dir="ltr" class="min-w-0 flex-1 truncate font-mono text-[12px]" title={branch.name}>
               {branch.name}
             </bdi>
@@ -83,6 +83,18 @@ export function JiraBranches(props: {
                 onClick={() => props.onOpenExternal(branch.url)}
               />
             </Tooltip>
+            <Show when={props.onDeploy}>
+              <Tooltip value={props.t("boc.jira.ticket.branches.deploy", { name: branch.name })}>
+                <IconButton
+                  size="small"
+                  variant="neutral"
+                  icon={<Icon name="cloud-upload" />}
+                  aria-label={props.t("boc.jira.ticket.branches.deploy", { name: branch.name })}
+                  disabled={!props.online}
+                  onClick={() => props.onDeploy?.(branch.name)}
+                />
+              </Tooltip>
+            </Show>
           </div>
         )}
       </For>

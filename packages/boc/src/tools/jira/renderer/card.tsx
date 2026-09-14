@@ -70,7 +70,7 @@ export function JiraIssueCard(props: {
           <Show when={(props.sessionCount ?? 0) > 0}>
             <span
               aria-label={props.t.plural("boc.jira.sessions.count", props.sessionCount ?? 0)}
-              class="flex items-center gap-1 text-v2-text-text-faint"
+              class="flex items-center gap-1 rounded-full bg-v2-icon-icon-accent/15 px-1.5 text-[11px] font-medium text-v2-icon-icon-accent"
             >
               <Icon name="speech-bubble" size="small" />
               <span class="tabular-nums">{props.sessionCount}</span>

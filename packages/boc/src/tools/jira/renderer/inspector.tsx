@@ -46,7 +46,7 @@ type JiraIssueInspectorProps = {
   overlay?: boolean
   failure?: JiraConnectionFailure
   deployedSystems?: readonly DeploymentSystem[]
-  onDeploy?: (system?: DeploymentSystem) => void
+  onDeploy?: (branch: string) => void
   onClose: () => void
   returnFocus?: HTMLElement
   onOpenExternal: (url: string) => void
@@ -323,7 +323,6 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
                   t={props.t}
                   locale={props.locale}
                   systems={props.deployedSystems}
-                  onDeploy={props.online ? props.onDeploy : undefined}
                 />
                 <JiraBranches
                   api={props.api}
@@ -331,6 +330,7 @@ export function JiraIssueInspector(props: JiraIssueInspectorProps) {
                   online={props.online}
                   t={props.t}
                   onOpenExternal={props.onOpenExternal}
+                  onDeploy={props.onDeploy}
                 />
                 <JiraPullRequests
                   api={props.api}
