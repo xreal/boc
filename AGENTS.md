@@ -25,6 +25,14 @@
 - Since the stable V2 launch, `boc-beta` tracks `upstream/v2` despite its historical branch name and the older beta-tracking notes above. Sync with `git fetch upstream v2 && git merge upstream/v2`; Boc application versions remain independent from the pinned compatible official server version.
 - The primary fork branch is now `v2` and tracks `upstream/v2`; this supersedes the historical `boc-beta` branch policies above. Work directly on `v2`, push only to `origin/v2`, and do not force-push it.
 
+## Boc feature map
+- `packages/boc/`
+  - `src/tools/<feature>/` — feature implementations.
+  - `src/` — shared registration, backend composition, and renderer bridges.
+  - `fork-surface.json` — approved upstream paths and their reasons; its audit defines the fork boundary.
+- `packages/{app,desktop,server,core,plugin,schema,protocol}/src/boc/` — package-local Boc integration.
+- `packages/{core,app,desktop}/` — review first during upstream syncs, then review upstream APIs imported by Boc-owned code.
+
 
 ---
 <!-- BOC FORK BOUNDARY: everything below this line is upstream AGENTS.md, do not touch. -->

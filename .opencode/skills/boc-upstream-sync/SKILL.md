@@ -9,7 +9,7 @@ Keep `v2` close to `upstream/v2` while preserving the smallest supported Boc int
 
 ## Boundaries
 
-- Read `AGENTS.md`, `BOC_FORK.md`, `packages/boc/fork-surface.json`, and applicable package `AGENTS.md` files first.
+- Read `AGENTS.md`, `packages/boc/fork-surface.json`, and applicable package `AGENTS.md` files first.
 - A review-only request stops before merge, commit, or push. A requested sync includes in-scope compatibility fixes and verification.
 - Never push to `upstream`, rebase shared `v2`, force-push, discard unrelated changes, or hide failures by weakening checks.
 - Preserve a dirty worktree. Use a scratch worktree for rehearsal; do not stash or overwrite user changes without explicit direction.
@@ -19,7 +19,7 @@ Keep `v2` close to `upstream/v2` while preserving the smallest supported Boc int
 1. Confirm the branch, remotes, status, and merge base. Fetch `upstream/v2`.
 2. Review the full incoming range with `git log HEAD..upstream/v2` and `git diff HEAD...upstream/v2`; do not rely on conflicts alone.
 3. Treat `fix(core):`, `fix(app):`, and `fix(desktop):` commits as high-priority signals. Inspect every incoming change under those packages even when its commit scope differs.
-4. Match incoming paths and symbols against `BOC_FORK.md`, the approved surface, and imports in fork-owned code. Inspect callers, types, defaults, provider order, build config, and generated clients.
+4. Match incoming paths and symbols against the approved surface and imports in fork-owned code. Inspect callers, types, defaults, provider order, build config, and generated clients.
 5. Give TUI-only changes lower priority, but follow any shared core, protocol, schema, client, UI, or server impact.
 6. Look for new upstream extension points or APIs that can replace a Boc override, copied assumption, or brittle internal import.
 
@@ -28,8 +28,8 @@ Keep `v2` close to `upstream/v2` while preserving the smallest supported Boc int
 - Follow the repository workflow: merge `upstream/v2` into `v2`; do not squash or rewrite upstream history.
 - Resolve each conflict by understanding both sides. Keep upstream behavior intact and reapply only the narrow Boc registration, channel case, or strategy hook; never choose whole-file ours/theirs blindly.
 - Fix merge-caused type, test, build, runtime-boundary, and generated-client issues within scope. When upstream provides a better seam, migrate the fork-owned bridge and remove the obsolete touch.
-- Keep Boc product names and behavior out of upstream files unless the integration map explicitly records a channel-specific exception.
-- Update `BOC_FORK.md` and `packages/boc/fork-surface.json` in the same change when capabilities, seams, or API dependencies move.
+- Keep Boc product names and behavior out of upstream files unless the path is approved in `packages/boc/fork-surface.json`.
+- Update `packages/boc/fork-surface.json` in the same change when the approved upstream integration surface changes.
 - If Protocol or Server `HttpApi` changed, run `bun run generate` from `packages/client`; never edit generated clients directly.
 
 ## Verify before delivery
