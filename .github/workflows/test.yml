@@ -1,16 +1,20 @@
 name: test
 
 on:
-  push:
-    branches:
-      - v2
   pull_request:
     branches:
       - v2
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      run-e2e:
+        description: "Run end-to-end tests even when the ref is v2"
+        required: false
+        type: boolean
+        default: false
 
 concurrency:
-  # Direct pushes and PRs share a stable group so stale validation is cancelled.
+  # PRs and release checks share a stable group so stale validation is cancelled.
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
@@ -45,7 +49,7 @@ jobs:
           TURBO_SCM_BASE: ${{ github.event_name == 'pull_request' && format('{0}^1', github.sha) || github.event.before }}
           TURBO_SCM_HEAD: ${{ github.sha }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "workflow_call" ]; then
             echo "app=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
@@ -112,7 +116,7 @@ jobs:
       - name: Run unit tests
         timeout-minutes: 20
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "workflow_call" ]; then
             GITHUB_ACTIONS=false bun turbo test
             exit 0
           fi
@@ -131,7 +135,7 @@ jobs:
         if: runner.os == 'Linux'
         timeout-minutes: 15
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "${{ github.event_name }}" = "workflow_call" ]; then
             bun turbo verify:package --filter=@opencode/sdk
             exit 0
           fi
@@ -179,7 +183,7 @@ jobs:
   e2e:
     name: e2e (${{ matrix.settings.name }})
     needs: affected
-    if: needs.affected.outputs.app == 'true' && github.ref_name != 'v2' && github.head_ref != 'v2'
+    if: needs.affected.outputs.app == 'true' && (inputs.run-e2e || (github.ref_name != 'v2' && github.head_ref != 'v2'))
     strategy:
       fail-fast: false
       matrix:
@@ -190,7 +194,7 @@ jobs:
             host: blacksmith-4vcpu-windows-2025
     runs-on: ${{ matrix.settings.host }}
     env:
-      E2E_ENABLED: ${{ needs.affected.outputs.app == 'true' && github.ref_name != 'v2' && github.head_ref != 'v2' }}
+      E2E_ENABLED: ${{ needs.affected.outputs.app == 'true' && (inputs.run-e2e || (github.ref_name != 'v2' && github.head_ref != 'v2')) }}
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.playwright-browsers
     defaults:
       run:

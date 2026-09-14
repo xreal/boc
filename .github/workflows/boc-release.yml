@@ -49,8 +49,25 @@ jobs:
             fi
           fi
 
-  verify:
+  full-test:
     needs: validate
+    uses: ./.github/workflows/test.yml
+    with:
+      run-e2e: true
+    secrets: inherit
+
+  full-typecheck:
+    needs: validate
+    uses: ./.github/workflows/typecheck.yml
+    secrets: inherit
+
+  fork-audit:
+    needs: validate
+    uses: ./.github/workflows/boc-audit.yml
+    secrets: inherit
+
+  verify:
+    needs: [validate, full-test, full-typecheck, fork-audit]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:

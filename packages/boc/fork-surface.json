@@ -47,11 +47,11 @@
     },
     {
       "path": ".github/workflows/test.yml",
-      "reason": "Run fork validation only on v2, cancel stale runs, and avoid allocating runners for disabled v2 E2E jobs"
+      "reason": "Run fork validation for v2 pull requests and release calls, cancel stale runs, and avoid allocating runners for disabled v2 E2E jobs"
     },
     {
       "path": ".github/workflows/typecheck.yml",
-      "reason": "Run typechecking only on v2 and cancel stale push or pull request runs"
+      "reason": "Run typechecking for v2 pull requests and release calls, with stale-run cancellation"
     },
     {
       "path": ".github/workflows/deploy-files.yml",
