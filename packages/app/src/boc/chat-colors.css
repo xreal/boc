@@ -1,0 +1,38 @@
+html[data-boc-product] [data-slot="session-chat-panel"] [data-timeline-row="AssistantPart"]
+  [data-component="text-part"] [data-component="markdown"] {
+  h1,
+  h2 {
+    color: var(--syntax-property);
+  }
+
+  h3,
+  h4,
+  h5,
+  h6 {
+    color: var(--syntax-type);
+  }
+
+  em {
+    color: var(--syntax-warning);
+  }
+
+  ul li::marker {
+    color: var(--syntax-warning);
+  }
+
+  ol li::marker {
+    color: var(--syntax-info);
+  }
+
+  :not(pre) > code:not([data-inline-code-kind]) {
+    color: var(--syntax-string);
+  }
+
+  blockquote {
+    border-color: var(--syntax-info);
+  }
+
+  th {
+    color: var(--syntax-property);
+  }
+}
