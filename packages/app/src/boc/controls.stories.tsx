@@ -26,6 +26,16 @@ function ControlsPreview() {
       "mode": "subagent"
     }
   },
+  "mcp": {
+    "servers": {
+      "documentation": {
+        "type": "remote",
+        "url": "https://docs.example.com/mcp",
+        "headers": { "X-Api-Key": "fixture-key" },
+        "oauth": { "client_id": "fixture-client", "scope": "docs.read" }
+      }
+    }
+  },
 }`,
       revision: 1,
       instructionExists: true,

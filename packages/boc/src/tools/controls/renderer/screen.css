@@ -81,6 +81,9 @@
     gap: 12px;
     margin-block-end: 8px;
   }
+  .controls-category + .controls-category {
+    margin-block-start: 10px;
+  }
   .controls-count {
     font-variant-numeric: tabular-nums;
   }

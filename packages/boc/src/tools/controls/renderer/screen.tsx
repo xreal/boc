@@ -298,7 +298,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                           (!filters.search && (filters.category === "all" || filters.category === kind))
                         }
                       >
-                        <section class="min-w-0">
+                        <section class="controls-category min-w-0">
                           <div class="controls-category-heading">
                             <h2 class="flex items-center gap-2 text-14-medium">
                               <span class="controls-category-icon" aria-hidden="true">

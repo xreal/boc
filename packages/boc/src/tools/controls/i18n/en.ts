@@ -171,6 +171,11 @@ export const controlsEnglish = {
   "boc.controls.editor.nameHint": "For example: reviewer",
   "boc.controls.editor.create": "Create definition",
   "boc.controls.editor.remove": "Remove from this file",
+  "boc.controls.editor.removeMcp": "Remove MCP server…",
+  "boc.controls.editor.confirmRemoveMcp": "Remove server",
+  "boc.controls.editor.keepMcp": "Keep server",
+  "boc.controls.editor.removeMcpHint":
+    "Remove {{name}} from this configuration file? It may remain available if it is also defined elsewhere.",
   "boc.controls.editor.defaultAgent": "Default agent",
   "boc.controls.editor.inherit": "Inherit",
   "boc.controls.editor.description": "Description",

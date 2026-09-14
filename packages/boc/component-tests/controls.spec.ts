@@ -198,6 +198,36 @@ story("edits native agent and MCP configuration", async ({ mount, page }) => {
   await expect(mcp.getByLabel("Definition · JSONC")).toHaveValue(/"client_id": "fixture-client"/)
 })
 
+story("removes an MCP server from the project configuration after confirmation", async ({ mount, page }) => {
+  const component = await mount("boc-controls--default")
+  await component
+    .locator("article")
+    .filter({ hasText: "Documentation" })
+    .getByRole("button", { name: "Edit", exact: true })
+    .click()
+
+  const dialog = page.getByRole("dialog")
+  await dialog.getByRole("button", { name: "Remove MCP server…", exact: true }).click()
+  await expect(
+    dialog.getByText(
+      "Remove Documentation from this configuration file? It may remain available if it is also defined elsewhere.",
+      { exact: true },
+    ),
+  ).toBeVisible()
+  await expect(dialog.getByRole("button", { name: "Remove server", exact: true })).toHaveAttribute(
+    "data-variant",
+    "danger",
+  )
+  await dialog.getByRole("button", { name: "Keep server", exact: true }).click()
+  await expect(dialog.getByRole("button", { name: "Remove MCP server…", exact: true })).toBeVisible()
+  await dialog.getByRole("button", { name: "Remove MCP server…", exact: true }).click()
+  await dialog.getByRole("button", { name: "Remove server", exact: true }).click()
+  await expect(dialog).toHaveCount(0)
+
+  await component.getByRole("button", { name: "Config file", exact: true }).click()
+  await expect(page.getByRole("dialog").getByLabel("Configuration content")).not.toHaveValue(/"documentation"\s*:/)
+})
+
 story("retains a configuration draft when the file conflicts", async ({ mount, page }) => {
   const component = await mount("boc-controls--default")
   await component.getByRole("button", { name: "Config file", exact: true }).click()

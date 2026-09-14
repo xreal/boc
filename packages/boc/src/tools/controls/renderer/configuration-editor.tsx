@@ -43,6 +43,7 @@ export function ConfigurationEditor(props: {
     error: "" as "" | "error" | "conflict" | "invalid",
     saved: false,
     closing: false,
+    removing: false,
   })
   const abort = new AbortController()
   const connection = props.host.connect(props.selection.server)
@@ -231,6 +232,40 @@ export function ConfigurationEditor(props: {
       }
       setView({ document, content: document.content, saved: true })
       props.saved()
+    } catch (error) {
+      const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined
+      if (!abort.signal.aborted)
+        setView(
+          "error",
+          type === "conflict"
+            ? "conflict"
+            : type === "invalid_configuration" || type === "invalid_config"
+              ? "invalid"
+              : "error",
+        )
+    } finally {
+      if (!abort.signal.aborted) setView("saving", false)
+    }
+  }
+  const removeMcp = async () => {
+    if (!connection || !view.document || view.saving || view.category !== "mcp") return
+    if (identity !== connection.identity()) {
+      setView("error", "error")
+      return
+    }
+    setView({ saving: true, error: "" })
+    try {
+      const content = applyEdits(
+        view.content,
+        modify(view.content, definition(), undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
+      )
+      await connection
+        .client()
+        .saveConfiguration({ scope: view.scope, content, expectedRevision: view.document.revision }, options())
+      if (abort.signal.aborted) return
+      if (identity !== connection.identity()) throw new Error("boc.controls.connection_changed")
+      props.saved()
+      props.close()
     } catch (error) {
       const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined
       if (!abort.signal.aborted)
@@ -543,7 +578,7 @@ export function ConfigurationEditor(props: {
                     </Field>
                   </Show>
                 </Show>
-                <Show when={!props.add && definitions().includes(view.id)}>
+                <Show when={!props.add && view.category === "agent" && definitions().includes(view.id)}>
                   <Button
                     variant="ghost"
                     disabled={view.saving}
@@ -685,11 +720,36 @@ export function ConfigurationEditor(props: {
           <Show when={view.saved}>
             <p class="controls-editor-success">{props.t("boc.controls.editor.saved")}</p>
           </Show>
+          <Show when={view.removing}>
+            <p class="controls-editor-danger">
+              {props.t("boc.controls.editor.removeMcpHint", { name: props.item?.name ?? view.id })}
+            </p>
+          </Show>
           <Show when={view.closing && dirty()}>
             <p>{props.t("boc.controls.editor.unsaved")}</p>
           </Show>
         </div>
         <div class="controls-editor-buttons">
+          <Show when={!props.add && view.category === "mcp" && definitions().includes(view.id)}>
+            <Button
+              variant={view.removing ? "danger" : "ghost"}
+              disabled={view.saving || dirty()}
+              onClick={() => {
+                if (view.removing) {
+                  void removeMcp()
+                  return
+                }
+                setView({ removing: true, saved: false })
+              }}
+            >
+              {props.t(view.removing ? "boc.controls.editor.confirmRemoveMcp" : "boc.controls.editor.removeMcp")}
+            </Button>
+            <Show when={view.removing}>
+              <Button variant="outline" disabled={view.saving} onClick={() => setView("removing", false)}>
+                {props.t("boc.controls.editor.keepMcp")}
+              </Button>
+            </Show>
+          </Show>
           <Show when={view.closing && dirty()}>
             <Button variant="outline" disabled={view.saving} onClick={props.close}>
               {props.t("boc.controls.editor.discard")}
