@@ -167,7 +167,7 @@ function JiraPreview(props: {
           ? {
               projects: () => [{ ...project, label: "Fixture project" }],
               start: async (input) => {
-                setView("started", input.model ? `${input.model.providerID}/${input.model.modelID}` : "")
+                setView("started", input.model ? `${input.model.providerID}/${input.model.modelID}` : "default")
                 setView("startedPrompt", input.prompt ?? "")
               },
               open: async (_server, sessionID) => {

@@ -175,6 +175,14 @@ story("modal start hands off to the composer and close restores the opener focus
   await expect(page.getByRole("button", { name: "Open ticket", exact: true })).toBeFocused()
 })
 
+story("ticket workspace starts a blank chat with the normal default model", async ({ mount, page }) => {
+  await mount("boc-jira--modal")
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await expect(page.getByLabel("Started model")).toHaveText("default")
+  await expect(page.getByLabel("Started prompt")).toHaveText("")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
+})
+
 story(
   "pull requests offer one review action that starts a session with the saved template",
   async ({ mount, page }) => {
