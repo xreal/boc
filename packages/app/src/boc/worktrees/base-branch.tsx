@@ -9,9 +9,85 @@ import { projectForSession } from "@/shell/layout/helpers"
 import { isWorkspaceDirectory, sameDirectory } from "@/workspaces/paths"
 
 export function BocWorktreeBaseBranch() {
+  const language = useLanguage()
+  const branch = useWorktreeOriginBranch()
+  const label = createMemo(() => {
+    const name = branch()
+    if (!name) return
+    return language.t("session.new.workspace.fromBranch", { branch: name })
+  })
+
+  return (
+    <Show when={label()}>
+      {(value) => (
+        <Tooltip placement="bottom" value={value()} class="mx-1 flex min-w-0 items-center">
+          <div
+            data-boc-worktree-base-branch
+            class="flex h-7 min-w-0 max-w-40 items-center gap-1.5 rounded-md bg-v2-background-bg-layer-02 px-2 text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-faint"
+          >
+            <Icon name="branch-out" size="small" class="shrink-0 text-v2-icon-icon-muted" />
+            <bdi dir="auto" class="truncate">
+              {value()}
+            </bdi>
+          </div>
+        </Tooltip>
+      )}
+    </Show>
+  )
+}
+
+export function BocWorktreeDetails(props: { branch?: string; baseBranch?: string }) {
+  const language = useLanguage()
+  const origin = useWorktreeOriginBranch()
+
+  return (
+    <>
+      <div class="session-summary-row">
+        <Icon name="branch" class="shrink-0 text-v2-icon-icon-muted" />
+        <span class="shrink-0 text-v2-text-text-muted">{language.t("session.summary.branch")}:</span>
+        <Show
+          when={props.branch}
+          fallback={
+            <span class="flex min-w-0 items-center gap-1.5">
+              <span class="shrink-0 whitespace-nowrap">{language.t("session.summary.noBranch")}</span>
+              <Show when={props.baseBranch}>
+                {(base) => (
+                  <>
+                    <span class="text-v2-text-text-muted">·</span>
+                    <span class="truncate text-v2-text-text-faint">
+                      {language.t("session.summary.basedOn", { branch: base() })}
+                    </span>
+                  </>
+                )}
+              </Show>
+            </span>
+          }
+        >
+          {(branch) => (
+            <bdi dir="auto" class="min-w-0 truncate">
+              {branch()}
+            </bdi>
+          )}
+        </Show>
+      </div>
+      <Show when={origin()}>
+        {(branch) => (
+          <div class="session-summary-row">
+            <Icon name="branch-out" class="shrink-0 text-v2-icon-icon-muted" />
+            <span class="shrink-0 text-v2-text-text-muted">{language.t("session.summary.createdFrom")}:</span>
+            <bdi dir="auto" class="min-w-0 truncate">
+              {branch()}
+            </bdi>
+          </div>
+        )}
+      </Show>
+    </>
+  )
+}
+
+function useWorktreeOriginBranch() {
   const server = useServer()
   const data = useData()
-  const language = useLanguage()
   const layout = useSessionLayout()
   const session = createMemo(() => (layout.params.id ? data.session.get(layout.params.id) : undefined))
   const project = createMemo(() => {
@@ -51,26 +127,6 @@ export function BocWorktreeBaseBranch() {
         .catch(() => null)
     },
   }))
-  const label = createMemo(() => {
-    if (base.data?.source !== "reflog") return
-    return language.t("session.new.workspace.fromBranch", { branch: base.data.name })
-  })
 
-  return (
-    <Show when={label()}>
-      {(value) => (
-        <Tooltip placement="bottom" value={value()} class="mx-1 flex min-w-0 items-center">
-          <div
-            data-boc-worktree-base-branch
-            class="flex h-7 min-w-0 max-w-40 items-center gap-1.5 rounded-md bg-v2-background-bg-layer-02 px-2 text-[13px] font-[440] leading-[var(--line-height-compact)] text-v2-text-text-faint"
-          >
-            <Icon name="branch-out" size="small" class="shrink-0 text-v2-icon-icon-muted" />
-            <bdi dir="auto" class="truncate">
-              {value()}
-            </bdi>
-          </div>
-        </Tooltip>
-      )}
-    </Show>
-  )
+  return createMemo(() => (base.data?.source === "reflog" ? base.data.name : undefined))
 }

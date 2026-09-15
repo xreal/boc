@@ -1429,6 +1429,8 @@ export const dict = {
   "workspace.lifecycle.set": "Worktree set",
   "session.summary.title": "Session details",
   "session.summary.tooltip": "Summary",
+  "session.summary.branch": "Branch",
+  "session.summary.createdFrom": "Created from",
   "session.summary.noBranch": "No branch",
   "session.summary.basedOn": "Based on {{branch}}",
   "session.summary.server": "Extensions",

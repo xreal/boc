@@ -2,6 +2,7 @@ import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Icon } from "@opencode/ui/icon"
 import { getFilename } from "@opencode/util/path"
 import { createMemo, Show, type JSX } from "solid-js"
+import { BocWorktreeDetails } from "@/boc/worktrees/base-branch"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { Project } from "@/runtime/server/types"
 import { useSettings } from "@/settings/model"
@@ -60,31 +61,7 @@ export function SessionSummaryPanel(props: {
             </span>
             <Icon name="fill-triangle-down" class="session-summary-menu-indicator shrink-0 text-v2-icon-icon-muted" />
           </SessionWorkspaceMenu>
-          <div class="session-summary-row">
-            <Icon name="branch" class="shrink-0 text-v2-icon-icon-muted" />
-            <Show
-              when={props.branch}
-              fallback={
-                <span class="flex min-w-0 items-center gap-1.5">
-                  <span class="shrink-0 whitespace-nowrap">{language.t("session.summary.noBranch")}</span>
-                  <Show when={props.baseBranch}>
-                    {(base) => (
-                      <>
-                        <span class="text-v2-text-text-muted">·</span>
-                        <span class="truncate text-v2-text-text-faint">
-                          {language.t("session.summary.basedOn", { branch: base() })}
-                        </span>
-                      </>
-                    )}
-                  </Show>
-                </span>
-              }
-            >
-              <span dir="auto" class="min-w-0 truncate">
-                {props.branch}
-              </span>
-            </Show>
-          </div>
+          <BocWorktreeDetails branch={props.branch} baseBranch={props.baseBranch} />
           <button type="button" class="session-summary-row" onClick={props.onReview}>
             <Icon name="review" class="shrink-0 text-v2-icon-icon-muted" />
             <span class="session-summary-label flex items-center gap-2">
