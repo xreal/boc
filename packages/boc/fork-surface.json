@@ -91,7 +91,7 @@
     },
     {
       "path": "packages/app/src/session/header/session-header.tsx",
-      "reason": "Place the Lane environment control in the session header flow before reserving the fixed review toggle"
+      "reason": "Place Boc worktree context and the Lane environment control in the session header flow before reserving the fixed review toggle"
     },
     {
       "path": "packages/app/src/session/terminal/panel.tsx",
