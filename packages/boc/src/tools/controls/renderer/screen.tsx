@@ -623,7 +623,13 @@ function ControlRow(props: {
       </div>
       <Show when={showStatus()}>
         <p id={statusID} class="controls-row-feedback" role="status">
-          {props.t(props.item.application === "failed" ? "boc.bergflow.savedPending" : "boc.bergflow.unknown")}
+          {props.t(
+            props.item.application === "failed"
+              ? "boc.bergflow.savedPending"
+              : props.item.application === "pending"
+                ? "boc.bergflow.applying"
+                : "boc.bergflow.unknown",
+          )}
         </p>
       </Show>
       <Show when={globallyDisabled()}>

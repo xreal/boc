@@ -655,6 +655,80 @@ live.live("controls apply native configuration through real config plugins and f
                 Effect.orDie,
               ),
             )
+
+            const disabledBuilder = yield* client.setEnabled({
+              kind: "agent",
+              id: "builder",
+              enabled: false,
+              expectedRevision: 8,
+            })
+            expect(disabledBuilder.items.find((item) => item.kind === "agent" && item.id === "builder")?.override).toBe(
+              false,
+            )
+            expect(disabledBuilder.items.find((item) => item.kind === "agent" && item.id === "writer")).toMatchObject({
+              effective: "enabled",
+              application: "applied",
+            })
+            yield* waitUntil(
+              "builder removal",
+              agents.get(Agent.ID.make("builder")).pipe(Effect.map((agent) => !agent)),
+            )
+            const repeatedDisable = yield* client.setEnabled({
+              kind: "agent",
+              id: "builder",
+              enabled: false,
+              expectedRevision: 9,
+            })
+            expect(repeatedDisable.items.find((item) => item.kind === "agent" && item.id === "builder")).toMatchObject({
+              override: false,
+              effective: "disabled",
+              application: "applied",
+            })
+            const cleared = yield* client.clearOverride({ kind: "agent", id: "builder", expectedRevision: 10 })
+            yield* waitUntil("builder reset", agents.get(Agent.ID.make("builder")).pipe(Effect.map((agent) => !!agent)))
+            const repeatedClear = yield* client.clearOverride({
+              kind: "agent",
+              id: "builder",
+              expectedRevision: cleared.revision,
+            })
+            expect(repeatedClear.items.find((item) => item.kind === "agent" && item.id === "builder")).toMatchObject({
+              override: null,
+              effective: "enabled",
+              application: "applied",
+            })
+            const disabledMcp = yield* client.setEnabled({
+              kind: "mcp",
+              id: "remote",
+              enabled: false,
+              expectedRevision: repeatedClear.revision,
+            })
+            yield* waitUntil(
+              "MCP disconnected",
+              client.getState({}).pipe(
+                Effect.map((state) =>
+                  state.items.some(
+                    (item) =>
+                      item.kind === "mcp" &&
+                      item.id === "remote" &&
+                      item.availability === "disabled" &&
+                      item.application === "applied",
+                  ),
+                ),
+                Effect.orDie,
+              ),
+            )
+            const repeatedMcp = yield* client.setEnabled({
+              kind: "mcp",
+              id: "remote",
+              enabled: false,
+              expectedRevision: disabledMcp.revision,
+            })
+            expect(repeatedMcp.items.find((item) => item.kind === "mcp" && item.id === "remote")).toMatchObject({
+              override: false,
+              effective: "disabled",
+              application: "applied",
+              availability: "disabled",
+            })
           }).pipe(Effect.provide(liveControlsLayer(project, global))),
         ),
       )
@@ -662,7 +736,152 @@ live.live("controls apply native configuration through real config plugins and f
   ),
 )
 
-function liveControlsLayer(project: string, global: string) {
+live.live("native toggles reload configuration even without filesystem watches", () =>
+  Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+    Effect.flatMap((tmp) => {
+      const project = path.join(tmp.path, "project")
+      const global = path.join(tmp.path, "global")
+      return Effect.promise(async () => {
+        await fs.mkdir(project, { recursive: true })
+        await fs.mkdir(global, { recursive: true })
+        await Bun.write(
+          path.join(project, "opencode.jsonc"),
+          JSON.stringify({
+            agents: { writer: { system: "Write clearly" } },
+            mcp: {
+              servers: { remote: { type: "remote", url: "http://127.0.0.1:1/mcp", oauth: false, disabled: true } },
+            },
+          }),
+        )
+      }).pipe(
+        Effect.andThen(
+          Effect.gen(function* () {
+            const plugins = yield* Plugin.Service
+            const rpc = yield* Rpc.Service
+            const agents = yield* Agent.Service
+            const services = yield* Effect.context<
+              | Config.Service
+              | FSUtil.Service
+              | Global.Service
+              | BocControlPolicy.Service
+              | BocSelection.Service
+              | InstructionDiscovery.Service
+              | Tool.Service
+              | Location.Service
+              | Mcp.Service
+            >()
+            yield* plugins.activate([
+              {
+                ...ConfigAgentPlugin.Plugin,
+                revision: "1",
+                source: { type: "builtin" },
+                effect: (ctx) => ConfigAgentPlugin.Plugin.effect(ctx).pipe(Effect.provide(services)),
+              },
+              {
+                ...ConfigMcpPlugin.Plugin,
+                revision: "1",
+                source: { type: "builtin" },
+                effect: (ctx) => ConfigMcpPlugin.Plugin.effect(ctx).pipe(Effect.provide(services)),
+              },
+              {
+                ...BocProjectControls.Definition,
+                revision: "1",
+                source: { type: "builtin" },
+                effect: (ctx) =>
+                  BocProjectControls.Definition.effect({ ...ctx, app: { ...ctx.app, channel: "boc" } }).pipe(
+                    Effect.provide(services),
+                  ),
+              },
+            ])
+            const client = rpc.client(BocControls.Rpc)
+            expect(yield* agents.get(Agent.ID.make("writer"))).toBeDefined()
+            const disabled = yield* client.setEnabled({
+              kind: "agent",
+              id: "writer",
+              enabled: false,
+              expectedRevision: 0,
+            })
+            expect(disabled.items.find((item) => item.kind === "agent" && item.id === "writer")?.override).toBe(false)
+            yield* waitUntil(
+              "disable without watcher",
+              agents.get(Agent.ID.make("writer")).pipe(Effect.map((agent) => !agent)),
+            )
+            const enabled = yield* client.setEnabled({
+              kind: "agent",
+              id: "writer",
+              enabled: true,
+              expectedRevision: disabled.revision,
+            })
+            yield* waitUntil(
+              "enable without watcher",
+              agents.get(Agent.ID.make("writer")).pipe(Effect.map((agent) => !!agent)),
+            )
+            const state = yield* client.getState({})
+            expect(state.items.find((item) => item.kind === "agent" && item.id === "writer")).toMatchObject({
+              override: true,
+              effective: "enabled",
+              application: "applied",
+            })
+            const cleared = yield* client.clearOverride({
+              kind: "agent",
+              id: "writer",
+              expectedRevision: enabled.revision,
+            })
+            expect(cleared.items.find((item) => item.kind === "agent" && item.id === "writer")).toMatchObject({
+              override: null,
+              effective: "enabled",
+              application: "applied",
+            })
+            const enabledMcp = yield* client.setEnabled({
+              kind: "mcp",
+              id: "remote",
+              enabled: true,
+              expectedRevision: cleared.revision,
+            })
+            yield* waitUntil(
+              "MCP enable without watcher",
+              client.getState({}).pipe(
+                Effect.map((state) =>
+                  state.items.some(
+                    (item) =>
+                      item.kind === "mcp" &&
+                      item.id === "remote" &&
+                      item.effective === "enabled" &&
+                      item.application === "applied",
+                  ),
+                ),
+                Effect.orDie,
+              ),
+            )
+            yield* client.setEnabled({
+              kind: "mcp",
+              id: "remote",
+              enabled: false,
+              expectedRevision: enabledMcp.revision,
+            })
+            yield* waitUntil(
+              "MCP disable without watcher",
+              client.getState({}).pipe(
+                Effect.map((state) =>
+                  state.items.some(
+                    (item) =>
+                      item.kind === "mcp" &&
+                      item.id === "remote" &&
+                      item.effective === "disabled" &&
+                      item.application === "applied",
+                  ),
+                ),
+                Effect.orDie,
+              ),
+            )
+          }).pipe(Effect.provide(liveControlsLayer(project, global, false))),
+        ),
+      )
+    }),
+  ),
+)
+
+function liveControlsLayer(project: string, global: string, watches = true) {
   return AppNodeBuilder.build(
     LayerNode.group([
       Plugin.node,
@@ -684,6 +903,9 @@ function liveControlsLayer(project: string, global: string) {
     ]),
     [
       Config.node.replace(Config.configured()),
+      ...(watches
+        ? []
+        : [Watcher.node.replace(Watcher.layer({ enabled: false }).pipe(Layer.provide(Watcher.nativeLayer)))]),
       Location.node.replace(
         Layer.succeed(Location.Service, Location.Service.of(location({ directory: AbsolutePath.make(project) }))),
       ),

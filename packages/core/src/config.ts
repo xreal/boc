@@ -37,6 +37,8 @@ export function latest<K extends keyof Info>(entries: readonly Entry[], key: K):
 export interface Interface {
   /** Returns location config documents and discovery sources from lowest to highest priority. */
   readonly entries: () => Effect.Effect<Entry[]>
+  /** Rescans configuration after an application-owned write without waiting for a filesystem event. */
+  readonly reload?: () => Effect.Effect<void>
   /**
    * Streams raw filesystem updates under config roots. Config owns root
    * topology and watch reconciliation; domain owners filter this feed for the
@@ -382,6 +384,12 @@ export const layer = (options?: Options) =>
         changes: () => Stream.fromPubSub(updates),
         preferences,
         updatePreferences,
+        reload: () =>
+          reload().pipe(
+            Effect.provideService(FSUtil.Service, fs),
+            Effect.provideService(Global.Service, globalService),
+            Effect.provideService(Location.Service, location),
+          ),
       })
     }),
   )

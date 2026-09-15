@@ -58,7 +58,6 @@ export const Definition = define({
       instruction: [],
     }
     const failed = new Set<BocControls.Kind>()
-    const pending = new Set<BocControls.Kind>()
     const disabled = (kind: BocControls.Kind, id: string) =>
       defaults.policy.settings[kind][id] === false || project.policy.settings[kind][id] === false
     const configurationPath = (scope: BocControls.ConfigurationScope) =>
@@ -128,6 +127,7 @@ export const Definition = define({
       if (current.revision !== input.expectedRevision) return { type: "conflict" as const, revision: current.revision }
       if (!validConfiguration(input.content)) return { type: "invalid" as const }
       yield* fs.writeWithDirs(current.path, input.content)
+      if (config.reload) yield* config.reload()
       return { type: "saved" as const, configuration: yield* configuration(input.scope) }
     })
     const source = Effect.fn("BocProjectControls.source")(function* (input: {
@@ -365,12 +365,23 @@ export const Definition = define({
         )
       configuredAgents.forEach(({ id, agent }) => {
         const capability = inventory.agent.find((item) => item.id === id)
-        if (capability) capability.definition = agent
+        if (!capability) return
+        capability.definition = agent
+        if (!markdownAgent(capability))
+          capability.nativeOverride = agent.disabled === undefined ? undefined : !agent.disabled
       })
       // Transforms capture inventory. Listing and snapshotting force those transforms to run.
       yield* ctx.skill.list({})
       yield* tools.snapshot()
       const mcp = yield* ctx.mcp.list({})
+      documents.forEach((document) => {
+        Object.entries(document.info.mcp?.servers ?? {}).forEach(([id, server]) => {
+          const capability = inventory.mcp.find((item) => item.id === id)
+          if (!capability?.mutable) return
+          capability.defaultEnabled = !server.disabled
+          capability.nativeOverride = server.disabled === undefined ? undefined : !server.disabled
+        })
+      })
       const instructions = yield* discovery.list()
       const plugins = yield* ctx.plugin.list({})
       inventory.agent.forEach((agent) => {
@@ -462,7 +473,14 @@ export const Definition = define({
             present: known.has(item.id),
             policy,
             failed,
-            pending,
+            active:
+              scope === "global"
+                ? undefined
+                : kind === "agent"
+                  ? agents.data.some((agent) => agent.id === item.id)
+                  : kind === "mcp"
+                    ? statuses.has(item.id) && statuses.get(item.id) !== "disabled"
+                    : undefined,
             incomplete,
             status: statuses.get(item.id),
             provenance,
@@ -596,22 +614,17 @@ export const Definition = define({
             change.action === "clear" && !targetContainsDefinition
               ? []
               : modify(document.content, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } })
-          // The real config watcher can publish before this RPC resumes after the
-          // write, so mark pending before saving rather than after it.
-          yield* Effect.sync(() => pending.add(change.kind))
           const saved = yield* saveConfiguration({
             scope,
             content: applyEdits(document.content, edits),
             expectedRevision: document.revision,
           }).pipe(Effect.orDie)
           if (saved.type === "conflict") {
-            pending.delete(change.kind)
             return yield* Effect.fail(
               call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
             )
           }
           if (saved.type === "invalid") {
-            pending.delete(change.kind)
             return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
           }
           const overrides = { ...policy.policy.settings[change.kind] }
@@ -713,16 +726,7 @@ export const Definition = define({
         ),
       ),
       Stream.debounce("100 millis"),
-      Stream.runForEach((event) =>
-        Effect.sync(() => {
-          if (event.type === "config.updated") {
-            pending.delete("agent")
-            pending.delete("mcp")
-          }
-          if (event.type === "agent.updated") pending.delete("agent")
-          if (["mcp.status.changed", "mcp.tools.changed"].includes(event.type)) pending.delete("mcp")
-        }).pipe(Effect.andThen(member.changed())),
-      ),
+      Stream.runForEach(() => member.changed()),
       Effect.forkScoped({ startImmediately: true }),
     )
   }, Effect.orDie),
@@ -734,7 +738,7 @@ function describe(input: {
   present: boolean
   policy: BocControls.Policy
   failed: Set<BocControls.Kind>
-  pending: Set<BocControls.Kind>
+  active: boolean | undefined
   incomplete: readonly BocControls.Kind[]
   status: string | undefined
   provenance: { source: string; origin: typeof BocControls.Origin.Type }
@@ -753,11 +757,14 @@ function describe(input: {
         ? (policyOverride ?? input.item.nativeOverride ?? null)
         : (policyOverride ?? null)
   const enabled = input.globallyDisabled ? false : (override ?? input.item.defaultEnabled)
+  // Confirm the requested setting against the live registry, including no-op saves.
+  // Events only trigger refreshes; they are not acknowledgements of a particular write.
+  const pending = input.active !== undefined && input.active !== enabled
   const unconfirmed =
     !input.present ||
     (override !== null && !input.item.mutable) ||
     input.failed.has(input.kind) ||
-    input.pending.has(input.kind) ||
+    pending ||
     input.incomplete.includes(input.kind)
   return {
     kind: input.kind,
@@ -773,7 +780,7 @@ function describe(input: {
     mutable: input.present && input.item.mutable && !input.globallyDisabled,
     present: input.present,
     effective: input.globallyDisabled ? "disabled" : unconfirmed ? "unknown" : enabled ? "enabled" : "disabled",
-    application: input.failed.has(input.kind) ? "failed" : input.pending.has(input.kind) ? "pending" : "applied",
+    application: input.failed.has(input.kind) ? "failed" : pending ? "pending" : "applied",
     availability: availability(input.kind, input.present, enabled, input.status),
     ...(input.globallyDisabled
       ? { reason: "disabled_globally" as const }

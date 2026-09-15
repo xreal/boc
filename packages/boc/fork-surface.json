@@ -34,6 +34,10 @@
       "reason": "Register native Project Controls after configuration producers and compose its shared policy and Location-scoped instruction selection services"
     },
     {
+      "path": "packages/core/src/config.ts",
+      "reason": "Expose an additive configuration rescan hook so Boc Project Controls can apply saved settings without relying on filesystem notifications"
+    },
+    {
       "path": "packages/core/src/config/plugin/agent.ts",
       "reason": "Attach the exact source document to agent metadata for native Boc controls"
     },
