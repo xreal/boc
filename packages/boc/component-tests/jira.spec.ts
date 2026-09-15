@@ -1,5 +1,21 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("board cards offer new chat and ticket work from a context menu", async ({ mount, page }) => {
+  await mount("boc-jira--card-menu")
+  const card = page.locator('[data-boc-issue-card="SHOP-617"]')
+
+  await card.click({ button: "right" })
+  await expect(page.getByRole("menuitem", { name: "New chat", exact: true })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "Work on this ticket", exact: true })).toBeVisible()
+  await page.getByRole("menuitem", { name: "New chat", exact: true }).click()
+  await expect(page.getByLabel("Started card action")).toHaveText("new")
+
+  await card.focus()
+  await page.keyboard.press("Shift+F10")
+  await page.getByRole("menuitem", { name: "Work on this ticket", exact: true }).click()
+  await expect(page.getByLabel("Started card action")).toHaveText("work")
+})
+
 story(
   "compact header keeps identity and copying while properties show priority and story points",
   async ({ mount, page }) => {

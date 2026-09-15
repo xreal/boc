@@ -14,8 +14,7 @@ import { JiraSessionInstructionFields } from "./session-instructions"
 import {
   defaultJiraSessionInstructions,
   jiraSessionDifficulties,
-  jiraSessionModel,
-  jiraSessionPrompt,
+  jiraTicketSession,
   type JiraSessionDifficulty,
 } from "../domain/sessions"
 
@@ -61,13 +60,7 @@ export function JiraIssueSessions(props: {
     if (disabled() || !host.sessions || !project) return
     setForm({ busy: true, error: "" })
     await host.sessions
-      .start({
-        issueUrl: props.issue.url,
-        title: `${props.issue.key}: ${props.issue.summary}`,
-        prompt: jiraSessionPrompt(props.issue, form.before, form.after),
-        model: jiraSessionModel(form.models[form.difficulty].model),
-        target: project,
-      })
+      .start(jiraTicketSession(props.issue, form, form.difficulty, project))
       .then(() => props.onNavigate?.())
       .catch((error: unknown) => {
         setForm("error", error instanceof Error ? error.message : props.t("boc.jira.sessions.startFailed"))

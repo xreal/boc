@@ -19,6 +19,7 @@ import {
   type JiraPreferences,
 } from "../domain/board"
 import type { JiraIssueDetail } from "../domain/issue"
+import { jiraBlankSession, jiraTicketSession } from "../domain/sessions"
 import type { JiraConnectionFailure, JiraConnectionStatus } from "../rpcs"
 import { deploymentTicketKey, type DeploymentSystem } from "../../deployments/domain/systems"
 import { DeploymentDialog } from "../../deployments/renderer/deploy-dialog"
@@ -63,6 +64,7 @@ export default function JiraScreen(props: BocScreenProps) {
     selectedIssueKey: undefined as string | undefined,
     issue: undefined as JiraIssueDetail | undefined,
     issueFailure: undefined as JiraConnectionFailure | undefined,
+    sessionFailure: false,
     sessionCounts: {} as Record<string, number>,
     loading: false as false | "workspace" | "board" | "issues" | "issue",
     failure: undefined as JiraConnectionFailure | undefined,
@@ -124,14 +126,19 @@ export default function JiraScreen(props: BocScreenProps) {
     prefix: "issue",
     cancel: (requestId) => void desktop.jira.cancelIssueRead({ requestId }).catch(() => undefined),
   })
+  const sessionRequests = createLatestRequest({
+    prefix: "board-session",
+    cancel: (requestId) => void desktop.jira.cancelIssueRead({ requestId }).catch(() => undefined),
+  })
   const beginBoardRequest = () => {
     issueRequests.invalidate()
+    sessionRequests.invalidate()
     return boardRequests.begin()
   }
 
   const bootstrap = async () => {
     const request = beginBoardRequest()
-    setView({ loading: "workspace", failure: undefined, issueFailure: undefined })
+    setView({ loading: "workspace", failure: undefined, issueFailure: undefined, sessionFailure: false })
     const connection = await desktop.jira.getConnectionStatus()
     if (!boardRequests.isCurrent(request)) return
     setView("connection", connection)
@@ -179,10 +186,52 @@ export default function JiraScreen(props: BocScreenProps) {
   const refreshSessionCounts = async () => {
     const counts = await desktop.jira.listSessionCounts().catch(() => undefined)
     if (!counts) return
-    setView(
-      "sessionCounts",
-      Object.fromEntries(counts.map((item) => [item.issueUrl, item.count])),
-    )
+    setView("sessionCounts", Object.fromEntries(counts.map((item) => [item.issueUrl, item.count])))
+  }
+
+  const sessionTarget = () => view.preferences.projectTargets?.find((item) => item.boardId === view.selectedBoardId)
+
+  const startNewChat = async (issue: JiraBoardIssue) => {
+    const target = sessionTarget()
+    if (!props.host.sessions) {
+      setView("sessionFailure", true)
+      return
+    }
+    if (!target) {
+      openSettings("boards")
+      return
+    }
+    setView("sessionFailure", false)
+    await props.host.sessions.start(jiraBlankSession(issue, target)).catch(() => setView("sessionFailure", true))
+  }
+
+  const startWork = async (issue: JiraBoardIssue) => {
+    const target = sessionTarget()
+    if (!props.host.sessions) {
+      setView("sessionFailure", true)
+      return
+    }
+    if (!target) {
+      openSettings("boards")
+      return
+    }
+    setView("sessionFailure", false)
+    const request = sessionRequests.begin()
+    const [result, instructions] = await Promise.all([
+      desktop.jira
+        .getIssue({ requestId: request.requestId, issueKey: issue.key })
+        .catch(() => ({ ok: false as const, category: "network" as const })),
+      desktop.jira.getSessionInstructions().catch(() => undefined),
+    ])
+    if (!sessionRequests.isCurrent(request)) return
+    sessionRequests.finish(request)
+    if (!result.ok || !instructions) {
+      setView("sessionFailure", true)
+      return
+    }
+    await props.host.sessions
+      .start(jiraTicketSession(result.issue, instructions, "default", target))
+      .catch(() => setView("sessionFailure", true))
   }
 
   const loadBoard = async (boardId: number, options: BoardLoadOptions = {}) => {
@@ -192,6 +241,7 @@ export default function JiraScreen(props: BocScreenProps) {
       selectedBoardId: boardId,
       loading: "board",
       failure: undefined,
+      sessionFailure: false,
       ...(options.resetView === false
         ? {}
         : {
@@ -302,13 +352,14 @@ export default function JiraScreen(props: BocScreenProps) {
     )
   }
 
-  const openSettings = () => {
+  const openSettings = (initialTab: "connection" | "boards" | "prompts" | "models" = "connection") => {
     void dialog.show(() => (
       <JiraSettingsDialog
         api={desktop.jira}
         locale={props.host.locale}
         openExternal={(url) => props.host.openExternal(url)}
         projects={props.host.sessions?.projects() ?? []}
+        initialTab={initialTab}
         onChanged={() => void bootstrap()}
         onNeedsDefaultBoard={() => openPickBoard("default")}
       />
@@ -391,6 +442,7 @@ export default function JiraScreen(props: BocScreenProps) {
     onCleanup(() => {
       boardRequests.invalidate()
       issueRequests.invalidate()
+      sessionRequests.invalidate()
       clearInterval(deploymentTimer)
       window.removeEventListener("online", syncOnline)
       window.removeEventListener("offline", syncOnline)
@@ -417,7 +469,7 @@ export default function JiraScreen(props: BocScreenProps) {
         }}
         onAddBoard={() => openPickBoard("add")}
         onSelectBoard={(boardId) => void loadBoard(boardId)}
-        onOpenSettings={openSettings}
+        onOpenSettings={() => openSettings()}
       />
 
       <Show when={view.connection?.status === "connected" && view.selectedBoardId !== undefined}>
@@ -445,6 +497,11 @@ export default function JiraScreen(props: BocScreenProps) {
       </Show>
 
       <Show when={surface() === "board"}>
+        <Show when={view.sessionFailure}>
+          <p role="alert" class="mx-3 mb-2 text-[12px] leading-[var(--line-height-compact)] text-v2-state-fg-danger">
+            {t("boc.jira.sessions.startFailed")}
+          </p>
+        </Show>
         <div class="relative flex min-h-0 flex-1 gap-2 px-3 pb-3">
           <JiraBoardColumns
             t={t}
@@ -453,6 +510,9 @@ export default function JiraScreen(props: BocScreenProps) {
             selectedIssueKey={view.selectedIssueKey}
             sessionCounts={view.sessionCounts}
             deployedHosts={deployedHostsForIssue}
+            sessionActionsDisabled={!props.host.sessions}
+            onNewChat={startNewChat}
+            onStartWork={startWork}
             onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
             onOpenExternal={(url) => props.host.openExternal(url)}
           />

@@ -20,11 +20,11 @@ export type BocHost = {
   sessions?: {
     projects(): { server: string; directory: string; label: string }[]
     start(input: {
-      prompt: string
       title: string
       issueUrl: string
-      model: { providerID: string; modelID: string; variant?: string }
       target: { server: string; directory: string }
+      prompt?: string
+      model?: { providerID: string; modelID: string; variant?: string }
     }): Promise<void>
     open(server: string, sessionID: string): Promise<void>
   }

@@ -112,6 +112,32 @@ export function jiraSessionPrompt(
     .join("\n\n")
 }
 
+export function jiraTicketSession(
+  issue: { key: string; summary: string; url: string; description?: string },
+  instructions: JiraSessionInstructions,
+  difficulty: JiraSessionDifficulty,
+  target: { server: string; directory: string },
+) {
+  return {
+    issueUrl: issue.url,
+    title: `${issue.key}: ${issue.summary}`,
+    prompt: jiraSessionPrompt(issue, instructions.before, instructions.after),
+    model: jiraSessionModel(instructions.models[difficulty].model),
+    target,
+  }
+}
+
+export function jiraBlankSession(
+  issue: { key: string; summary: string; url: string },
+  target: { server: string; directory: string },
+) {
+  return {
+    issueUrl: issue.url,
+    title: `${issue.key}: ${issue.summary}`,
+    target,
+  }
+}
+
 export function jiraPullRequestReviewPrompt(
   issue: { key: string; summary: string; url: string; description?: string },
   pullRequest: { number: number; title: string; url: string; headRefName: string },

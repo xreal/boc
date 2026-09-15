@@ -1,11 +1,52 @@
 import { expect, test } from "bun:test"
 import {
   defaultJiraSessionInstructions,
+  jiraBlankSession,
   jiraSessionModel,
   jiraSessionPrompt,
+  jiraTicketSession,
   jiraPullRequestReviewPrompt,
   normalizeJiraSessionInstructions,
 } from "./sessions"
+
+test("prepares a blank default chat without a prompt or model", () => {
+  expect(
+    jiraBlankSession(
+      {
+        key: "APP-42",
+        summary: "Fix checkout",
+        url: "https://example.atlassian.net/browse/APP-42",
+      },
+      { server: "local", directory: "/workspace" },
+    ),
+  ).toEqual({
+    issueUrl: "https://example.atlassian.net/browse/APP-42",
+    title: "APP-42: Fix checkout",
+    target: { server: "local", directory: "/workspace" },
+  })
+})
+
+test("prepares the complete ticket session input", () => {
+  expect(
+    jiraTicketSession(
+      {
+        key: "APP-42",
+        summary: "Fix checkout",
+        url: "https://example.atlassian.net/browse/APP-42",
+        description: "Keep saved carts intact.",
+      },
+      defaultJiraSessionInstructions,
+      "default",
+      { server: "local", directory: "/workspace" },
+    ),
+  ).toEqual({
+    issueUrl: "https://example.atlassian.net/browse/APP-42",
+    title: "APP-42: Fix checkout",
+    prompt: `${defaultJiraSessionInstructions.before}\n\nAPP-42: Fix checkout\n\nhttps://example.atlassian.net/browse/APP-42\n\nKeep saved carts intact.\n\n${defaultJiraSessionInstructions.after}`,
+    model: { providerID: "github-copilot", modelID: "gemini-3.8-flash" },
+    target: { server: "local", directory: "/workspace" },
+  })
+})
 
 test("prepares the ticket with Markdown intact between optional instructions", () => {
   expect(

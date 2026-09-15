@@ -20,6 +20,7 @@ export function JiraSettingsDialog(props: {
   locale: () => string
   openExternal: (url: string) => void
   projects: { server: string; directory: string; label: string }[]
+  initialTab?: "connection" | "boards" | "prompts" | "models"
   onChanged?: () => void
   onNeedsDefaultBoard?: () => void
 }) {
@@ -28,7 +29,7 @@ export function JiraSettingsDialog(props: {
   const [connection, { refetch }] = createResource(() => props.api.getConnectionStatus())
   const [preferences, { refetch: refetchPreferences }] = createResource(() => props.api.getPreferences())
   const [form, setForm] = createStore({
-    tab: "connection",
+    tab: props.initialTab ?? "connection",
     site: "",
     email: "",
     hydrated: false,
@@ -130,7 +131,15 @@ export function JiraSettingsDialog(props: {
         />
       </DialogHeader>
       <DialogBody class="min-h-0 px-4 pb-4">
-        <Tabs variant="line" value={form.tab} onChange={(tab) => setForm("tab", tab)} class="min-h-0">
+        <Tabs
+          variant="line"
+          value={form.tab}
+          onChange={(tab) => {
+            if (tab !== "connection" && tab !== "boards" && tab !== "prompts" && tab !== "models") return
+            setForm("tab", tab)
+          }}
+          class="min-h-0"
+        >
           <Tabs.List aria-label={t("boc.jira.connection.settings")} class="shrink-0">
             <Tabs.Trigger value="connection">{t("boc.jira.settings.tab.connection")}</Tabs.Trigger>
             <Tabs.Trigger value="boards">{t("boc.jira.settings.tab.boards")}</Tabs.Trigger>

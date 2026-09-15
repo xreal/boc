@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { JiraColumnGroup } from "../domain/board"
-import { jiraBoardFocusTarget } from "./columns"
+import { jiraBoardFocusTarget } from "./focus"
 
 const groups: JiraColumnGroup[] = [
   {
