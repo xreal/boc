@@ -123,6 +123,18 @@ describe("jiraBoardSurface", () => {
         filtered: [{ id: "1", key: "PLAT-1", summary: "A", labels: [], url: "https://acme.atlassian.net/browse/PLAT-1" }],
       }),
     ).toBe("board")
+    expect(
+      jiraBoardSurface({
+        online: true,
+        loading: false,
+        connection: connected,
+        boards: [{ id: 84 }],
+        board: { ...board, sprints: [] },
+        issues: [],
+        filtered: [],
+        searching: true,
+      }),
+    ).toBe("board")
   })
 })
 

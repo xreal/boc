@@ -1,7 +1,7 @@
 import { Button } from "@opencode/ui/button"
 import { useDialog } from "@opencode/ui/context/dialog"
 import { Loader } from "@opencode/ui/loader"
-import { onCleanup, onMount, Show } from "solid-js"
+import { createEffect, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocScreenProps } from "../../../registry"
 import { useBocDesktop } from "../../../renderer/desktop"
@@ -25,6 +25,7 @@ import { deploymentTicketKey, type DeploymentSystem } from "../../deployments/do
 import { DeploymentDialog } from "../../deployments/renderer/deploy-dialog"
 import { JiraBoardColumns } from "./columns"
 import { JiraIssueDialog } from "./inspector"
+import { JiraIssueList } from "./issue-list"
 import { createJiraBoardLanes } from "./lanes"
 import { createLatestRequest, type LatestRequest } from "./latest-request"
 import { JiraPickBoardDialog } from "./pick-board"
@@ -58,6 +59,9 @@ export default function JiraScreen(props: BocScreenProps) {
     deploymentSystems: [] as readonly DeploymentSystem[],
     lane: "stories" as JiraBoardLane,
     search: "",
+    searchIssues: [] as readonly JiraBoardIssue[],
+    searchLoading: false,
+    searchFailure: undefined as JiraConnectionFailure | undefined,
     assignee: undefined as string | undefined,
     issueType: undefined as string | undefined,
     priority: undefined as string | undefined,
@@ -91,6 +95,9 @@ export default function JiraScreen(props: BocScreenProps) {
       view.lane,
     )
   const hasIssueFilters = () => Boolean(view.search || view.assignee || view.issueType || view.priority)
+  const searching = () => view.search.trim().length > 0
+  const searchingJira = () => searching() && filtered().length === 0
+  const searchResults = () => (filtered().length > 0 ? filtered() : view.searchIssues)
   const groups = () => groupIssuesByColumn(view.board?.columns ?? [], filtered())
   const selectedBoard = () =>
     view.boards.find((board) => board.id === view.selectedBoardId) ??
@@ -108,6 +115,7 @@ export default function JiraScreen(props: BocScreenProps) {
       issues: view.issues,
       filtered: filtered(),
       hasIssueFilters: hasIssueFilters(),
+      searching: searching(),
     })
 
   const lanes = createJiraBoardLanes({
@@ -130,11 +138,43 @@ export default function JiraScreen(props: BocScreenProps) {
     prefix: "board-session",
     cancel: (requestId) => void desktop.jira.cancelIssueRead({ requestId }).catch(() => undefined),
   })
+  const searchRequests = createLatestRequest({
+    prefix: "issue-search",
+    cancel: (requestId) =>
+      void desktop.jira.cancelIssueResourceRead({ resource: "search", requestId }).catch(() => undefined),
+  })
   const beginBoardRequest = () => {
     issueRequests.invalidate()
     sessionRequests.invalidate()
     return boardRequests.begin()
   }
+
+  createEffect(() => {
+    const query = view.search.trim()
+    const hasBoardMatches = filtered().length > 0
+    const online = view.online
+    searchRequests.invalidate()
+    setView({ searchIssues: [], searchLoading: false, searchFailure: undefined })
+    if (!query || hasBoardMatches || !online) return
+
+    setView("searchLoading", true)
+    const timer = setTimeout(() => {
+      const request = searchRequests.begin()
+      void desktop.jira
+        .searchIssues({ requestId: request.requestId, query })
+        .catch(() => ({ ok: false as const, category: "network" as const }))
+        .then((result) => {
+          if (!searchRequests.isCurrent(request)) return
+          searchRequests.finish(request)
+          if (!result.ok) {
+            setView({ searchLoading: false, searchFailure: result })
+            return
+          }
+          setView({ searchIssues: result.issues, searchLoading: false, searchFailure: undefined })
+        })
+    }, 300)
+    onCleanup(() => clearTimeout(timer))
+  })
 
   const bootstrap = async () => {
     const request = beginBoardRequest()
@@ -443,6 +483,7 @@ export default function JiraScreen(props: BocScreenProps) {
       boardRequests.invalidate()
       issueRequests.invalidate()
       sessionRequests.invalidate()
+      searchRequests.invalidate()
       clearInterval(deploymentTimer)
       window.removeEventListener("online", syncOnline)
       window.removeEventListener("offline", syncOnline)
@@ -478,13 +519,14 @@ export default function JiraScreen(props: BocScreenProps) {
           board={view.board}
           sprintId={view.sprintId}
           issues={view.issues}
-          filtered={filtered()}
+          filtered={searching() ? searchResults() : filtered()}
           lanes={lanes()}
           lane={view.lane}
           search={view.search}
           assignee={view.assignee}
           issueType={view.issueType}
           priority={view.priority}
+          searchingJira={searchingJira()}
           onSelectLane={(lane) => setView("lane", lane)}
           onSelectSprint={(sprintId) => {
             if (view.selectedBoardId === undefined) return
@@ -503,19 +545,54 @@ export default function JiraScreen(props: BocScreenProps) {
           </p>
         </Show>
         <div class="relative flex min-h-0 flex-1 gap-2 px-3 pb-3">
-          <JiraBoardColumns
-            t={t}
-            locale={props.host.locale()}
-            groups={groups()}
-            selectedIssueKey={view.selectedIssueKey}
-            sessionCounts={view.sessionCounts}
-            deployedHosts={deployedHostsForIssue}
-            sessionActionsDisabled={!props.host.sessions}
-            onNewChat={startNewChat}
-            onStartWork={startWork}
-            onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
-            onOpenExternal={(url) => props.host.openExternal(url)}
-          />
+          <Show
+            when={searching()}
+            fallback={
+              <JiraBoardColumns
+                t={t}
+                locale={props.host.locale()}
+                groups={groups()}
+                selectedIssueKey={view.selectedIssueKey}
+                sessionCounts={view.sessionCounts}
+                deployedHosts={deployedHostsForIssue}
+                sessionActionsDisabled={!props.host.sessions}
+                onNewChat={startNewChat}
+                onStartWork={startWork}
+                onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
+                onOpenExternal={(url) => props.host.openExternal(url)}
+              />
+            }
+          >
+            <div class="min-h-0 flex-1 overflow-auto">
+              <Show when={searchResults().length > 0}>
+                <JiraIssueList
+                  t={t}
+                  issues={searchResults()}
+                  selectedIssueKey={view.selectedIssueKey}
+                  onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}
+                  onOpenExternal={(url) => props.host.openExternal(url)}
+                />
+              </Show>
+              <Show when={searchingJira() && searchResults().length === 0}>
+                <p
+                  role={view.searchFailure ? "alert" : "status"}
+                  class="flex min-h-full items-center justify-center gap-2 px-6 pb-12 text-center text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted"
+                  classList={{ "text-v2-state-fg-danger": view.searchFailure !== undefined }}
+                >
+                  <Show when={view.searchLoading}>
+                    <Loader />
+                  </Show>
+                  {!view.online
+                    ? t("boc.jira.board.offline")
+                    : view.searchLoading
+                      ? t("boc.jira.board.search.loading")
+                      : view.searchFailure
+                        ? t("boc.jira.board.search.failed")
+                        : t("boc.jira.board.search.empty")}
+                </p>
+              </Show>
+            </div>
+          </Show>
           <Show when={view.selectedIssueKey}>
             {(key) => (
               <JiraIssueDialog

@@ -99,6 +99,7 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     if (
       tag === "BocJiraGetBoard" ||
       tag === "BocJiraListIssues" ||
+      tag === "BocJiraSearchIssues" ||
       tag === "BocJiraGetIssue" ||
       tag === "BocJiraListIssueStatuses"
     ) {
@@ -158,6 +159,10 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     ok: false,
     category: "auth",
   })
+  await expect(api.jira.searchIssues({ requestId: "search", query: "PLAT-1" })).resolves.toEqual({
+    ok: false,
+    category: "auth",
+  })
   await expect(api.jira.getIssue({ requestId: "issue", issueKey: "PLAT-1" })).resolves.toEqual({
     ok: false,
     category: "auth",
@@ -178,6 +183,7 @@ test("maps the renderer API to the typed Jira RPCs", async () => {
     "BocJiraListBoards",
     "BocJiraGetBoard",
     "BocJiraListIssues",
+    "BocJiraSearchIssues",
     "BocJiraGetIssue",
     "BocJiraListIssueStatuses",
     "BocJiraCancelBoardRead",

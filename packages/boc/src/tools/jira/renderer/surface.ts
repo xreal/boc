@@ -27,6 +27,7 @@ export function jiraBoardSurface(input: {
   issues: readonly JiraBoardIssue[]
   filtered: readonly JiraBoardIssue[]
   hasIssueFilters?: boolean
+  searching?: boolean
 }): JiraBoardSurface {
   if (!input.online && !input.board) return "offline"
   if (!input.connection || input.loading) return "loading"
@@ -35,8 +36,9 @@ export function jiraBoardSurface(input: {
   if (input.failure?.category === "rate-limit") return "rate-limit"
   if (input.failure) return "error"
   if (input.boards.length === 0) return "no-boards"
-  if (input.board?.type === "scrum" && input.board.sprints.length === 0) return "no-sprints"
   if (!input.board) return "needs-default"
+  if (input.searching) return "board"
+  if (input.board.type === "scrum" && input.board.sprints.length === 0) return "no-sprints"
   if (input.issues.length === 0) return "empty"
   if (input.filtered.length === 0 && input.hasIssueFilters) return "no-matches"
   return "board"

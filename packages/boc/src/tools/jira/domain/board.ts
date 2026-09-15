@@ -237,6 +237,18 @@ export function boardIssuesJql(input: { filterId: string; sprintId?: number; sub
   return parts.join(" AND ")
 }
 
+export function jiraIssueSearchJql(value: string) {
+  const query = value.trim()
+  if (!query) return
+  const summary = query.replace(/[^\p{L}\p{N}_]+/gu, " ").trim()
+  if (isJiraIssueKey(query)) {
+    const key = query.toUpperCase()
+    return summary ? `key = ${key} OR summary ~ "${summary}" ORDER BY updated DESC` : `key = ${key}`
+  }
+  if (!summary) return
+  return `summary ~ "${summary}" ORDER BY updated DESC`
+}
+
 export function groupIssuesByColumn(columns: readonly JiraBoardColumn[], issues: readonly JiraBoardIssue[]): JiraColumnGroup[] {
   const statusToColumn = new Map(columns.flatMap((column) => column.statusIds.map((statusId) => [statusId, column.id])))
   const issuesByColumn = new Map(columns.map((column) => [column.id, [] as JiraBoardIssue[]]))

@@ -147,6 +147,7 @@ describe("Jira RPC success schemas", () => {
       "BocJiraListBoards",
       "BocJiraGetBoard",
       "BocJiraListIssues",
+      "BocJiraSearchIssues",
       "BocJiraGetIssue",
       "BocJiraListIssueStatuses",
       "BocJiraCancelBoardRead",

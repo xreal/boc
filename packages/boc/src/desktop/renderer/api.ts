@@ -80,6 +80,7 @@ export function createBocDesktopAPI(invoke: BocDesktopInvoke) {
       listBoards: (input: BocDesktopInvokeArgs<"BocJiraListBoards">[0]) => invoke("BocJiraListBoards", input),
       getBoard: (input: BocDesktopInvokeArgs<"BocJiraGetBoard">[0]) => invoke("BocJiraGetBoard", input),
       listIssues: (input: BocDesktopInvokeArgs<"BocJiraListIssues">[0]) => invoke("BocJiraListIssues", input),
+      searchIssues: (input: BocDesktopInvokeArgs<"BocJiraSearchIssues">[0]) => invoke("BocJiraSearchIssues", input),
       getIssue: (input: BocDesktopInvokeArgs<"BocJiraGetIssue">[0]) => invoke("BocJiraGetIssue", input),
       listIssueStatuses: (input: BocDesktopInvokeArgs<"BocJiraListIssueStatuses">[0]) =>
         invoke("BocJiraListIssueStatuses", input),

@@ -125,6 +125,12 @@ export const JiraBoardIssuesInput = Schema.Struct({
 })
 export type JiraBoardIssuesInput = typeof JiraBoardIssuesInput.Type
 
+export const JiraIssueSearchInput = Schema.Struct({
+  requestId: JiraReadRequestId,
+  query: Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+})
+export type JiraIssueSearchInput = typeof JiraIssueSearchInput.Type
+
 export const JiraIssueKeyInput = Schema.Struct({
   requestId: JiraReadRequestId,
   issueKey: JiraIssueKey,
@@ -247,7 +253,15 @@ export const BocJiraListPullRequests = Rpc.make("BocJiraListPullRequests", {
 export const BocJiraCancelIssueResourceRead = Rpc.make("BocJiraCancelIssueResourceRead", {
   payload: {
     requestId: JiraReadRequestId,
-    resource: Schema.Literals(["comments", "assignees", "pull-requests", "issue-statuses", "attachment", "branches"]),
+    resource: Schema.Literals([
+      "comments",
+      "assignees",
+      "pull-requests",
+      "issue-statuses",
+      "attachment",
+      "branches",
+      "search",
+    ]),
   },
   success: Schema.Void,
 })
@@ -282,6 +296,11 @@ export const BocJiraGetBoard = Rpc.make("BocJiraGetBoard", {
 
 export const BocJiraListIssues = Rpc.make("BocJiraListIssues", {
   payload: JiraBoardIssuesInput,
+  success: JiraIssuesResult,
+})
+
+export const BocJiraSearchIssues = Rpc.make("BocJiraSearchIssues", {
+  payload: JiraIssueSearchInput,
   success: JiraIssuesResult,
 })
 
@@ -364,6 +383,7 @@ export const JiraRpcs = RpcGroup.make(
   BocJiraListBoards,
   BocJiraGetBoard,
   BocJiraListIssues,
+  BocJiraSearchIssues,
   BocJiraGetIssue,
   BocJiraListIssueStatuses,
   BocJiraCancelBoardRead,

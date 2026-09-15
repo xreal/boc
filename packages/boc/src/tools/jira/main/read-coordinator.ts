@@ -1,6 +1,7 @@
 export type JiraReadScope =
   | "board"
   | "issue"
+  | "search"
   | "issue-statuses"
   | "comments"
   | "assignees"

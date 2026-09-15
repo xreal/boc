@@ -127,6 +127,7 @@ export function JiraBoardToolbar(props: {
   assignee?: string
   issueType?: string
   priority?: string
+  searchingJira?: boolean
   onSelectLane: (lane: JiraBoardLane) => void
   onSelectSprint: (sprintId: number) => void
   onSearch: (value: string) => void
@@ -158,6 +159,7 @@ export function JiraBoardToolbar(props: {
         name="jira-board-search"
         autocomplete="off"
         spellcheck={false}
+        maxlength={255}
         placeholder={props.t("boc.jira.board.search.placeholder")}
         value={props.search}
         leadingIcon={<Icon name="magnifying-glass" />}
@@ -213,14 +215,16 @@ export function JiraBoardToolbar(props: {
         </Button>
       </Show>
 
-      <Show when={props.issues.length > 0}>
+      <Show when={props.issues.length > 0 || props.filtered.length > 0}>
         <span class="ml-auto text-[12px] leading-[var(--line-height-compact)] tabular-nums text-v2-text-text-faint">
-          {narrowed()
-            ? props.t("boc.jira.board.issueCount.filtered", {
-                count: props.filtered.length,
-                total: props.issues.length,
-              })
-            : props.t("boc.jira.board.issueCount", { count: props.filtered.length })}
+          {props.searchingJira
+            ? props.t("boc.jira.board.issueCount", { count: props.filtered.length })
+            : narrowed()
+              ? props.t("boc.jira.board.issueCount.filtered", {
+                  count: props.filtered.length,
+                  total: props.issues.length,
+                })
+              : props.t("boc.jira.board.issueCount", { count: props.filtered.length })}
         </span>
       </Show>
     </div>

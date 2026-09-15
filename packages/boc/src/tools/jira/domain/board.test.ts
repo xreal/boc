@@ -24,6 +24,7 @@ import {
   summarizeBoardLanes,
   jiraIssueIsSubtask,
   jiraAssetUrl,
+  jiraIssueSearchJql,
   storyPointFieldIds,
   type JiraBoardIssue,
   type JiraBoardSummary,
@@ -291,6 +292,14 @@ describe("board issue JQL", () => {
       'filter = 1001 AND (fixVersion = "1.0")',
     )
     expect(boardIssuesJql({ filterId: "1001", sprintId: 37, subQuery: "ignored" })).toBe("filter = 1001 AND sprint = 37")
+  })
+
+  test("searches an exact ticket key or words from a ticket summary", () => {
+    expect(jiraIssueSearchJql("plat-42")).toBe('key = PLAT-42 OR summary ~ "plat 42" ORDER BY updated DESC')
+    expect(jiraIssueSearchJql("  checkout / confirmation!  ")).toBe(
+      'summary ~ "checkout confirmation" ORDER BY updated DESC',
+    )
+    expect(jiraIssueSearchJql("!!!")).toBeUndefined()
   })
 })
 

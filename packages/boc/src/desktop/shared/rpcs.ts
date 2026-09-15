@@ -34,6 +34,7 @@ export {
   BocJiraGetPreferences,
   BocJiraListBoards,
   BocJiraListIssues,
+  BocJiraSearchIssues,
   BocJiraListIssueStatuses,
   BocJiraSaveConnection,
   BocJiraSavePreferences,
