@@ -96,8 +96,11 @@ export default function JiraScreen(props: BocScreenProps) {
     )
   const hasIssueFilters = () => Boolean(view.search || view.assignee || view.issueType || view.priority)
   const searching = () => view.search.trim().length > 0
-  const searchingJira = () => searching() && filtered().length === 0
-  const searchResults = () => (filtered().length > 0 ? filtered() : view.searchIssues)
+  const searchResults = () => {
+    const boardMatches = filtered()
+    const boardKeys = new Set(boardMatches.map((issue) => issue.key))
+    return [...boardMatches, ...view.searchIssues.filter((issue) => !boardKeys.has(issue.key))]
+  }
   const groups = () => groupIssuesByColumn(view.board?.columns ?? [], filtered())
   const selectedBoard = () =>
     view.boards.find((board) => board.id === view.selectedBoardId) ??
@@ -151,11 +154,10 @@ export default function JiraScreen(props: BocScreenProps) {
 
   createEffect(() => {
     const query = view.search.trim()
-    const hasBoardMatches = filtered().length > 0
     const online = view.online
     searchRequests.invalidate()
     setView({ searchIssues: [], searchLoading: false, searchFailure: undefined })
-    if (!query || hasBoardMatches || !online) return
+    if (!query || !online) return
 
     setView("searchLoading", true)
     const timer = setTimeout(() => {
@@ -526,7 +528,7 @@ export default function JiraScreen(props: BocScreenProps) {
           assignee={view.assignee}
           issueType={view.issueType}
           priority={view.priority}
-          searchingJira={searchingJira()}
+          searchingJira={searching()}
           onSelectLane={(lane) => setView("lane", lane)}
           onSelectSprint={(sprintId) => {
             if (view.selectedBoardId === undefined) return
@@ -573,7 +575,7 @@ export default function JiraScreen(props: BocScreenProps) {
                   onOpenExternal={(url) => props.host.openExternal(url)}
                 />
               </Show>
-              <Show when={searchingJira() && searchResults().length === 0}>
+              <Show when={searching() && searchResults().length === 0}>
                 <p
                   role={view.searchFailure ? "alert" : "status"}
                   class="flex min-h-full items-center justify-center gap-2 px-6 pb-12 text-center text-[13px] leading-[var(--line-height-compact)] text-v2-text-text-muted"
