@@ -38,7 +38,7 @@ import { parseCommentNote, readPromptPresentation } from "@/composer/comment-not
 import { useCommand } from "@/shell/commands/command"
 import { useSettings } from "@/settings/model"
 import { SessionProjectMenu, SessionTitleHeader } from "../session-identity-header"
-import { SessionHeaderSpacer } from "@/session/header/session-header"
+import { SessionHeaderEndActions } from "@/session/header/session-header"
 import type { BackgroundTask } from "../summary/background"
 
 const SessionSummaryPanel = lazy(async () => {
@@ -571,7 +571,7 @@ function MessageTimelineView(
                         </SummaryPopover>
                       )}
                     </Show>
-                    <SessionHeaderSpacer visible={props.reserveReviewToggle} />
+                    <SessionHeaderEndActions visible={props.reserveReviewToggle} />
                   </div>
                 )}
               </Show>

@@ -86,8 +86,20 @@
       "reason": "Select Lane for Boc checkout creation and notify the Boc session-link bridge after successful session creation"
     },
     {
-      "path": "packages/app/src/session/header/session-header-actions.tsx",
-      "reason": "Mount the Boc environment control beside the existing session header actions"
+      "path": "packages/app/e2e/regression/boc-environment-header.spec.ts",
+      "reason": "Verify Lane environment actions remain clear of adjacent session header controls in LTR and RTL layouts"
+    },
+    {
+      "path": "packages/app/src/session/header/session-header.tsx",
+      "reason": "Place the Lane environment control in the session header flow before reserving the fixed review toggle"
+    },
+    {
+      "path": "packages/app/src/session/terminal/panel.tsx",
+      "reason": "Place the compact Lane environment control in the terminal header when it owns the side panel"
+    },
+    {
+      "path": "packages/app/src/session/timeline/message-timeline.tsx",
+      "reason": "Render the session header end actions that own the Lane environment control"
     },
     {
       "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",

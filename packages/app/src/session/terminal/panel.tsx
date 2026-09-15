@@ -23,6 +23,7 @@ import { terminalTabLabel } from "@/session/terminal/terminal-label"
 import { createSizing, focusTerminalById } from "@/session/helpers"
 import { getTerminalHandoff, setTerminalHandoff } from "@/session/handoff"
 import { useSessionLayout } from "@/session/session-layout"
+import { BocEnvironmentSessionControl } from "@/boc/environments/session"
 import { TerminalSurface } from "./surface"
 
 const MAX_CACHED_TERMINAL_WORKSPACES = 20
@@ -337,9 +338,12 @@ export function TerminalPanel(
                   </div>
                 </Tabs.List>
               </Tabs>
-              {/* Reserve outside the scroll viewport so overflowing tabs cannot cover the toggle. */}
+              {/* Keep fixed header actions outside the scroll viewport so overflowing tabs cannot cover them. */}
               <Show when={props.reserveReviewToggle}>
-                <div class="w-12 shrink-0" aria-hidden />
+                <div class="h-full shrink-0 flex items-center">
+                  <BocEnvironmentSessionControl compact />
+                  <div class="w-12 shrink-0" aria-hidden />
+                </div>
               </Show>
             </div>
             <div class="flex-1 min-h-0 relative">
