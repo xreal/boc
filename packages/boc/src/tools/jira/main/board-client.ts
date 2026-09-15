@@ -29,7 +29,17 @@ const MAX_SPRINT_PAGES = 40
 const ISSUE_PAGE_SIZE = 100
 const MAX_ISSUE_PAGES = 50
 const ISSUE_SEARCH_LIMIT = 50
-const ISSUE_FIELDS = ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated"]
+const ISSUE_FIELDS = [
+  "summary",
+  "status",
+  "assignee",
+  "creator",
+  "issuetype",
+  "priority",
+  "labels",
+  "created",
+  "updated",
+]
 
 const AgilePage = Schema.Struct({
   isLast: Schema.optionalKey(Schema.Boolean),

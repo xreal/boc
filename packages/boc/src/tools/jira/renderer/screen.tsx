@@ -569,6 +569,7 @@ export default function JiraScreen(props: BocScreenProps) {
               <Show when={searchResults().length > 0}>
                 <JiraIssueList
                   t={t}
+                  locale={props.host.locale()}
                   issues={searchResults()}
                   selectedIssueKey={view.selectedIssueKey}
                   onSelectIssue={(issue, returnFocus) => void loadIssue(issue.key, returnFocus)}

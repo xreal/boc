@@ -90,6 +90,7 @@ describe("Jira board client", () => {
         "summary",
         "status",
         "assignee",
+        "creator",
         "issuetype",
         "priority",
         "labels",

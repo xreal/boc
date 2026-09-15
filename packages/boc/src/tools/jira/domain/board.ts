@@ -45,6 +45,8 @@ export const JiraBoardIssue = Schema.Struct({
   statusId: Schema.optionalKey(Schema.String),
   statusName: Schema.optionalKey(Schema.String),
   assigneeName: Schema.optionalKey(Schema.String),
+  creatorName: Schema.optionalKey(Schema.String),
+  creatorAvatarUrl: Schema.optionalKey(Schema.String),
   issueTypeName: Schema.optionalKey(Schema.String),
   issueTypeIconUrl: Schema.optionalKey(Schema.String),
   subtask: Schema.optionalKey(Schema.Boolean),
@@ -203,6 +205,7 @@ export function mapJiraBoardIssue(
   if (!id || !key || !summary) return
   const status = fields && isRecord(fields.status) ? fields.status : undefined
   const assignee = fields && isRecord(fields.assignee) ? fields.assignee : undefined
+  const creator = fields && isRecord(fields.creator) ? fields.creator : undefined
   const issueType = fields && isRecord(fields.issuetype) ? fields.issuetype : undefined
   const priority = fields && isRecord(fields.priority) ? fields.priority : undefined
   return compact({
@@ -212,7 +215,9 @@ export function mapJiraBoardIssue(
     statusId: status ? text(status.id) : undefined,
     statusName: status ? text(status.name) : undefined,
     assigneeName: assignee ? text(assignee.displayName) : undefined,
-    assigneeAvatarUrl: assigneeAvatarUrl(assignee, browseOrigin),
+    assigneeAvatarUrl: userAvatarUrl(assignee, browseOrigin),
+    creatorName: creator ? text(creator.displayName) : undefined,
+    creatorAvatarUrl: userAvatarUrl(creator, browseOrigin),
     issueTypeName: issueType ? text(issueType.name) : undefined,
     issueTypeIconUrl: issueType ? jiraAssetUrl(issueType.iconUrl, browseOrigin) : undefined,
     subtask: isSubtaskIssueType(issueType) ? true : undefined,
@@ -478,9 +483,9 @@ export function jiraIssueIsSubtask(issue: Pick<JiraBoardIssue, "subtask" | "issu
   return issue.subtask === true || isSubtaskTypeName(issue.issueTypeName)
 }
 
-function assigneeAvatarUrl(assignee: Record<string, unknown> | undefined, origin: string) {
-  if (!assignee) return
-  const urls = isRecord(assignee.avatarUrls) ? assignee.avatarUrls : undefined
+function userAvatarUrl(user: Record<string, unknown> | undefined, origin: string) {
+  if (!user) return
+  const urls = isRecord(user.avatarUrls) ? user.avatarUrls : undefined
   if (!urls) return
   return jiraAssetUrl(urls["24x24"] ?? urls["48x48"] ?? urls["32x32"] ?? urls["16x16"], origin)
 }

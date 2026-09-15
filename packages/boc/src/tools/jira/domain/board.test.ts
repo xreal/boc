@@ -89,6 +89,9 @@ describe("Jira board mapping", () => {
       assigneeName: "Mia Krystof",
       assigneeAvatarUrl:
         "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
+      creatorName: "Ada Lovelace",
+      creatorAvatarUrl:
+        "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/AL-5.png?size=24&s=24",
       issueTypeName: "Story",
       issueTypeIconUrl: "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
       priorityName: "Medium",

@@ -219,6 +219,7 @@ export const jiraEnglish = {
   "boc.jira.board.search.results": "Issue search results",
   "boc.jira.board.search.ticket": "Ticket",
   "boc.jira.board.search.summary": "Summary",
+  "boc.jira.board.search.creator": "Creator",
   "boc.jira.board.search.loading": "Searching Jira…",
   "boc.jira.board.search.empty": "No Jira issues match this search.",
   "boc.jira.board.search.failed": "Jira search could not be completed.",
