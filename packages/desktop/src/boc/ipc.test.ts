@@ -24,6 +24,7 @@ const jiraTags = [
   "BocJiraListBoards",
   "BocJiraGetBoard",
   "BocJiraListIssues",
+  "BocJiraSearchIssues",
   "BocJiraGetIssue",
   "BocJiraListIssueStatuses",
   "BocJiraCancelBoardRead",
