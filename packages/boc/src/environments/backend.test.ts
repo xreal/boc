@@ -431,9 +431,23 @@ async function configure(fixture: Awaited<ReturnType<typeof environmentFixture>>
   await eventually(() => expect(fixture.process.commands.length).toBeGreaterThan(0))
   fixture.createContainers()
   const command = fixture.process.commands.at(-1)!
+  await eventually(() => expect(fixture.process.observers(command.id)).toBe(1))
   fixture.process.exit(command.id, 0)
   await eventually(async () => {
     expect((await backend.inspect("project", fixture.checkout)).latestRun?.status).toBe("succeeded")
+  })
+  // An unconfirmed removal passes through operation admission without starting another process.
+  expect(
+    await backend.run({
+      projectID: "project",
+      directory: fixture.checkout,
+      sessionID: "session",
+      action: "remove",
+    }),
+  ).toMatchObject({
+    accepted: false,
+    reason: "confirmation-required",
+    environment: { latestRun: { action: "setup", status: "succeeded" } },
   })
 }
 
