@@ -41,33 +41,49 @@ test("does not add agent context for an unconfigured checkout", async () => {
   expect(system).toEqual([])
 })
 
-for (const mode of [
-  { includeChanges: false, strategy: "lane-clean", copied: false },
-  { includeChanges: true, strategy: "lane-dirty", copied: true },
-]) {
-  test(`creates a ${mode.strategy} worktree, starts setup, and moves the session`, async () => {
-    const fixture = agentFixture({ changes: 2 })
+test("creates a clean Lane, starts setup, and moves the session", async () => {
+  const fixture = agentFixture({ changes: 2 })
 
-    const result = await Effect.runPromise(
-      prepareEnvironment(
-        fixture.context,
-        fixture.environments,
-        { name: "feature", includeChanges: mode.includeChanges, confirmed: true },
-        { sessionID: fixture.sessionID },
+  const result = await Effect.runPromise(
+    prepareEnvironment(
+      fixture.context,
+      fixture.environments,
+      { name: "feature", confirmed: true },
+      { sessionID: fixture.sessionID },
+    ),
+  )
+
+  expect(fixture.creations).toEqual([
+    { projectID: fixture.context.location.project.id, from: fixture.source, name: "feature" },
+  ])
+  expect(fixture.runs).toHaveLength(1)
+  expect(fixture.runs[0]).toMatchObject({ directory: fixture.lane, action: "setup" })
+  expect(fixture.moves).toEqual([
+    { sessionID: fixture.sessionID, directory: fixture.lane, delivery: "steer" },
+  ])
+  expect(result.output).toContain("remain only in the source checkout")
+})
+
+for (const createdStrategy of ["git", "lane"]) {
+  test(`removes a worktree created by the unexpected ${createdStrategy} strategy`, async () => {
+    const fixture = agentFixture({ createdStrategy })
+
+    await expect(
+      Effect.runPromise(
+        prepareEnvironment(
+          fixture.context,
+          fixture.environments,
+          { name: "feature", confirmed: true },
+          { sessionID: fixture.sessionID },
+        ),
       ),
-    )
+    ).rejects.toThrow("Lane plugin is not the selected worktree strategy")
 
-    expect(fixture.creations).toEqual([
-      { projectID: fixture.context.location.project.id, from: fixture.source, name: "feature" },
+    expect(fixture.removals).toEqual([
+      { projectID: fixture.context.location.project.id, directory: fixture.lane, force: false },
     ])
-    expect(fixture.runs).toHaveLength(1)
-    expect(fixture.runs[0]).toMatchObject({ directory: fixture.lane, action: "setup" })
-    expect(fixture.moves).toEqual([
-      { sessionID: fixture.sessionID, directory: fixture.lane, delivery: "steer" },
-    ])
-    expect(result.output).toContain(
-      mode.copied ? "source checkout remains unchanged" : "remain only in the source checkout",
-    )
+    expect(fixture.runs).toEqual([])
+    expect(fixture.moves).toEqual([])
   })
 }
 
@@ -79,7 +95,7 @@ test("removes a new Lane when setup is rejected before it starts", async () => {
       prepareEnvironment(
         fixture.context,
         fixture.environments,
-        { name: "feature", includeChanges: false, confirmed: true },
+        { name: "feature", confirmed: true },
         { sessionID: fixture.sessionID },
       ),
     ),
@@ -111,26 +127,28 @@ test("starts a stopped environment in the current Lane without creating another 
   expect(fixture.moves).toEqual([])
 })
 
-test("refuses to copy local changes from a non-primary linked worktree", async () => {
+test("creates a clean Lane from a non-primary linked worktree", async () => {
   const fixture = agentFixture({ directory: "/workspace-linked", strategy: "git", changes: 1 })
 
-  await expect(
-    Effect.runPromise(
-      prepareEnvironment(
-        fixture.context,
-        fixture.environments,
-        { name: "feature", includeChanges: true, confirmed: true },
-        { sessionID: fixture.sessionID },
-      ),
+  const result = await Effect.runPromise(
+    prepareEnvironment(
+      fixture.context,
+      fixture.environments,
+      { name: "feature", confirmed: true },
+      { sessionID: fixture.sessionID },
     ),
-  ).rejects.toThrow("only from the primary checkout")
+  )
 
-  expect(fixture.creations).toEqual([])
+  expect(fixture.creations).toEqual([
+    { projectID: fixture.context.location.project.id, from: fixture.directory, name: "feature" },
+  ])
+  expect(result.output).toContain("remain only in the source checkout")
 })
 
 function agentFixture(options: {
   directory?: string
   strategy?: string
+  createdStrategy?: string
   changes?: number
   environment?: BocEnvironment.State
   rejection?: Extract<BocEnvironment.OperationResult, { accepted: false }>["reason"]
@@ -148,14 +166,19 @@ function agentFixture(options: {
   const removals: Array<{ projectID?: string; directory: string; force: boolean }> = []
   const moves: Array<{ sessionID: string; directory: string; delivery?: string }> = []
   const runs: Array<Parameters<EnvironmentBackend["run"]>[0]> = []
+  let created = false
   const context: Parameters<typeof prepareEnvironment>[0] = {
     location,
     worktree: {
       list: () =>
-        Effect.succeed([{ directory, ...(options.strategy === undefined ? {} : { strategy: options.strategy }) }]),
+        Effect.succeed([
+          { directory, ...(options.strategy === undefined ? {} : { strategy: options.strategy }) },
+          ...(created ? [{ directory: lane, strategy: options.createdStrategy ?? "lane-clean" }] : []),
+        ]),
       create: (input) =>
         Effect.sync(() => {
           creations.push({ projectID: input?.projectID, from: input?.from, name: input?.name })
+          created = true
           return { directory: lane }
         }),
       remove: (input) =>

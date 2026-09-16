@@ -12,15 +12,9 @@ const PrepareInput = Schema.Struct({
       description: "Short worktree name derived from the task or ticket. Required when creating a new worktree.",
     }),
   ),
-  includeChanges: Schema.optionalKey(
-    Schema.Boolean.annotate({
-      description:
-        "Whether to copy tracked edits and ordinary untracked files from the primary checkout. Required when creating a new Lane.",
-    }),
-  ),
   confirmed: Schema.Literal(true).annotate({
     description:
-      "Set to true only after the user confirms the Lane name and whether local changes will be copied.",
+      "Set to true only after the user confirms the Lane name and that tracked and ordinary untracked changes will stay in the source checkout.",
   }),
 })
 const PrepareOutput = Schema.String
@@ -63,7 +57,7 @@ export function registerEnvironmentAgent(context: Context, environments: Environ
       editor.add({
         name: "prepare_environment",
         description:
-          "Create an isolated Git worktree with Lane and start its app stack only when needed and after explicit user approval. Use this for feature work that benefits from isolation or requires testing a running application. Before calling, propose a short worktree name and say whether current uncommitted changes will be copied; the user must approve both. Outside an existing managed worktree, creates one with the clean or change-copying Lane strategy, starts the project's Devenv lifecycle, and moves the current session at the next safe boundary. Never use it for analysis, read-only work, or routine small edits. In an existing managed worktree, starts or resumes its environment without creating another worktree. The source checkout is never cleaned. Do not run destination-dependent tools in the same execute call. After the move, use environment_status in a later call to verify readiness before claiming the application works.",
+          "Create a clean isolated Git worktree with Lane and start its app stack only when needed and after explicit user approval. Use this for feature work that benefits from isolation or requires testing a running application. Before calling, propose a short worktree name and say that current tracked and ordinary untracked changes will remain only in the source checkout; the user must approve both. Outside an existing managed worktree, creates a clean Lane, starts the project's Devenv lifecycle, and moves the current session at the next safe boundary. Never use it for analysis, read-only work, or routine small edits. In an existing managed worktree, starts or resumes its environment without creating another worktree. The source checkout is never cleaned. Do not run destination-dependent tools in the same execute call. After the move, use environment_status in a later call to verify readiness before claiming the application works.",
         input: PrepareInput,
         output: PrepareOutput,
         options: { namespace: "boc", codemode: true, pinned: true },
@@ -89,15 +83,6 @@ export function prepareEnvironment(
     }
 
     if (!input.name) return yield* new Tool.Error({ message: "A Lane name is required for this checkout" })
-    if (input.includeChanges === undefined) {
-      return yield* new Tool.Error({ message: "Choose whether local changes should be copied into the new Lane" })
-    }
-    if (input.includeChanges && context.location.directory !== context.location.project.directory) {
-      return yield* new Tool.Error({
-        message:
-          "Lane can copy local changes only from the primary checkout. Preserve or clean the changes in this linked worktree before preparing a Lane.",
-      })
-    }
 
     const changes = yield* context.vcs
       .status()
@@ -109,6 +94,28 @@ export function prepareEnvironment(
         name: input.name,
       })
       .pipe(Effect.mapError(toolError(`Unable to create Lane ${input.name}`)))
+    const createdOwner = yield* context.worktree
+      .list({ projectID: context.location.project.id })
+      .pipe(
+        Effect.map(
+          (inventory) => inventory.find((worktree) => worktree.directory === created.directory)?.strategy,
+        ),
+        Effect.mapError(toolError(`Lane ${created.directory} was created, but its owner could not be verified`)),
+      )
+    if (createdOwner !== "lane-clean") {
+      yield* context.worktree
+        .remove({ projectID: context.location.project.id, directory: created.directory, force: false })
+        .pipe(
+          Effect.mapError(
+            toolError(
+              `A worktree was created with strategy ${createdOwner ?? "unknown"} instead of Lane and could not be removed: ${created.directory}`,
+            ),
+          ),
+        )
+      return yield* new Tool.Error({
+        message: `The Lane plugin is not the selected worktree strategy; the unexpected ${createdOwner ?? "unknown"} worktree was removed`,
+      })
+    }
     const operation = yield* runEnvironment(environments, {
       projectID: context.location.project.id,
       directory: created.directory,
@@ -147,9 +154,7 @@ export function prepareEnvironment(
     const sourceChanges =
       changes.data.length === 0
         ? "The source checkout was clean."
-        : input.includeChanges
-          ? `${changes.data.length} changed file(s) were copied. The source checkout remains unchanged.`
-          : `${changes.data.length} changed file(s) remain only in the source checkout.`
+        : `${changes.data.length} changed file(s) remain only in the source checkout.`
     return toolResult(
       `Lane created: ${created.directory}\n${sourceChanges}\nEnvironment setup started. The session will move at the next safe boundary.\n\n${environmentStatus(operation.environment)}`,
     )
