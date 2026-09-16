@@ -110,6 +110,10 @@
       "reason": "Verify Lane environment actions remain clear of adjacent session header controls in LTR and RTL layouts"
     },
     {
+      "path": "packages/app/e2e/regression/boc-settings.spec.ts",
+      "reason": "Verify the standard settings command opens settings and returns to a Boc dashboard"
+    },
+    {
       "path": "packages/app/src/session/header/session-header.tsx",
       "reason": "Place Boc worktree context and the Lane environment control in the session header flow before reserving the fixed review toggle"
     },
