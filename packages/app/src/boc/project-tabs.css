@@ -40,3 +40,14 @@
   grid-template-columns: 24px minmax(0, 1fr);
   grid-template-rows: 24px var(--line-height-compact);
 }
+
+[data-slot="vertical-tabs-sidebar"] [data-slot="vertical-tabs-scroll"] {
+  scrollbar-width: auto;
+  background:
+    linear-gradient(to bottom, var(--v2-background-bg-deep) 35%, transparent) top / 100% 14px no-repeat local,
+    linear-gradient(to bottom, var(--v2-border-border-muted), transparent) top / 100% 8px no-repeat scroll;
+}
+
+[data-slot="vertical-tabs-sidebar"] [data-slot="vertical-tabs-scroll"]::-webkit-scrollbar {
+  display: block;
+}
