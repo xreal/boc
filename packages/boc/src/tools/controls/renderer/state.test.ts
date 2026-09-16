@@ -143,3 +143,31 @@ test("locks context during mutation and never retries it after reconnect", async
     fixtureState.dispose()
   }
 })
+
+test.each([
+  ["not_ready", "notReady"],
+  ["invalid_configuration", "invalidConfiguration"],
+] as const)("reports %s as a rejected write, not an unknown outcome", async (type, error) => {
+  let writes = 0
+  const fixtureState = fixture(
+    async (directory) => snapshot(directory),
+    async () => {
+      writes++
+      throw { type }
+    },
+  )
+  try {
+    fixtureState.control.select({ server: "remote", project: "/project", directory: "/project" })
+    await flush()
+    const item = fixtureState.control.view.snapshot?.items[0]
+    if (!item) throw new Error("Expected initial state")
+    await fixtureState.control.mutate(item, "set", false)
+    expect(fixtureState.control.view.rowError).toEqual({ key: item.key, error })
+    expect(fixtureState.control.view.error).toBeUndefined()
+    expect(fixtureState.control.view.stale).toBe(false)
+    expect(fixtureState.control.view.snapshot?.revision).toBe(0)
+    expect(writes).toBe(1)
+  } finally {
+    fixtureState.dispose()
+  }
+})
