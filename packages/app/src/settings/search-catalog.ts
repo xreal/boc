@@ -38,6 +38,13 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
   },
   {
     tab: "general",
+    label: "settings.general.row.spellcheck.title",
+    target: "settings-spellcheck",
+    description: "settings.general.row.spellcheck.description",
+    keywords: "spelling grammar red underline",
+  },
+  {
+    tab: "general",
     label: "settings.general.row.terminalPlacement.title",
     target: "settings-terminal-placement",
     keywords: "terminal side bottom position",

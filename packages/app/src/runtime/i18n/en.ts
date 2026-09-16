@@ -1190,6 +1190,8 @@ export const dict = {
   "settings.general.row.showCustomAgents.title": "Show agent",
   "settings.general.row.showCustomAgents.description":
     "Switch between agents in the composer. When hidden, defaults to Build agent.",
+  "settings.general.row.spellcheck.title": "Spell checker",
+  "settings.general.row.spellcheck.description": "Underline possible spelling mistakes in the prompt editor",
   "settings.general.row.followUpBehavior.title": "Follow-up behavior",
   "settings.general.row.followUpBehavior.description":
     "Choose whether to queue follow-ups or steer the current turn. Use {{keybind}} to switch.",

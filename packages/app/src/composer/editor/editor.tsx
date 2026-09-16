@@ -15,6 +15,7 @@ import { AttachmentCard } from "@opencode/session-ui/attachment-card"
 import { CommentCard } from "@opencode/session-ui/comment-card"
 import { typeLabel } from "@opencode/session-ui/message-file"
 import { Skill } from "@opencode/schema/skill"
+import { useSettings } from "@/settings/model"
 import type {
   ComposerAttachment,
   ComposerComment,
@@ -53,6 +54,7 @@ export type ComposerEditorProps = {
 
 export function ComposerEditor(props: ComposerEditorProps) {
   const i18n = useI18n()
+  const settings = useSettings()
   const state = props.controller.state
   const view = props.controller.view
   let editor: HTMLDivElement | undefined
@@ -180,7 +182,7 @@ export function ComposerEditor(props: ComposerEditorProps) {
             contenteditable={!props.disabled && !props.readOnly}
             autocapitalize={state.mode === "normal" ? "sentences" : "off"}
             autocorrect={state.mode === "normal" ? "on" : "off"}
-            spellcheck={state.mode === "normal"}
+            spellcheck={state.mode === "normal" && settings.general.spellcheck()}
             // @ts-expect-error
             autocomplete="off"
             class="relative z-10 block min-h-[60px] w-full whitespace-pre-wrap bg-transparent px-4 pt-4 pb-2 text-[13px] font-[440] leading-5 text-v2-text-text-base focus:outline-none [&_[data-mention=file]]:text-syntax-property [&_[data-mention=agent]]:text-syntax-type [&_[data-mention=reference]]:text-syntax-keyword"
