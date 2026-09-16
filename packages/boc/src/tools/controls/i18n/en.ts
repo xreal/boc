@@ -6,8 +6,7 @@ export const controlsEnglish = {
   "boc.bergflow.origin.plugin": "Plugin · registered capability",
   "boc.bergflow.subtitle": "Your project. Your capabilities.",
   "boc.bergflow.readOnly": "Read-only",
-  "boc.bergflow.readOnly.agent":
-    "Agents are shown for reference. Agent switching is not yet available in Project Controls.",
+  "boc.bergflow.readOnly.agent": "Agents without a writable configuration source are read-only.",
   "boc.bergflow.readOnly.instruction": "Only project-owned automatic instruction files can be switched here.",
   "boc.bergflow.scope.instruction":
     "Project files affect future automatic instruction loads. Instructions already in session history and nested instructions loaded while reading files are unchanged.",
@@ -72,6 +71,9 @@ export const controlsEnglish = {
     "The state has been refreshed. Review the saved setting before making another change.",
   "boc.bergflow.error.rejected":
     "This capability is no longer available or cannot be changed. The list has been refreshed.",
+  "boc.bergflow.error.notReady": "This capability is not ready to change. Refresh the list and try again.",
+  "boc.bergflow.error.invalidConfiguration":
+    "The change would produce an invalid configuration and was not saved. Check the configuration file.",
   "boc.bergflow.error.connection":
     "Could not connect or start sign-in. Check the server configuration and try again. Servers requiring an authentication form can be configured through OpenCode’s integration settings.",
   "boc.bergflow.reason.read_only": "This capability is read-only because its update behavior is not yet verified.",

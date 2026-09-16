@@ -4,6 +4,7 @@ import { Icon } from "@opencode/ui/icon"
 import { Show } from "solid-js"
 import type { BocTranslator } from "../../../renderer/i18n"
 import { jiraIssueIsSubtask, type JiraBoardIssue } from "../domain/board"
+import JiraIssueCardMenu from "./card-menu"
 import { JiraIssueTypeIcon } from "./issue-type-icon"
 import { jiraRelativeTime } from "./time"
 import { jiraPriorityTone, jiraToneText } from "./tone"
@@ -16,11 +17,20 @@ export function JiraIssueCard(props: {
   selected: boolean
   sessionCount?: number
   deployedHosts?: readonly string[]
+  sessionActionsDisabled?: boolean
+  onNewChat: () => Promise<void>
+  onStartWork: () => Promise<void>
   onSelect: (returnFocus: HTMLButtonElement) => void
   onOpenExternal: (url: string) => void
 }) {
   return (
-    <div classList={{ "pl-2": jiraIssueIsSubtask(props.issue) }}>
+    <JiraIssueCardMenu
+      t={props.t}
+      indented={jiraIssueIsSubtask(props.issue)}
+      disabled={props.sessionActionsDisabled}
+      onNewChat={props.onNewChat}
+      onStartWork={props.onStartWork}
+    >
       <button
         type="button"
         data-boc-issue-card={props.issue.key}
@@ -28,11 +38,21 @@ export function JiraIssueCard(props: {
         data-selected={props.selected ? "" : undefined}
         aria-expanded={props.selected}
         aria-controls="boc-jira-issue-inspector"
-        class="flex w-full flex-col gap-1.5 rounded-[6px] bg-v2-background-bg-button-neutral hover:bg-[linear-gradient(var(--v2-overlay-simple-overlay-hover),var(--v2-overlay-simple-overlay-hover))] px-3 py-2.5 text-left outline-none transition-[box-shadow,background-color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
+        class="flex w-full flex-col gap-1.5 rounded-[6px] bg-v2-background-bg-button-neutral hover:bg-[linear-gradient(var(--v2-overlay-simple-overlay-hover),var(--v2-overlay-simple-overlay-hover))] px-3 py-2.5 text-start outline-none transition-[box-shadow,background-color] duration-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-v2-border-border-focus"
         classList={{
           "shadow-[0_0_0_0.5px_var(--v2-border-border-base)] hover:shadow-[0_0_0_0.5px_var(--v2-border-border-strong)]":
             !props.selected,
           "shadow-[0_0_0_1px_var(--v2-border-border-focus)]": props.selected,
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "ContextMenu" && (event.key !== "F10" || !event.shiftKey)) return
+          event.preventDefault()
+          const bounds = event.currentTarget.getBoundingClientRect()
+          const clientX =
+            getComputedStyle(event.currentTarget).direction === "rtl" ? bounds.right - 12 : bounds.left + 12
+          event.currentTarget.dispatchEvent(
+            new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX, clientY: bounds.bottom }),
+          )
         }}
         onClick={(event) => props.onSelect(event.currentTarget)}
       >
@@ -51,7 +71,7 @@ export function JiraIssueCard(props: {
           </span>
           <Show when={props.issue.priorityName}>
             {(priority) => (
-              <span class={`ml-auto truncate ${jiraToneText[jiraPriorityTone(priority())]}`}>{priority()}</span>
+              <span class={`ms-auto truncate ${jiraToneText[jiraPriorityTone(priority())]}`}>{priority()}</span>
             )}
           </Show>
         </span>
@@ -76,7 +96,7 @@ export function JiraIssueCard(props: {
               <span class="tabular-nums">{props.sessionCount}</span>
             </span>
           </Show>
-          <span class="ml-auto flex shrink-0 items-center gap-2">
+          <span class="ms-auto flex shrink-0 items-center gap-2">
             <Show when={jiraRelativeTime(props.issue.updatedAt, props.locale)}>
               {(updated) => <span class="text-v2-text-text-faint">{updated()}</span>}
             </Show>
@@ -91,6 +111,6 @@ export function JiraIssueCard(props: {
           </span>
         </span>
       </button>
-    </div>
+    </JiraIssueCardMenu>
   )
 }

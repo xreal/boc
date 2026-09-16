@@ -24,6 +24,7 @@ import {
   summarizeBoardLanes,
   jiraIssueIsSubtask,
   jiraAssetUrl,
+  jiraIssueSearchJql,
   storyPointFieldIds,
   type JiraBoardIssue,
   type JiraBoardSummary,
@@ -88,6 +89,9 @@ describe("Jira board mapping", () => {
       assigneeName: "Mia Krystof",
       assigneeAvatarUrl:
         "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
+      creatorName: "Ada Lovelace",
+      creatorAvatarUrl:
+        "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/AL-5.png?size=24&s=24",
       issueTypeName: "Story",
       issueTypeIconUrl: "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",
       priorityName: "Medium",
@@ -291,6 +295,14 @@ describe("board issue JQL", () => {
       'filter = 1001 AND (fixVersion = "1.0")',
     )
     expect(boardIssuesJql({ filterId: "1001", sprintId: 37, subQuery: "ignored" })).toBe("filter = 1001 AND sprint = 37")
+  })
+
+  test("searches an exact ticket key or words from a ticket summary", () => {
+    expect(jiraIssueSearchJql("plat-42")).toBe('key = PLAT-42 OR summary ~ "plat 42" ORDER BY updated DESC')
+    expect(jiraIssueSearchJql("  checkout / confirmation!  ")).toBe(
+      'summary ~ "checkout confirmation" ORDER BY updated DESC',
+    )
+    expect(jiraIssueSearchJql("!!!")).toBeUndefined()
   })
 })
 

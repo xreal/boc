@@ -118,8 +118,7 @@ export const jiraEnglish = {
     "Applied to new ticket prompts. You can still edit or clear them for an individual ticket.",
   "boc.jira.sessions.defaults.before":
     "Implement the Jira ticket below. Make the solution complete, simple, clean, modern, maintainable, and consistent with existing project patterns. Avoid unnecessary complexity and unrelated changes.\n------",
-  "boc.jira.sessions.defaults.after":
-    "------\nDo not commit or push without my approval!",
+  "boc.jira.sessions.defaults.after": "------\nDo not commit or push without my approval!",
   "boc.jira.sessions.defaults.reviewLabel": "Pull request review",
   "boc.jira.sessions.defaults.reviewDescription":
     "Used when Review starts a new session from a pull request in a Jira ticket.",
@@ -138,6 +137,7 @@ export const jiraEnglish = {
   "boc.jira.sessions.title": "Sessions",
   "boc.jira.sessions.count.one": "{{count}} session",
   "boc.jira.sessions.count.other": "{{count}} sessions",
+  "boc.jira.sessions.new": "New chat",
   "boc.jira.sessions.start": "Work on this ticket",
   "boc.jira.sessions.instructions": "Optional instructions",
   "boc.jira.sessions.before": "Before the ticket",
@@ -216,6 +216,13 @@ export const jiraEnglish = {
   "boc.jira.board.switcher": "Switch board",
   "boc.jira.board.search.placeholder": "Search issues",
   "boc.jira.board.search.label": "Search issues",
+  "boc.jira.board.search.results": "Issue search results",
+  "boc.jira.board.search.ticket": "Ticket",
+  "boc.jira.board.search.summary": "Summary",
+  "boc.jira.board.search.creator": "Creator",
+  "boc.jira.board.search.loading": "Searching Jira…",
+  "boc.jira.board.search.empty": "No Jira issues match this search.",
+  "boc.jira.board.search.failed": "Jira search could not be completed.",
   "boc.jira.board.inspector.status": "Status",
   "boc.jira.board.filters.assignee": "Assignee",
   "boc.jira.board.filters.assignee.all": "All assignees",

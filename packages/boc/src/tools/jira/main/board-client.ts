@@ -8,6 +8,7 @@ import {
   configurationFilterId,
   configurationName,
   configurationSubQuery,
+  jiraIssueSearchJql,
   mapJiraBoardIssue,
   mapJiraBoardSummary,
   mapJiraSprint,
@@ -27,7 +28,18 @@ const SPRINT_PAGE_SIZE = 50
 const MAX_SPRINT_PAGES = 40
 const ISSUE_PAGE_SIZE = 100
 const MAX_ISSUE_PAGES = 50
-const ISSUE_FIELDS = ["summary", "status", "assignee", "issuetype", "priority", "labels", "created", "updated"]
+const ISSUE_SEARCH_LIMIT = 50
+const ISSUE_FIELDS = [
+  "summary",
+  "status",
+  "assignee",
+  "creator",
+  "issuetype",
+  "priority",
+  "labels",
+  "created",
+  "updated",
+]
 
 const AgilePage = Schema.Struct({
   isLast: Schema.optionalKey(Schema.Boolean),
@@ -182,6 +194,7 @@ export async function fetchJiraBoardIssues(
 export async function fetchJiraIssuesByJql(
   auth: JiraAuth,
   jql: string,
+  limit = ISSUE_PAGE_SIZE * MAX_ISSUE_PAGES,
 ): Promise<{ ok: true; issues: JiraBoardIssue[] } | JiraClientFailure> {
   const storyPointFields = await fetchStoryPointFieldIds(auth)
   const issues: JiraBoardIssue[] = []
@@ -194,7 +207,7 @@ export async function fetchJiraIssuesByJql(
       path: "/rest/api/3/search/jql",
       body: {
         jql,
-        maxResults: ISSUE_PAGE_SIZE,
+        maxResults: Math.min(ISSUE_PAGE_SIZE, limit - issues.length),
         fields: [...ISSUE_FIELDS, ...storyPointFields],
         ...(nextPageToken ? { nextPageToken } : {}),
       },
@@ -210,11 +223,17 @@ export async function fetchJiraIssuesByJql(
       if (issue) issues.push(issue)
     }
 
-    if (decoded.isLast === true || !decoded.nextPageToken) break
+    if (issues.length >= limit || decoded.isLast === true || !decoded.nextPageToken) break
     nextPageToken = decoded.nextPageToken
   }
 
-  return { ok: true, issues }
+  return { ok: true, issues: issues.slice(0, limit) }
+}
+
+export function searchJiraIssues(auth: JiraAuth, query: string) {
+  const jql = jiraIssueSearchJql(query)
+  if (!jql) return Promise.resolve({ ok: true as const, issues: [] })
+  return fetchJiraIssuesByJql(auth, jql, ISSUE_SEARCH_LIMIT)
 }
 
 function sprintFailureAsEmpty(type: "scrum" | "kanban", failure: JiraClientFailure) {

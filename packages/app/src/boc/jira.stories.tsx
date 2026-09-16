@@ -9,6 +9,7 @@ import {
   BocDesktopProvider,
   JiraIssueInspector,
   JiraIssueDialog,
+  JiraIssueCard,
   deploymentSystemFixtures,
   createBocTranslator,
   createBocDesktopAPI,
@@ -18,6 +19,30 @@ import {
   jiraIssueFixture,
   type JiraFixtureScenario,
 } from "@boc/extensions/jira/preview"
+
+function JiraCardMenuPreview() {
+  const language = useLanguage()
+  const [view, setView] = createStore({ action: "" })
+  const issue = jiraIssueFixture()
+  return (
+    <div class="flex h-screen items-start bg-v2-background-bg-base p-8 text-v2-text-text-base">
+      <div class="w-72">
+        <JiraIssueCard
+          t={createBocTranslator(language.locale)}
+          issue={issue}
+          locale={language.locale()}
+          index={0}
+          selected={false}
+          onNewChat={async () => setView("action", "new")}
+          onStartWork={async () => setView("action", "work")}
+          onSelect={() => undefined}
+          onOpenExternal={() => undefined}
+        />
+        <p aria-label="Started card action">{view.action}</p>
+      </div>
+    </div>
+  )
+}
 
 function JiraPreview(props: {
   scenario?: JiraFixtureScenario
@@ -142,8 +167,8 @@ function JiraPreview(props: {
           ? {
               projects: () => [{ ...project, label: "Fixture project" }],
               start: async (input) => {
-                setView("started", `${input.model.providerID}/${input.model.modelID}`)
-                setView("startedPrompt", input.prompt)
+                setView("started", input.model ? `${input.model.providerID}/${input.model.modelID}` : "default")
+                setView("startedPrompt", input.prompt ?? "")
               },
               open: async (_server, sessionID) => {
                 setView("opened", sessionID)
@@ -242,3 +267,4 @@ export const UnknownAssignment = { args: { scenario: "unknown" } }
 export const Stale = { args: { scenario: "stale" } }
 export const Switching = { args: { scenario: "switching" } }
 export const NarrowRtl = { globals: { direction: "rtl", locale: "en", theme: "dark" } }
+export const CardMenu = { render: () => <JiraCardMenuPreview /> }

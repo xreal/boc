@@ -15,6 +15,8 @@ export type ControlError =
   | "unknown"
   | "reconciled"
   | "rejected"
+  | "notReady"
+  | "invalidConfiguration"
   | "connection"
 type Snapshot = Omit<ControlState, "items"> & { items: Array<ControlItem & { key: string }> }
 
@@ -245,6 +247,8 @@ function failure(error: unknown, mutation = false): ControlError {
   const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined
   if (type === "conflict") return "conflict"
   if (type === "persistence_failed") return "persistence"
+  if (type === "not_ready") return "notReady"
+  if (type === "invalid_configuration") return "invalidConfiguration"
   if (type === "rpc.unavailable") return "missing"
   if (type === "unsupported" || (typeof error === "object" && error !== null && "issues" in error)) return "unsupported"
   if (type === "not_supported" || type === "unknown_capability") return "rejected"

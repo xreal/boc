@@ -1,4 +1,5 @@
 export { JiraIssueInspector, JiraIssueDialog } from "./renderer/inspector"
+export { JiraIssueCard } from "./renderer/card"
 export { deploymentSystemFixtures } from "../deployments/fixtures/systems"
 export { createJiraAssignments } from "./renderer/assignments"
 export { createJiraFixtureApi, jiraIssueFixture } from "./fixtures/issue"

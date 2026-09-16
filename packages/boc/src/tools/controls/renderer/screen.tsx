@@ -374,7 +374,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                           error={view.rowError?.key === item.key ? view.rowError.error : undefined}
                           operations={view.snapshot?.info.operations ?? []}
                           canConnect={!!host.connectMcp}
-                          edit={() => edit("project", item)}
+                          edit={() => edit(view.scope, item)}
                           change={(action, enabled) => void preserveFocus(() => control.mutate(item, action, enabled))}
                         />
                       )}

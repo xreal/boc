@@ -115,6 +115,14 @@ export const issueSearchIssue = {
           "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/MK-5.png?size=24&s=24",
       },
     },
+    creator: {
+      accountId: "account-creator",
+      displayName: "Ada Lovelace",
+      avatarUrls: {
+        "24x24":
+          "https://avatar-management--avatars.server-location.prod.public.atl-paas.net/initials/AL-5.png?size=24&s=24",
+      },
+    },
     issuetype: {
       name: "Story",
       iconUrl: "https://acme.atlassian.net/rest/api/2/universal_avatar/view/type/issuetype/avatar/10315?size=medium",

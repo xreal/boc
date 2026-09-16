@@ -15,10 +15,17 @@ import {
   type JiraConnectionSuccess,
   type JiraIssueKeyInput,
   type JiraIssueResult,
+  type JiraIssueSearchInput,
   type JiraIssueStatusesResult,
   type JiraIssuesResult,
 } from "../rpcs"
-import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, fetchStoryPointFieldIds } from "./board-client"
+import {
+  fetchJiraBoard,
+  fetchJiraBoardIssues,
+  fetchJiraBoards,
+  fetchStoryPointFieldIds,
+  searchJiraIssues,
+} from "./board-client"
 import { fetchJiraMyself, type JiraAuth, type JiraFetch, type JiraWait } from "./client"
 import {
   assignJiraIssue,
@@ -141,6 +148,7 @@ export function createJiraHandlers(runtime: JiraRuntime) {
       BocJiraListBoards: (payload) => Effect.promise(() => listBoards(runtime, reads, payload)),
       BocJiraGetBoard: (payload) => Effect.promise(() => getBoard(runtime, reads, payload)),
       BocJiraListIssues: (payload) => Effect.promise(() => listIssues(runtime, reads, payload)),
+      BocJiraSearchIssues: (payload) => Effect.promise(() => searchIssues(runtime, reads, payload)),
       BocJiraGetIssue: (payload) => Effect.promise(() => getIssue(runtime, reads, payload)),
       BocJiraListIssueStatuses: (payload) =>
         Effect.promise(() =>
@@ -321,6 +329,18 @@ export async function getIssue(
     const auth = storedAuth(runtime, signal)
     if (!auth.ok) return Promise.resolve(auth)
     return fetchJiraIssue(auth, payload.issueKey, await fetchStoryPointFieldIds(auth))
+  })
+}
+
+export async function searchIssues(
+  runtime: JiraRuntime,
+  reads: JiraReadCoordinator,
+  payload: JiraIssueSearchInput,
+): Promise<JiraIssuesResult> {
+  return reads.run("search", payload.requestId, (signal) => {
+    const auth = storedAuth(runtime, signal)
+    if (!auth.ok) return Promise.resolve(auth)
+    return searchJiraIssues(auth, payload.query)
   })
 }
 

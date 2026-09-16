@@ -361,25 +361,29 @@ export function createEnvironmentBackend(options: EnvironmentBackendOptions): En
   return { agentContext, inspect, run, cancel, logs, resize }
 
   async function reconcile(record: EnvironmentRecord, devenv: DevenvInstallation) {
-    const latest = record.latestRun
-    if (!latest?.ptyID) {
+    const environmentKey = key(record.projectID, record.directory)
+    if (active.has(environmentKey)) return
+    const persisted = await store.read(record.projectID, record.directory)
+    if (active.has(environmentKey)) return
+    const latest = persisted?.latestRun
+    if (!persisted || !latest || latest.id !== record.latestRun?.id || latest.status !== "running") return
+    if (!latest.ptyID) {
       await store.write({
-        ...record,
-        latestRun: latest ? { ...latest, status: "unknown", endedAt: Date.now() } : latest,
+        ...persisted,
+        latestRun: { ...latest, status: "unknown", endedAt: Date.now() },
       })
       return
     }
-    const environmentKey = key(record.projectID, record.directory)
-    if (active.has(environmentKey)) return
     const process = await options.process.get(latest.ptyID).catch(() => undefined)
+    if (active.has(environmentKey)) return
     if (!process) {
-      await store.write({ ...record, latestRun: { ...latest, status: "unknown", endedAt: Date.now() } })
+      await store.write({ ...persisted, latestRun: { ...latest, status: "unknown", endedAt: Date.now() } })
       return
     }
-    const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve(), record }
+    const operation: ActiveOperation = { cancelled: false, completion: Promise.resolve(), record: persisted }
     active.set(environmentKey, operation)
-    operation.completion = continueExecution(record, devenv, operation, latest.ptyID).finally(() =>
-      release(operation, record),
+    operation.completion = continueExecution(persisted, devenv, operation, latest.ptyID).finally(() =>
+      release(operation, persisted),
     )
     void operation.completion
   }

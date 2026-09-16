@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test"
-import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards } from "./board-client"
+import { fetchJiraBoard, fetchJiraBoardIssues, fetchJiraBoards, searchJiraIssues } from "./board-client"
 import { fetchJiraIssue } from "./issue-client"
 import { parseJiraCloudSite } from "../domain/site"
 import { containsSecret } from "../domain/errors"
@@ -90,6 +90,7 @@ describe("Jira board client", () => {
         "summary",
         "status",
         "assignee",
+        "creator",
         "issuetype",
         "priority",
         "labels",
@@ -139,6 +140,28 @@ describe("Jira board client", () => {
         url: "https://acme.atlassian.net/browse/PLAT-1",
       },
     })
+  })
+
+  test("searches Jira by ticket key and summary outside the board", async () => {
+    const bodies: Record<string, unknown>[] = []
+    const fetch = fetchScript((url, init) => {
+      if (url.pathname === "/rest/api/3/field") return fieldListResponse()
+      if (url.pathname === "/rest/api/3/search/jql") {
+        const body = JSON.parse(String(init?.body))
+        bodies.push(body)
+        return issueSearchResponse(body.nextPageToken === "page-2" ? 2 : 1)
+      }
+      return jsonResponse(404, {})
+    })
+
+    const result = await searchJiraIssues(auth(fetch), "plat-1")
+
+    expect(result.ok).toBe(true)
+    expect(bodies[0]).toMatchObject({
+      jql: 'key = PLAT-1 OR summary ~ "plat 1" ORDER BY updated DESC',
+      maxResults: 50,
+    })
+    expect(bodies[1]).toMatchObject({ maxResults: 49, nextPageToken: "page-2" })
   })
 
   test("normalizes a rate-limited board request without leaking the token", async () => {

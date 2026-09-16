@@ -1,5 +1,21 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("board cards offer new chat and ticket work from a context menu", async ({ mount, page }) => {
+  await mount("boc-jira--card-menu")
+  const card = page.locator('[data-boc-issue-card="SHOP-617"]')
+
+  await card.click({ button: "right" })
+  await expect(page.getByRole("menuitem", { name: "New chat", exact: true })).toBeVisible()
+  await expect(page.getByRole("menuitem", { name: "Work on this ticket", exact: true })).toBeVisible()
+  await page.getByRole("menuitem", { name: "New chat", exact: true }).click()
+  await expect(page.getByLabel("Started card action")).toHaveText("new")
+
+  await card.focus()
+  await page.keyboard.press("Shift+F10")
+  await page.getByRole("menuitem", { name: "Work on this ticket", exact: true }).click()
+  await expect(page.getByLabel("Started card action")).toHaveText("work")
+})
+
 story(
   "compact header keeps identity and copying while properties show priority and story points",
   async ({ mount, page }) => {
@@ -157,6 +173,14 @@ story("modal start hands off to the composer and close restores the opener focus
   await page.getByRole("button", { name: "Open ticket", exact: true }).click()
   await page.keyboard.press("Escape")
   await expect(page.getByRole("button", { name: "Open ticket", exact: true })).toBeFocused()
+})
+
+story("ticket workspace starts a blank chat with the normal default model", async ({ mount, page }) => {
+  await mount("boc-jira--modal")
+  await page.getByRole("button", { name: "New chat", exact: true }).click()
+  await expect(page.getByLabel("Started model")).toHaveText("default")
+  await expect(page.getByLabel("Started prompt")).toHaveText("")
+  await expect(page.getByRole("dialog")).toHaveCount(0)
 })
 
 story(

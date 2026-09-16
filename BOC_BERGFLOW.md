@@ -1,6 +1,16 @@
 # Project Controls delivery
 
-## Implemented behavior
+## Current native implementation
+
+Project setup now uses the bundled `boc.project-controls` backend and `boc.controls.v1` RPC, not the portable Bergflow package described below. Agent definitions in JSON/JSONC use native configuration overrides; discovered Markdown agents use Boc policy without rewriting their source files. Markdown agents are supported in both Project and Global scopes. Registry-only agents without a writable source are read-only.
+
+Every toggle resolves the current inventory under the mutation lock before selecting its storage owner. Reading the screen first is not required. Global disables also block project-level re-enabling. Regression checks live in `packages/core/test/boc/controls.test.ts` and `packages/boc/src/tools/controls/renderer/state.test.ts`; filesystem fixtures must isolate both global configuration and the home directory.
+
+These backend changes require a rebuilt Boc application/server. Restarting an older packaged build does not load repository changes.
+
+## Historical portable implementation
+
+The remaining sections record the earlier Bergflow delivery and verification, not the current native architecture.
 
 Boc exposes the screen, navigation entry, and session command as **Project Controls**. Bergflow remains the underlying plugin and diagnostic identity. Boc bundles the private `@bergflow/opencode` 0.2.1 artifact through an opt-in host fallback. The same package loads independently in original OpenCode V2. Explicit external definitions take precedence, keep their options, and never produce a second active provider. Disabled or broken external configuration does not silently activate the bundle. Ordinary startup does not download a plugin or rewrite configuration.
 

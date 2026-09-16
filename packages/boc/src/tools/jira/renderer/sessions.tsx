@@ -13,9 +13,9 @@ import type { JiraIssueDetail } from "../domain/issue"
 import { JiraSessionInstructionFields } from "./session-instructions"
 import {
   defaultJiraSessionInstructions,
+  jiraBlankSession,
   jiraSessionDifficulties,
-  jiraSessionModel,
-  jiraSessionPrompt,
+  jiraTicketSession,
   type JiraSessionDifficulty,
 } from "../domain/sessions"
 
@@ -45,6 +45,7 @@ export function JiraIssueSessions(props: {
   })
   const target = () => preferences()?.projectTargets?.find((item) => item.boardId === props.boardId)
   const disabled = () => form.busy || defaults.loading || preferences.loading || !defaults() || !target()
+  const newChatDisabled = () => form.busy || preferences.loading || !target()
   const [sessions, { refetch }] = createResource(
     () => props.issue.url,
     async (issueUrl) => {
@@ -56,23 +57,28 @@ export function JiraIssueSessions(props: {
     },
   )
 
-  async function start() {
-    const project = target()
-    if (disabled() || !host.sessions || !project) return
+  async function launch(open: () => Promise<void>) {
     setForm({ busy: true, error: "" })
-    await host.sessions
-      .start({
-        issueUrl: props.issue.url,
-        title: `${props.issue.key}: ${props.issue.summary}`,
-        prompt: jiraSessionPrompt(props.issue, form.before, form.after),
-        model: jiraSessionModel(form.models[form.difficulty].model),
-        target: project,
-      })
+    await open()
       .then(() => props.onNavigate?.())
       .catch((error: unknown) => {
         setForm("error", error instanceof Error ? error.message : props.t("boc.jira.sessions.startFailed"))
       })
       .finally(() => setForm("busy", false))
+  }
+
+  async function start() {
+    const project = target()
+    const sessions = host.sessions
+    if (disabled() || !sessions || !project) return
+    await launch(() => sessions.start(jiraTicketSession(props.issue, form, form.difficulty, project)))
+  }
+
+  async function newChat() {
+    const project = target()
+    const sessions = host.sessions
+    if (newChatDisabled() || !sessions || !project) return
+    await launch(() => sessions.start(jiraBlankSession(props.issue, project)))
   }
 
   return (
@@ -81,17 +87,29 @@ export function JiraIssueSessions(props: {
         aria-label={props.t("boc.jira.ticket.sessions")}
         class="flex flex-col gap-3 border-t border-v2-border-border-muted pt-4"
       >
-        <h3 class="flex h-6 items-center gap-2 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
-          {props.t("boc.jira.ticket.sessions")}
-          <Show when={!sessions.loading && !sessions()?.failed && (sessions()?.links.length ?? 0) > 0}>
-            <span
-              aria-label={props.t.plural("boc.jira.sessions.count", sessions()?.links.length ?? 0)}
-              class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-v2-icon-icon-accent/15 px-1.5 text-[11px] font-medium text-v2-icon-icon-accent"
-            >
-              <span class="tabular-nums">{sessions()?.links.length}</span>
-            </span>
-          </Show>
-        </h3>
+        <div class="flex h-6 items-center gap-2">
+          <h3 class="flex items-center gap-2 text-[12px] leading-[var(--line-height-compact)] text-v2-text-text-muted [font-weight:530]">
+            {props.t("boc.jira.ticket.sessions")}
+            <Show when={!sessions.loading && !sessions()?.failed && (sessions()?.links.length ?? 0) > 0}>
+              <span
+                aria-label={props.t.plural("boc.jira.sessions.count", sessions()?.links.length ?? 0)}
+                class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-v2-icon-icon-accent/15 px-1.5 text-[11px] font-medium text-v2-icon-icon-accent"
+              >
+                <span class="tabular-nums">{sessions()?.links.length}</span>
+              </span>
+            </Show>
+          </h3>
+          <Button
+            class="ms-auto"
+            size="small"
+            variant="ghost-muted"
+            icon="plus"
+            disabled={newChatDisabled()}
+            onClick={() => void newChat()}
+          >
+            {props.t("boc.jira.sessions.new")}
+          </Button>
+        </div>
         <details class="jira-session-instructions">
           <summary>
             <Icon name="chevron-right" size="small" />
