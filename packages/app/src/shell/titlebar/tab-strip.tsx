@@ -337,7 +337,7 @@ export function TitlebarTabStrip(props: {
                 mergeVisibleTabOrder(
                   props.tabs.map(tabKey),
                   current,
-                  arrayMove(current, source.initialIndex, source.index),
+                  projectTabs.storageOrder(arrayMove(current, source.initialIndex, source.index)),
                 ),
               )
             }

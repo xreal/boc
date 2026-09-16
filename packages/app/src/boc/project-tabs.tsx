@@ -41,6 +41,15 @@ type ProjectGroup = {
   serverLabel?: string
 }
 
+export function reverseProjectTabGroups<T>(
+  tabs: readonly T[],
+  projectKey: (tab: T) => string,
+  projectOrder: readonly string[],
+) {
+  const groups = Map.groupBy(tabs, projectKey)
+  return projectOrder.flatMap((key) => groups.get(key)?.toReversed() ?? [])
+}
+
 export function createBocProjectTabs(input: {
   tabs: () => Tab[]
   current: () => Tab | undefined
@@ -92,14 +101,11 @@ export function createBocProjectTabs(input: {
   ])
   const ordered = createMemo(() => {
     if (!input.enabled()) return input.tabs()
-    const groups = new Map<string, Tab[]>()
-    input.tabs().forEach((tab) => {
-      const key = projects().get(tabKey(tab))!.key
-      const group = groups.get(key)
-      if (group) group.push(tab)
-      if (!group) groups.set(key, [tab])
-    })
-    return groupOrder().flatMap((key) => groups.get(key) ?? [])
+    return reverseProjectTabGroups(
+      input.tabs(),
+      (tab) => projects().get(tabKey(tab))!.key,
+      groupOrder(),
+    )
   })
 
   // A newly selected tab reveals its group; collapsing the active group itself stays possible.
@@ -200,9 +206,22 @@ export function createBocProjectTabs(input: {
 
   return {
     ordered,
+    current: input.current,
+    storageOrder: (keys: string[]) => {
+      if (!input.enabled()) return keys
+      return reverseProjectTabGroups(
+        keys,
+        (key) => projects().get(key)!.key,
+        groupOrder(),
+      )
+    },
     projects,
     collapsed: (key: string) => state.collapsed[key] ?? false,
-    visible: (tab: Tab) => !input.enabled() || !state.collapsed[projects().get(tabKey(tab))!.key],
+    visible: (tab: Tab) => {
+      if (!input.enabled()) return true
+      const project = projects().get(tabKey(tab))
+      return !!project && !state.collapsed[project.key]
+    },
     toggle: (key: string) => setState("collapsed", key, !state.collapsed[key]),
     rememberOrder: () => {
       if (input.enabled()) setState("order", groupOrder())
@@ -258,6 +277,20 @@ export function BocProjectTabList(props: {
   })
   const [menu, setMenu] = createStore({ open: undefined as string | undefined })
   const clearDrag = () => setDrag({ source: undefined, target: undefined })
+  createEffect(
+    on(
+      props.groups.current,
+      (current) => {
+        if (!props.enabled || !current) return
+        queueMicrotask(() =>
+          listRef
+            .querySelector<HTMLElement>('[data-titlebar-tab-slot][data-active="true"]')
+            ?.scrollIntoView({ behavior: "instant", block: "nearest" }),
+        )
+      },
+      { defer: true },
+    ),
+  )
 
   function dropTarget(event: DragEvent) {
     const bounds = listRef.getBoundingClientRect()
@@ -282,7 +315,9 @@ export function BocProjectTabList(props: {
     const groups = new Map<string, string>()
     if (!props.enabled) return new Set<string>()
     props.visible.forEach((tab) => {
-      const key = props.groups.projects().get(tabKey(tab))!.key
+      const project = props.groups.projects().get(tabKey(tab))
+      if (!project) return
+      const key = project.key
       if (!groups.has(key)) groups.set(key, tabKey(tab))
     })
     return new Set(groups.values())
