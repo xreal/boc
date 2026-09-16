@@ -46,6 +46,14 @@ export function createBocSessions(): BocHost["sessions"] {
           showToast({ title: t("boc.jira.sessions.linkFailed") })
         })
     },
+    async getTitle(server, sessionID) {
+      const conn = servers.list.find((item) => ServerConnection.key(item) === server)
+      if (!conn) throw new Error(t("boc.jira.sessions.unavailable"))
+      const ctx = global.ensureServerCtx(conn)
+      const cachedTitle = ctx.data.session.get(sessionID)?.title
+      if (cachedTitle) return cachedTitle
+      return (await ctx.sdk.api.session.get({ sessionID })).title
+    },
     async open(server, sessionID) {
       const conn = servers.list.find((item) => ServerConnection.key(item) === server)
       if (!conn) throw new Error(t("boc.jira.sessions.unavailable"))

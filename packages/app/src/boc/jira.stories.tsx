@@ -170,6 +170,7 @@ function JiraPreview(props: {
                 setView("started", input.model ? `${input.model.providerID}/${input.model.modelID}` : "default")
                 setView("startedPrompt", input.prompt ?? "")
               },
+              getTitle: async (_server, sessionID) => `Actual title ${sessionID}`,
               open: async (_server, sessionID) => {
                 setView("opened", sessionID)
               },
