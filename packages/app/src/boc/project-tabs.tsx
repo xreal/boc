@@ -41,6 +41,15 @@ type ProjectGroup = {
   serverLabel?: string
 }
 
+export function reverseProjectTabGroups<T>(
+  tabs: readonly T[],
+  projectKey: (tab: T) => string,
+  projectOrder: readonly string[],
+) {
+  const groups = Map.groupBy(tabs, projectKey)
+  return projectOrder.flatMap((key) => groups.get(key)?.toReversed() ?? [])
+}
+
 export function createBocProjectTabs(input: {
   tabs: () => Tab[]
   current: () => Tab | undefined
@@ -92,14 +101,11 @@ export function createBocProjectTabs(input: {
   ])
   const ordered = createMemo(() => {
     if (!input.enabled()) return input.tabs()
-    const groups = new Map<string, Tab[]>()
-    input.tabs().forEach((tab) => {
-      const key = projects().get(tabKey(tab))!.key
-      const group = groups.get(key)
-      if (group) group.push(tab)
-      if (!group) groups.set(key, [tab])
-    })
-    return groupOrder().flatMap((key) => groups.get(key) ?? [])
+    return reverseProjectTabGroups(
+      input.tabs(),
+      (tab) => projects().get(tabKey(tab))!.key,
+      groupOrder(),
+    )
   })
 
   // A newly selected tab reveals its group; collapsing the active group itself stays possible.
@@ -200,6 +206,14 @@ export function createBocProjectTabs(input: {
 
   return {
     ordered,
+    storageOrder: (keys: string[]) => {
+      if (!input.enabled()) return keys
+      return reverseProjectTabGroups(
+        keys,
+        (key) => projects().get(key)!.key,
+        groupOrder(),
+      )
+    },
     projects,
     collapsed: (key: string) => state.collapsed[key] ?? false,
     visible: (tab: Tab) => !input.enabled() || !state.collapsed[projects().get(tabKey(tab))!.key],
