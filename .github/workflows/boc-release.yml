@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  BOC_SERVER_VERSION: 2.0.3
+  BOC_SERVER_VERSION: 2.0.5
 
 concurrency:
   group: boc-release

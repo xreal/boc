@@ -70,7 +70,7 @@ export function ConfigurationEditor(props: {
     const found = node(path)
     if (found) return getNodeValue(found)
     const server = path[0] === "mcp" && path[1] === "servers" ? view.document?.mcp?.[String(path[2])] : undefined
-    return server && path.length === 4 ? Reflect.get(server, path[3]!) : undefined
+    return server && path.length === 4 ? server[path[3] as keyof typeof server] : undefined
   }
   const text = (path: (string | number)[]) => {
     const found = value(path)

@@ -210,7 +210,7 @@ export const Definition = define({
         id: skill.id,
         name: skill.name,
         description: skill.description ?? "",
-        source: skill.location,
+        source: skill.path,
         defaultEnabled: true,
         mutable: true,
       }))

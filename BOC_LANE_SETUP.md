@@ -4,7 +4,7 @@ Boc creates new Desktop checkouts with [Lane](https://lane.lukeed.com/) through 
 
 ## Install Lane
 
-Install Lane `0.1.0` using the method documented at <https://lane.lukeed.com/> and verify it:
+Install Lane `0.2.0` using the method documented at <https://lane.lukeed.com/> and verify it:
 
 ```sh
 lane --version
@@ -15,7 +15,7 @@ lane --version
 Install the tested plugin revision globally:
 
 ```sh
-opencode plugin add git+https://github.com/anomalyco/opencode-plugin-lane.git#cb007ac5ef18770b170b17027cfab9f6346d50d50eca
+opencode plugin add git+https://github.com/bergthorsten/opencode-plugin-lane.git#28c61952e63358b9de0119c6160f0136bb0316be
 ```
 
 Configure the plugin in the backend's global `opencode.jsonc`. If the command already created an entry, edit that entry instead of adding a duplicate:
@@ -25,7 +25,7 @@ Configure the plugin in the backend's global `opencode.jsonc`. If the command al
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "git+https://github.com/anomalyco/opencode-plugin-lane.git#cb007ac5ef18770b170b17027cfab9f6346d50d50eca",
+      "package": "git+https://github.com/bergthorsten/opencode-plugin-lane.git#28c61952e63358b9de0119c6160f0136bb0316be",
       "options": {
         "executable": "<absolute-path-to-lane>",
         "dirty": false
@@ -40,7 +40,8 @@ Use an absolute executable path because a GUI-launched Desktop service may not i
 ## Checkout behavior
 
 - Boc does not bundle Lane. If Lane or its plugin is unavailable, checkout creation fails without falling back to Git.
-- `dirty: false` prevents tracked and ordinary untracked edits from being copied into new Lanes.
+- `dirty: false` keeps ordinary Desktop-created Lanes clean. The agent preparation tool explicitly selects `lane-clean` or `lane-dirty` after the user confirms whether local changes should be copied.
+- `lane-dirty` copies changes into the new Lane but never cleans the source checkout.
 - Gitignored files are still reflinked unless excluded. Add `lane.exclude` entries for secrets such as `.env` when needed.
 - Lane worktrees live under `<primary-checkout>/.lane/trees/`. The directory returned by the backend is authoritative in Boc.
 - `lane init` is not required for worktree operation. Use it only when intentionally adopting Lane's context-memory workflow because it edits `AGENTS.md` and creates tracked files.
@@ -64,4 +65,4 @@ Boc's development-environment controls use Devenv's convention-based Lane lifecy
 
 Both executable scripts must exist in the active Devenv installation's `scripts` directory. Boc derives the stack identity from the authoritative Lane path, verifies the checkout owner and Docker Compose labels, and stores only its own operation/output state. It does not use `.devenv/worktrees` assignment files or `devenv stack` commands.
 
-Leave the project's **Worktree startup script** empty when using Boc's environment controls. Create the Lane first, then use **Set up environment** so Boc can own the lifecycle and show its live output.
+Leave the project's **Worktree startup script** empty when using Boc's environment controls. Create the Lane and use **Set up environment**, or let the confirmed `boc.prepare_environment` agent tool perform both steps, so Boc can own the lifecycle and show its live output.

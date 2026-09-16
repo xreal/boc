@@ -13,9 +13,9 @@
   </description>
   <launchable type="desktop-id">ai.boc.desktop.beta.desktop</launchable>
   <content_rating type="oars-1.1" />
-  <url type="bugtracker">https://github.com/BergDevOrg/boc/issues</url>
+  <url type="bugtracker">https://github.com/xreal/boc/issues</url>
   <url type="homepage">https://opencode.ai</url>
-  <url type="vcs-browser">https://github.com/BergDevOrg/boc</url>
+  <url type="vcs-browser">https://github.com/xreal/boc</url>
   <screenshots>
     <screenshot type="default">
       <image>https://raw.githubusercontent.com/anomalyco/opencode/b75d4d1c5ec449585d515c756fc81f080a157a9a/packages/web/src/assets/lander/screenshot.png</image>

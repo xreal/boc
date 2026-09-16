@@ -1,4 +1,4 @@
-import type { LocationGetOutput, OpenCodeClient, WorktreeCreateInput } from "@opencode/client/promise"
+import type { LocationGetOutput, OpenCodeClient } from "@opencode/client/promise"
 import type { Data } from "@opencode/client/solid"
 
 export async function createWorktree(input: {
@@ -7,12 +7,10 @@ export async function createWorktree(input: {
   directory: string
   project?: LocationGetOutput["project"]
   branch?: string
-  strategy?: WorktreeCreateInput["strategy"]
 }) {
   const project = input.project ?? (await input.api.location.get({ location: { directory: input.directory } })).project
   const created = await input.api.worktree.create({
-    location: { directory: input.directory },
-    strategy: input.strategy ?? "git",
+    projectID: project.id,
     from: project.canonical,
     branch: input.branch,
   })

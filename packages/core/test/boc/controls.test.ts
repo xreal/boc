@@ -147,7 +147,7 @@ it.live("native controls enforce saved tools and skills, retain source and rejec
                 id: Skill.ID.make("guide"),
                 name: Skill.Name.make("Guide"),
                 description: "",
-                location: AbsolutePath.make("/builtin/guide.md"),
+                path: AbsolutePath.make("/builtin/guide.md"),
                 content: "Guide",
               }),
             )
@@ -156,7 +156,7 @@ it.live("native controls enforce saved tools and skills, retain source and rejec
                 id: Skill.ID.make("removable"),
                 name: Skill.Name.make("Removable"),
                 description: "",
-                location: AbsolutePath.make(removableSkill),
+                path: AbsolutePath.make(removableSkill),
                 content: "Temporary skill",
               }),
             )
@@ -165,7 +165,7 @@ it.live("native controls enforce saved tools and skills, retain source and rejec
                 id: Skill.ID.make("legacy-global"),
                 name: Skill.Name.make("Legacy global"),
                 description: "",
-                location: AbsolutePath.make(legacyGlobalSkill),
+                path: AbsolutePath.make(legacyGlobalSkill),
                 content: "Legacy skill",
               }),
             )

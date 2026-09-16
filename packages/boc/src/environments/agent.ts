@@ -6,6 +6,31 @@ import type { AgentEnvironment, EnvironmentBackend } from "./backend"
 
 const StatusInput = Schema.Struct({})
 const StatusOutput = Schema.String
+const PrepareInput = Schema.Struct({
+  name: Schema.optionalKey(
+    Schema.Trim.pipe(Schema.check(Schema.isNonEmpty())).annotate({
+      description: "Short worktree name derived from the task or ticket. Required when creating a new worktree.",
+    }),
+  ),
+  includeChanges: Schema.optionalKey(
+    Schema.Boolean.annotate({
+      description:
+        "Whether to copy tracked edits and ordinary untracked files from the primary checkout. Required when creating a new Lane.",
+    }),
+  ),
+  confirmed: Schema.Literal(true).annotate({
+    description:
+      "Set to true only after the user confirms the Lane name and whether local changes will be copied.",
+  }),
+})
+const PrepareOutput = Schema.String
+
+type EnvironmentAgentContext = {
+  readonly location: Context["location"]
+  readonly session: Pick<Context["session"], "move">
+  readonly vcs: Pick<Context["vcs"], "status">
+  readonly worktree: Pick<Context["worktree"], "list" | "create" | "remove">
+}
 
 export function registerEnvironmentAgent(context: Context, environments: EnvironmentBackend) {
   const location = {
@@ -16,11 +41,11 @@ export function registerEnvironmentAgent(context: Context, environments: Environ
   return Effect.gen(function* () {
     yield* context.session.hook("context", environmentContextHook(location, environments))
     yield* context.tool.transform((editor) => {
-      editor.namespace({ name: "boc", description: "Boc worktree development environment tools." })
+      editor.namespace({ name: "boc", description: "Isolated Git worktrees and local application environments." })
       editor.add({
         name: "environment_status",
         description:
-          "Inspect the current Boc-managed Lane worktree environment. Returns its canonical URL, container states, HTTP readiness, and latest lifecycle status. This tool is read-only.",
+          "Inspect the local application environment attached to the current isolated worktree. Returns its canonical URL, container states, HTTP readiness, and latest lifecycle status. This tool is read-only.",
         input: StatusInput,
         output: StatusOutput,
         options: { namespace: "boc", codemode: true },
@@ -31,12 +56,170 @@ export function registerEnvironmentAgent(context: Context, environments: Environ
           }).pipe(
             Effect.map((environment) => {
               const output = environmentStatus(environment)
-              return { output, content: output }
+              return toolResult(output)
             }),
           ),
       })
+      editor.add({
+        name: "prepare_environment",
+        description:
+          "Create an isolated Git worktree with Lane and start its app stack only when needed and after explicit user approval. Use this for feature work that benefits from isolation or requires testing a running application. Before calling, propose a short worktree name and say whether current uncommitted changes will be copied; the user must approve both. Outside an existing managed worktree, creates one with the clean or change-copying Lane strategy, starts the project's Devenv lifecycle, and moves the current session at the next safe boundary. Never use it for analysis, read-only work, or routine small edits. In an existing managed worktree, starts or resumes its environment without creating another worktree. The source checkout is never cleaned. Do not run destination-dependent tools in the same execute call. After the move, use environment_status in a later call to verify readiness before claiming the application works.",
+        input: PrepareInput,
+        output: PrepareOutput,
+        options: { namespace: "boc", codemode: true, pinned: true },
+        execute: (input, call) => prepareEnvironment(context, environments, input, call),
+      })
     })
   })
+}
+
+export function prepareEnvironment(
+  context: EnvironmentAgentContext,
+  environments: Pick<EnvironmentBackend, "inspect" | "run">,
+  input: typeof PrepareInput.Type,
+  call: Pick<Tool.Context, "sessionID">,
+) {
+  return Effect.gen(function* () {
+    const worktrees = yield* context.worktree
+      .list({ projectID: context.location.project.id })
+      .pipe(Effect.mapError(toolError("Unable to inspect the current worktree")))
+    const current = worktrees.find((worktree) => worktree.directory === context.location.directory)
+    if (isLaneStrategy(current?.strategy)) {
+      return yield* prepareCurrentEnvironment(context, environments, call.sessionID)
+    }
+
+    if (!input.name) return yield* new Tool.Error({ message: "A Lane name is required for this checkout" })
+    if (input.includeChanges === undefined) {
+      return yield* new Tool.Error({ message: "Choose whether local changes should be copied into the new Lane" })
+    }
+    if (input.includeChanges && context.location.directory !== context.location.project.directory) {
+      return yield* new Tool.Error({
+        message:
+          "Lane can copy local changes only from the primary checkout. Preserve or clean the changes in this linked worktree before preparing a Lane.",
+      })
+    }
+
+    const changes = yield* context.vcs
+      .status()
+      .pipe(Effect.mapError(toolError("Unable to inspect local changes before creating the Lane")))
+    const created = yield* context.worktree
+      .create({
+        projectID: context.location.project.id,
+        from: context.location.directory,
+        name: input.name,
+      })
+      .pipe(Effect.mapError(toolError(`Unable to create Lane ${input.name}`)))
+    const operation = yield* runEnvironment(environments, {
+      projectID: context.location.project.id,
+      directory: created.directory,
+      sessionID: call.sessionID,
+      action: "setup",
+    })
+
+    if (!operation.accepted && operation.reason === "operation-running") {
+      return yield* new Tool.Error({
+        message: `Lane ${created.directory} was created, but another environment operation is already running`,
+      })
+    }
+    if (!operation.accepted) {
+      yield* context.worktree
+        .remove({ projectID: context.location.project.id, directory: created.directory, force: false })
+        .pipe(
+          Effect.mapError(
+            toolError(
+              `Environment setup was rejected (${operation.reason}) and the new Lane could not be removed: ${created.directory}`,
+            ),
+          ),
+        )
+      return yield* new Tool.Error({
+        message: `Environment setup was rejected (${operation.reason}); the new Lane was removed`,
+      })
+    }
+
+    yield* context.session
+      .move({ sessionID: call.sessionID, directory: created.directory, delivery: "steer" })
+      .pipe(
+        Effect.mapError(
+          toolError(`Lane ${created.directory} was created and setup started, but the session could not be moved`),
+        ),
+      )
+
+    const sourceChanges =
+      changes.data.length === 0
+        ? "The source checkout was clean."
+        : input.includeChanges
+          ? `${changes.data.length} changed file(s) were copied. The source checkout remains unchanged.`
+          : `${changes.data.length} changed file(s) remain only in the source checkout.`
+    return toolResult(
+      `Lane created: ${created.directory}\n${sourceChanges}\nEnvironment setup started. The session will move at the next safe boundary.\n\n${environmentStatus(operation.environment)}`,
+    )
+  })
+}
+
+function prepareCurrentEnvironment(
+  context: EnvironmentAgentContext,
+  environments: Pick<EnvironmentBackend, "inspect" | "run">,
+  sessionID: Tool.Context["sessionID"],
+) {
+  return Effect.gen(function* () {
+    const environment = yield* Effect.tryPromise({
+      try: () => environments.inspect(context.location.project.id, context.location.directory),
+      catch: toolError("Unable to inspect the current Lane environment"),
+    })
+    if (!environment.availability.available) {
+      return yield* new Tool.Error({
+        message: `The current Lane environment is unavailable: ${environment.availability.reason}`,
+      })
+    }
+    if (environment.latestRun?.status === "running") {
+      return toolResult(`Environment preparation is already running.\n\n${environmentStatus(environment)}`)
+    }
+    if (environment.stack.status === "invalid") {
+      return yield* new Tool.Error({ message: "The current Lane environment configuration is invalid" })
+    }
+    if (environment.stack.status === "configured" && environment.containers.status === "running") {
+      return toolResult(`Development environment is already running.\n\n${environmentStatus(environment)}`)
+    }
+    if (environment.stack.status === "configured" && environment.containers.status === "unknown") {
+      return yield* new Tool.Error({
+        message: "Container state is unknown; inspect the environment before starting another operation",
+      })
+    }
+
+    const action =
+      environment.stack.status === "unconfigured" || environment.containers.status === "absent" ? "setup" : "start"
+    const operation = yield* runEnvironment(environments, {
+      projectID: context.location.project.id,
+      directory: context.location.directory,
+      sessionID,
+      action,
+    })
+    if (!operation.accepted) {
+      return yield* new Tool.Error({ message: `Environment ${action} was rejected: ${operation.reason}` })
+    }
+    return toolResult(
+      `Environment ${action === "setup" ? "setup" : "start"} started.\n\n${environmentStatus(operation.environment)}`,
+    )
+  })
+}
+
+function runEnvironment(environments: Pick<EnvironmentBackend, "run">, input: Parameters<EnvironmentBackend["run"]>[0]) {
+  return Effect.tryPromise({
+    try: () => environments.run(input),
+    catch: toolError(`Unable to ${input.action} the development environment`),
+  })
+}
+
+function isLaneStrategy(strategy: string | undefined) {
+  return strategy === "lane" || strategy === "lane-clean" || strategy === "lane-dirty"
+}
+
+function toolError(message: string) {
+  return (error: unknown) => new Tool.Error({ message, error })
+}
+
+function toolResult(output: string) {
+  return { output, content: output }
 }
 
 export function environmentContextHook(

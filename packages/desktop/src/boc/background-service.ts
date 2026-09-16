@@ -118,5 +118,7 @@ async function availableIsolated(lifecycle: BocServiceLifecycle) {
 }
 
 function hasString<T extends string>(value: unknown, key: T): value is Record<T, string> {
-  return typeof value === "object" && value !== null && typeof Reflect.get(value, key) === "string"
+  if (typeof value !== "object" || value === null) return false
+  const record = value as Record<PropertyKey, unknown>
+  return typeof record[key] === "string"
 }
