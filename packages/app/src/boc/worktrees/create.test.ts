@@ -5,7 +5,7 @@ import { createRoot } from "solid-js"
 import { createWorktree } from "../../workspaces/create"
 import { bocWorktreeStrategy } from "./policy"
 
-test("uses Lane once and synchronizes the server-selected directory", async () => {
+test("creates a project worktree and synchronizes the server-selected directory", async () => {
   const project = { id: "proj_clone", directory: "/copies/repo", canonical: "/copies/repo" }
   const requests: Request[] = []
   const api = OpenCode.make({
@@ -33,14 +33,13 @@ test("uses Lane once and synchronizes the server-selected directory", async () =
         data,
         directory: project.directory,
         project,
-        strategy: "lane",
       })
 
       expect(directory).toBe("/copies/repo/.lane/trees/topic")
       const creations = requests.filter((request) => request.method === "POST")
       expect(creations).toHaveLength(1)
       expect(await creations[0].json()).toEqual({
-        strategy: "lane",
+        projectID: project.id,
         from: project.canonical,
       })
       expect(data.location.info({ directory })).toEqual({ directory, project })
@@ -50,7 +49,7 @@ test("uses Lane once and synchronizes the server-selected directory", async () =
   })
 })
 
-test("returns a Lane failure without retrying with Git", async () => {
+test("returns a worktree failure without retrying", async () => {
   const requests: Request[] = []
   const api = OpenCode.make({
     baseUrl: "http://localhost:3000",
@@ -58,7 +57,7 @@ test("returns a Lane failure without retrying with Git", async () => {
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const request = new Request(input, init)
         requests.push(request)
-        return Response.json({ message: "Lane strategy is unavailable" }, { status: 500 })
+        return Response.json({ message: "Worktree creation failed" }, { status: 500 })
       },
       { preconnect() {} },
     ),
@@ -70,11 +69,10 @@ test("returns a Lane failure without retrying with Git", async () => {
       data: { location: { syncInfo: async () => undefined } } as never,
       directory: "/project",
       project: { id: "project", directory: "/project", canonical: "/project" },
-      strategy: "lane",
     }),
   ).rejects.toBeDefined()
   expect(requests).toHaveLength(1)
-  expect(await requests[0].json()).toMatchObject({ strategy: "lane" })
+  expect(await requests[0].json()).toMatchObject({ projectID: "project" })
 })
 
 test("selects Lane only for Boc products", () => {

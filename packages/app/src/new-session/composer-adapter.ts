@@ -18,7 +18,6 @@ import { showToast } from "@/shell/notifications/toast"
 import { SessionRouteKey, SessionStateKey } from "@/runtime/server/scope"
 import { clearSessionMessageHandoff, setSessionMessageHandoff } from "@/session/handoff"
 import { useBocSessionLink } from "@/boc/session-links"
-import { bocWorktreeStrategy } from "@/boc/worktrees/policy"
 import type { DraftMcpControls } from "./mcp"
 
 export function createNewSessionComposerAdapter(props: {
@@ -68,7 +67,6 @@ export function createNewSessionComposerAdapter(props: {
         data,
         serverSDK,
         language,
-        worktreeStrategy: bocWorktreeStrategy(),
       })
       if (!sessionDirectory) {
         await pending?.rollback()
@@ -210,7 +208,6 @@ async function resolveSessionDirectory(input: {
   data: ReturnType<typeof useData>
   serverSDK: ReturnType<typeof useServerSDK>
   language: ReturnType<typeof useLanguage>
-  worktreeStrategy: ReturnType<typeof bocWorktreeStrategy>
 }) {
   if (input.worktree === "main") return input.projectDirectory
   if (input.worktree !== "create") return input.worktree
@@ -221,7 +218,6 @@ async function resolveSessionDirectory(input: {
     directory: input.projectDirectory,
     project: input.data.location.info({ directory: input.projectDirectory })?.project,
     branch: input.branch,
-    strategy: input.worktreeStrategy,
   }).catch((error) => {
     showToast({
       title: input.language.t("prompt.toast.worktreeCreateFailed.title"),

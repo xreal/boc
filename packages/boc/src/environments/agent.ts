@@ -1,7 +1,6 @@
 import type { Context } from "@opencode/plugin/effect/plugin"
 import type { SessionHooks } from "@opencode/plugin/effect/session"
 import { Tool } from "@opencode/schema/tool"
-import { Worktree } from "@opencode/schema/worktree"
 import { Effect, Schema } from "effect"
 import type { AgentEnvironment, EnvironmentBackend } from "./backend"
 
@@ -82,7 +81,7 @@ export function prepareEnvironment(
 ) {
   return Effect.gen(function* () {
     const worktrees = yield* context.worktree
-      .list()
+      .list({ projectID: context.location.project.id })
       .pipe(Effect.mapError(toolError("Unable to inspect the current worktree")))
     const current = worktrees.find((worktree) => worktree.directory === context.location.directory)
     if (isLaneStrategy(current?.strategy)) {
@@ -105,7 +104,7 @@ export function prepareEnvironment(
       .pipe(Effect.mapError(toolError("Unable to inspect local changes before creating the Lane")))
     const created = yield* context.worktree
       .create({
-        strategy: Worktree.StrategyID.make(input.includeChanges ? "lane-dirty" : "lane-clean"),
+        projectID: context.location.project.id,
         from: context.location.directory,
         name: input.name,
       })
@@ -124,7 +123,7 @@ export function prepareEnvironment(
     }
     if (!operation.accepted) {
       yield* context.worktree
-        .remove({ directory: created.directory, force: false })
+        .remove({ projectID: context.location.project.id, directory: created.directory, force: false })
         .pipe(
           Effect.mapError(
             toolError(

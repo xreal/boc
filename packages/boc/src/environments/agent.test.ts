@@ -58,7 +58,7 @@ for (const mode of [
     )
 
     expect(fixture.creations).toEqual([
-      { strategy: mode.strategy, from: fixture.source, name: "feature" },
+      { projectID: fixture.context.location.project.id, from: fixture.source, name: "feature" },
     ])
     expect(fixture.runs).toHaveLength(1)
     expect(fixture.runs[0]).toMatchObject({ directory: fixture.lane, action: "setup" })
@@ -85,7 +85,9 @@ test("removes a new Lane when setup is rejected before it starts", async () => {
     ),
   ).rejects.toThrow("the new Lane was removed")
 
-  expect(fixture.removals).toEqual([{ directory: fixture.lane, force: false }])
+  expect(fixture.removals).toEqual([
+    { projectID: fixture.context.location.project.id, directory: fixture.lane, force: false },
+  ])
   expect(fixture.moves).toEqual([])
 })
 
@@ -142,8 +144,8 @@ function agentFixture(options: {
     directory,
     project: { id: projectID, directory: source, canonical: source },
   })
-  const creations: Array<{ strategy?: string; from?: string; name?: string }> = []
-  const removals: Array<{ directory: string; force: boolean }> = []
+  const creations: Array<{ projectID?: string; from?: string; name?: string }> = []
+  const removals: Array<{ projectID?: string; directory: string; force: boolean }> = []
   const moves: Array<{ sessionID: string; directory: string; delivery?: string }> = []
   const runs: Array<Parameters<EnvironmentBackend["run"]>[0]> = []
   const context: Parameters<typeof prepareEnvironment>[0] = {
@@ -153,7 +155,7 @@ function agentFixture(options: {
         Effect.succeed([{ directory, ...(options.strategy === undefined ? {} : { strategy: options.strategy }) }]),
       create: (input) =>
         Effect.sync(() => {
-          creations.push({ strategy: input?.strategy, from: input?.from, name: input?.name })
+          creations.push({ projectID: input?.projectID, from: input?.from, name: input?.name })
           return { directory: lane }
         }),
       remove: (input) =>

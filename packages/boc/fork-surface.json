@@ -54,8 +54,8 @@
       "reason": "Run fork validation for v2 pull requests and release calls, cancel stale runs, and avoid allocating runners for disabled v2 E2E jobs"
     },
     {
-      "path": ".github/workflows/typecheck.yml",
-      "reason": "Run typechecking for v2 pull requests and release calls, with stale-run cancellation"
+      "path": ".github/workflows/check.yml",
+      "reason": "Run linting and typechecking for v2 pull requests and release calls, with stale-run cancellation"
     },
     {
       "path": ".github/workflows/deploy-files.yml",
@@ -103,7 +103,7 @@
     },
     {
       "path": "packages/app/src/new-session/composer-adapter.ts",
-      "reason": "Select Lane for Boc checkout creation and notify the Boc session-link bridge after successful session creation"
+      "reason": "Notify the Boc session-link bridge after successful session creation"
     },
     {
       "path": "packages/app/e2e/regression/boc-environment-header.spec.ts",
@@ -130,16 +130,8 @@
       "reason": "Render the session header end actions that own the Lane environment control"
     },
     {
-      "path": "packages/app/src/session/timeline/session-workspace-menu.tsx",
-      "reason": "Select Lane when Boc creates a checkout while moving a session"
-    },
-    {
       "path": "packages/app/src/session/files/session-side-panel.tsx",
       "reason": "Render the channel-aware Boc brand mark and place the compact environment action in the open side-panel header"
-    },
-    {
-      "path": "packages/app/src/workspaces/create.ts",
-      "reason": "Accept one optional explicit strategy while preserving Git for ordinary upstream creation"
     },
     {
       "path": "packages/app/src/shell/routes/routes.tsx",

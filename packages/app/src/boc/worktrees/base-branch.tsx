@@ -100,8 +100,9 @@ function useWorktreeOriginBranch() {
   createEffect(() => {
     const current = session()
     const root = project()
-    if (!current || !root?.vcs || sameDirectory(root.worktree, current.location.directory)) return
-    void server.ctx.sync.worktrees.load(root.worktree)
+    if (!current || !root?.id || !root.vcs || sameDirectory(root.worktree, current.location.directory)) return
+    const projectID = root.id
+    void server.ctx.sync.worktrees.list(projectID).then(() => server.ctx.sync.worktrees.refresh(projectID))
   })
   const target = createMemo(() => {
     const current = session()
