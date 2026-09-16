@@ -98,6 +98,18 @@
       "reason": "Verify the fork's preferred application defaults"
     },
     {
+      "path": "packages/app/src/composer/editor/editor.tsx",
+      "reason": "Apply the fork's spellcheck preference to the composer editor"
+    },
+    {
+      "path": "packages/app/src/settings/general/general.tsx",
+      "reason": "Expose the fork's spellcheck preference in general settings"
+    },
+    {
+      "path": "packages/app/src/settings/search-catalog.ts",
+      "reason": "Index the fork's spellcheck preference in settings search"
+    },
+    {
       "path": "packages/app/src/runtime/i18n/en.ts",
       "reason": "Define English source labels for Boc worktree origin details"
     },
