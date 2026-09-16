@@ -73,6 +73,7 @@ describe("settings schema", () => {
         showTerminal: false,
         timelineDetail: timelinePresets[2].value,
         showCustomAgents: false,
+        spellcheck: true,
         mobileTitlebarPosition: "top",
         mobileDiffWrap: true,
         terminalPlacement: "side",
@@ -146,6 +147,12 @@ describe("settings schema", () => {
     expect(decode({}).general.experimentalBrowser).toBe(false)
     expect(decode({ general: { experimentalBrowser: true } }).general.experimentalBrowser).toBe(true)
     expect(decode({ general: { experimentalBrowser: false } }).general.experimentalBrowser).toBe(false)
+  })
+
+  test("spellcheck is enabled by default and preserves an explicit choice", () => {
+    expect(decode({}).general.spellcheck).toBe(true)
+    expect(decode({ general: { spellcheck: false } }).general.spellcheck).toBe(false)
+    expect(decode({ general: { spellcheck: true } }).general.spellcheck).toBe(true)
   })
 
   test.each([undefined, null, false, 7, "invalid", []].map((invalid) => [invalid]))(

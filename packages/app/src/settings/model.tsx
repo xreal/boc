@@ -90,6 +90,7 @@ const generalSchema = Persistence.struct({
     tools: placementOnlySchema,
   }),
   showCustomAgents: Schema.Boolean,
+  spellcheck: Schema.Boolean,
   mobileTitlebarPosition: Schema.Literals(["top", "bottom"]),
   mobileDiffWrap: Schema.Boolean,
   terminalPlacement: Schema.Literals(["side", "bottom"]),
@@ -247,6 +248,7 @@ export const defaultSettings: Settings = {
     showTerminal: false,
     timelineDetail: { ...timelinePresets[2].value },
     showCustomAgents: false,
+    spellcheck: true,
     mobileTitlebarPosition: "top",
     mobileDiffWrap: true,
     terminalPlacement: "side",
@@ -336,6 +338,10 @@ export const { use: useSettings, provider: SettingsProvider } = createSimpleCont
         showCustomAgents,
         setShowCustomAgents(value: boolean) {
           setStore("general", "showCustomAgents", value)
+        },
+        spellcheck: withFallback(() => store.general?.spellcheck, defaultSettings.general.spellcheck),
+        setSpellcheck(value: boolean) {
+          setStore("general", "spellcheck", value)
         },
         mobileTitlebarPosition: withFallback(
           () => store.general?.mobileTitlebarPosition,
