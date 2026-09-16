@@ -1,19 +1,19 @@
 # Boc fork notes (append-only zone)
 
-- This is the Boc fork (`BergDevOrg/boc`). It extends the upstream opencode desktop beta.
+- This is the Boc fork (`xreal/boc`). It extends the upstream opencode desktop beta.
 - Upstream remote is `upstream` (`anomalyco/opencode`); `origin` is this fork. Sync with `git fetch upstream && git merge upstream/beta`. Never push to upstream.
 - Fork line `boc-beta` tracks `upstream/beta` (deliberate deviation from the upstream AGENTS.md default of `v2` below).
 - Goal: stay as close to upstream as possible. Keep the upstream diff minimal so pulls stay trivial:
   - Fork-owned code lives in dedicated directories (e.g. `packages/app/src/boc/`). Upstream files get additive-only touches (imports, registrations, extra switch/channel cases) — never behavior changes.
   - Prefer existing extension seams: Effect `Layer` overrides, additive RPC groups, `command.register`, channel-keyed build config.
-  - New app identity is channel-keyed (`boc`: `ai.boc.desktop.beta` / `Boc Beta` / updates from `BergDevOrg/boc`) so Boc Beta installs side-by-side with upstream OpenCode Beta.
+- New app identity is channel-keyed (`boc`: `ai.boc.desktop.beta` / `Boc Beta` / updates from `xreal/boc`) so Boc Beta installs side-by-side with upstream OpenCode Beta.
 - AGENTS.md convention: fork notes are added ABOVE the boundary line below, newest last. NEVER edit or delete anything below the boundary line — that content mirrors upstream verbatim so merges stay clean. NEVER rewrite the notes above; only append.
 
 ## Importand Rules:
 - Write code for expression, not just correctness: make variable names, method names, conditions, abstractions, and composition communicate intent clearly and naturally. Prefer simple, deliberate, Taylor Otwell or DHH style code that reads almost like prose, keeps control flow shallow, gives important concepts good names, removes unnecessary ceremony, and feels thoughtfully designed rather than merely working—without introducing speculative abstractions or architecture.
 
 ## Private iteration workflow
-- Until the repository owner explicitly changes this policy, work directly on `boc-beta`. Make small, logical conventional commits and push them to `origin/boc-beta`; do not open a pull request unless explicitly requested. Never push to `upstream` and do not force-push `boc-beta`.
+- Work directly on the active Boc branch; do not open a pull request unless explicitly requested.
 - Files under `tmp/` are local working documents. Update them when a task requires it, but never force-add or commit ignored `tmp/` files.
 - Never include personal names, email addresses, or user-specific absolute paths in repository files, plans, handovers, or prompts. Use role-based wording and repository-relative paths.
 - When the fork opens to other contributors, replace this policy with branch protection, required checks, and pull-request review before merging.
@@ -22,7 +22,7 @@
 - Use the project skill at `.opencode/skills/boc-upstream-sync/SKILL.md` for upstream reviews, merge rehearsals, and merges. It prioritizes incoming `core`, `app`, and `desktop` changes; TUI-only changes remain secondary unless they affect shared APIs.
 - Boc releases accept only the Boc application version. Keep `BOC_SERVER_VERSION` in `.github/workflows/boc-release.yml` pinned to the exact compatible official server version and update that pin during upstream syncs, not during routine Boc releases.
 - Since the stable V2 launch, `boc-beta` tracks `upstream/v2` despite its historical branch name and the older beta-tracking notes above. Sync with `git fetch upstream v2 && git merge upstream/v2`; Boc application versions remain independent from the pinned compatible official server version.
-- The primary fork branch is now `v2` and tracks `upstream/v2`; this supersedes the historical `boc-beta` branch policies above. Work directly on `v2`, push only to `origin/v2`, and do not force-push it.
+- The primary fork branch is now `v2` and tracks `upstream/v2`; this supersedes the historical `boc-beta` branch policies above. Work directly on `v2`.
 
 ## Boc feature map
 - `packages/boc/`
