@@ -54,6 +54,13 @@ const it = testEffect(
     ]),
     [
       Location.node.replace(tempLocationLayer),
+      Global.node.replace(
+        Layer.unwrap(
+          Effect.acquireDisposable(Effect.promise(() => tmpdir())).pipe(
+            Effect.map((tmp) => Global.layerWith({ config: path.join(tmp.path, "config"), home: tmp.path })),
+          ),
+        ),
+      ),
       Config.node.replace(
         Config.testLayer([
           new Document({
@@ -71,7 +78,7 @@ const it = testEffect(
 
 const live = testEffect(Layer.empty)
 
-it.effect("native controls enforce saved tools and skills, retain source and reject stale revisions", () =>
+it.live("native controls enforce saved tools and skills, retain source and reject stale revisions", () =>
   Effect.gen(function* () {
     const plugins = yield* Plugin.Service
     const rpc = yield* Rpc.Service
@@ -121,6 +128,11 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
         effect: (host) =>
           Effect.gen(function* () {
             const ctx = BocControlSource.remember(host, "native-fixture")
+            yield* ctx.agent.transform((editor) =>
+              editor.update(Agent.ID.make("bundled"), (agent) => {
+                agent.system = "Bundled agent without a configuration source"
+              }),
+            )
             yield* ctx.tool.transform((editor) =>
               editor.add({
                 name: "sample",
@@ -215,6 +227,13 @@ it.effect("native controls enforce saved tools and skills, retain source and rej
       .pipe(Effect.flip)
     expect(staleSource).toMatchObject({ type: "conflict" })
     const initial = yield* client.getState({})
+    expect(initial.items.find((item) => item.kind === "agent" && item.id === "bundled")).toMatchObject({
+      mutable: false,
+      reason: "read_only",
+    })
+    expect(
+      yield* client.setEnabled({ kind: "agent", id: "bundled", enabled: false, expectedRevision: 0 }).pipe(Effect.flip),
+    ).toMatchObject({ type: "not_supported" })
     expect(initial.items.find((item) => item.id === "sample")?.origin).toBe("system")
     expect(initial.items.find((item) => item.id === "guide")?.origin).toBe("system")
     const globalState = yield* client.getState({ scope: "global" })
@@ -744,6 +763,11 @@ live.live("native toggles reload configuration even without filesystem watches",
       return Effect.promise(async () => {
         await fs.mkdir(project, { recursive: true })
         await fs.mkdir(global, { recursive: true })
+        await fs.mkdir(path.join(global, "agents"), { recursive: true })
+        await Bun.write(
+          path.join(global, "agents", "reviewer.md"),
+          "---\nmode: subagent\ndescription: Reviews changes\n---\nReview carefully.\n",
+        )
         await Bun.write(
           path.join(project, "opencode.jsonc"),
           JSON.stringify({
@@ -794,12 +818,26 @@ live.live("native toggles reload configuration even without filesystem watches",
               },
             ])
             const client = rpc.client(BocControls.Rpc)
+            // A mutation is valid before any controls snapshot or agent listing.
+            const coldDisable = yield* client.setEnabled({
+              kind: "agent",
+              id: "reviewer",
+              enabled: false,
+              expectedRevision: 0,
+            })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toBeUndefined()
+            const coldReset = yield* client.clearOverride({
+              kind: "agent",
+              id: "reviewer",
+              expectedRevision: coldDisable.revision,
+            })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toMatchObject({ system: "Review carefully." })
             expect(yield* agents.get(Agent.ID.make("writer"))).toBeDefined()
             const disabled = yield* client.setEnabled({
               kind: "agent",
               id: "writer",
               enabled: false,
-              expectedRevision: 0,
+              expectedRevision: coldReset.revision,
             })
             expect(disabled.items.find((item) => item.kind === "agent" && item.id === "writer")?.override).toBe(false)
             yield* waitUntil(
@@ -874,6 +912,100 @@ live.live("native toggles reload configuration even without filesystem watches",
                 Effect.orDie,
               ),
             )
+            const beforeReview = yield* client.getState({})
+            expect(beforeReview.items.find((item) => item.kind === "agent" && item.id === "reviewer")).toMatchObject({
+              origin: "global",
+              mutable: true,
+              effective: "enabled",
+            })
+            const withoutReviewer = yield* client.setEnabled({
+              kind: "agent",
+              id: "reviewer",
+              enabled: false,
+              expectedRevision: beforeReview.revision,
+            })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toBeUndefined()
+            expect(withoutReviewer.items.find((item) => item.kind === "agent" && item.id === "reviewer")).toMatchObject(
+              {
+                override: false,
+                effective: "disabled",
+                application: "applied",
+              },
+            )
+            const globalReview = yield* client.getState({ scope: "global" })
+            expect(globalReview.items.find((item) => item.kind === "agent" && item.id === "reviewer")).toMatchObject({
+              origin: "global",
+              mutable: true,
+              effective: "enabled",
+            })
+            yield* client.clearOverride({ kind: "agent", id: "reviewer", expectedRevision: withoutReviewer.revision })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toBeDefined()
+            const globallyDisabled = yield* client.setEnabled({
+              scope: "global",
+              kind: "agent",
+              id: "reviewer",
+              enabled: false,
+              expectedRevision: globalReview.revision,
+            })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toBeUndefined()
+            expect(
+              globallyDisabled.items.find((item) => item.kind === "agent" && item.id === "reviewer"),
+            ).toMatchObject({
+              mutable: true,
+              override: false,
+              effective: "disabled",
+            })
+            const projectReview = yield* client.getState({})
+            expect(projectReview.items.find((item) => item.kind === "agent" && item.id === "reviewer")).toMatchObject({
+              mutable: false,
+              effective: "disabled",
+              reason: "disabled_globally",
+            })
+            expect(
+              yield* client
+                .setEnabled({
+                  kind: "agent",
+                  id: "reviewer",
+                  enabled: true,
+                  expectedRevision: projectReview.revision,
+                })
+                .pipe(Effect.flip),
+            ).toMatchObject({ type: "not_supported" })
+            const globallyEnabled = yield* client.setEnabled({
+              scope: "global",
+              kind: "agent",
+              id: "reviewer",
+              enabled: true,
+              expectedRevision: globallyDisabled.revision,
+            })
+            expect(yield* agents.get(Agent.ID.make("reviewer"))).toMatchObject({ system: "Review carefully." })
+            expect(globallyEnabled.items.find((item) => item.kind === "agent" && item.id === "reviewer")).toMatchObject(
+              {
+                override: null,
+                effective: "enabled",
+              },
+            )
+            yield* client.clearOverride({
+              scope: "global",
+              kind: "agent",
+              id: "reviewer",
+              expectedRevision: globallyEnabled.revision,
+            })
+            expect(
+              (yield* client.getState({})).items.find((item) => item.kind === "agent" && item.id === "reviewer"),
+            ).toMatchObject({
+              mutable: true,
+              override: null,
+              effective: "enabled",
+              application: "applied",
+            })
+            expect(yield* Effect.promise(() => Bun.file(path.join(global, "agents", "reviewer.md")).text())).toBe(
+              "---\nmode: subagent\ndescription: Reviews changes\n---\nReview carefully.\n",
+            )
+            expect(
+              parse((yield* client.getConfiguration({ scope: "project" })).content).agents.reviewer,
+            ).toBeUndefined()
+            expect(parse((yield* client.getConfiguration({ scope: "global" })).content).agents).toBeUndefined()
           }).pipe(Effect.provide(liveControlsLayer(project, global, false))),
         ),
       )

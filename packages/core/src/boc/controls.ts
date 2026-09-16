@@ -415,23 +415,32 @@ export const Definition = define({
         scope === "project"
           ? inventory
           : {
-              agent: Array.from(globalAgents.values()).map(({ id, agent, source }) => ({
-                id,
-                name: id,
-                description: agent.description ?? "",
-                source,
-                definition: agent,
-                ...(agent.disabled === undefined ? {} : { nativeOverride: !agent.disabled }),
-                defaultEnabled: true,
-                mutable: true,
-                ...(Config.latest(globalDocuments, "default_agent") === id &&
-                agent.mode !== "subagent" &&
-                !agent.disabled
-                  ? { defaultAgent: true }
-                  : {}),
-                ...(agent.mode ? { agentMode: agent.mode } : {}),
-                ...(agent.model ? { model: formatModel(agent.model) } : {}),
-              })),
+              agent: [
+                ...Array.from(globalAgents.values()).map(({ id, agent, source }) => ({
+                  id,
+                  name: id,
+                  description: agent.description ?? "",
+                  source,
+                  definition: agent,
+                  ...(agent.disabled === undefined ? {} : { nativeOverride: !agent.disabled }),
+                  defaultEnabled: true,
+                  mutable: true,
+                  ...(Config.latest(globalDocuments, "default_agent") === id &&
+                  agent.mode !== "subagent" &&
+                  !agent.disabled
+                    ? { defaultAgent: true }
+                    : {}),
+                  ...(agent.mode ? { agentMode: agent.mode } : {}),
+                  ...(agent.model ? { model: formatModel(agent.model) } : {}),
+                })),
+                ...inventory.agent.filter(
+                  (item) =>
+                    markdownAgent(item) &&
+                    item.source &&
+                    sourceScope(item.source) === "global" &&
+                    !globalAgents.has(item.id),
+                ),
+              ],
               skill: inventory.skill.filter((item) => item.source && sourceScope(item.source) === "global"),
               tool: [],
               mcp: Array.from(globalMcp.values()).map(({ id, server, source }) => ({
@@ -526,6 +535,8 @@ export const Definition = define({
       policies.lock.withPermits(1)(
         Effect.gen(function* () {
           const scope = change.scope ?? "project"
+          if (scope === "global" && change.kind === "tool" && change.action !== "clear")
+            return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
           const policy = scope === "global" ? defaults : project
           if (change.expectedRevision !== policy.policy.revision)
             return yield* Effect.fail(
@@ -539,12 +550,24 @@ export const Definition = define({
             return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
           if (change.action !== "clear" && current.incomplete.includes(change.kind))
             return yield* Effect.fail(call.error("not_ready", "boc.controls.not_ready", {}))
+          // Resolve the storage owner from this snapshot, never from an earlier
+          // getState call. Markdown agents are registry definitions, not JSON documents.
+          const configurationKind =
+            change.kind === "mcp" || (change.kind === "agent" && !markdownAgent(item)) ? change.kind : undefined
           if (change.action !== "retry") {
+            if (configurationKind)
+              yield* writeNativeOverride(
+                { ...change, kind: configurationKind, action: change.action, scope },
+                item,
+                call,
+              )
             const overrides = { ...policy.policy.settings[change.kind] }
             if (change.action === "clear") delete overrides[change.id]
             if (change.action === "set" && change.enabled !== undefined) {
-              if (scope === "global" && change.enabled) delete overrides[change.id]
-              if (scope === "project" || !change.enabled) overrides[change.id] = change.enabled
+              const removePolicy =
+                (scope === "global" && change.enabled) || (scope === "project" && !!configurationKind)
+              if (removePolicy) delete overrides[change.id]
+              if (!removePolicy) overrides[change.id] = change.enabled
             }
             const settings = { ...policy.policy.settings, [change.kind]: overrides }
             const save =
@@ -557,12 +580,13 @@ export const Definition = define({
               ),
             )
           }
-          yield* Effect.forEach(policy.members, (member) => member.apply(change.kind))
+          if (!configurationKind || scope === "global" || change.action === "retry")
+            yield* Effect.forEach(policy.members, (member) => member.apply(change.kind))
           yield* Effect.forEach(policy.members, (member) => member.changed())
           return yield* state(scope).pipe(Effect.orDie)
         }).pipe(Effect.uninterruptible),
       )
-    const mutateNative = (
+    const writeNativeOverride = (
       change: {
         kind: "agent" | "mcp"
         id: string
@@ -571,74 +595,51 @@ export const Definition = define({
         enabled?: boolean
         scope: BocControls.ConfigurationScope
       },
+      item: BocControls.Item,
       call: RpcCallContext<typeof BocControls.Rpc.methods.setEnabled>,
     ) =>
-      policies.lock.withPermits(1)(
-        Effect.gen(function* () {
-          const policy = change.scope === "global" ? defaults : project
-          if (change.expectedRevision !== policy.policy.revision)
-            return yield* Effect.fail(
-              call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
-            )
-          const current = yield* state(change.scope).pipe(Effect.orDie)
-          const item = current.items.find((item) => item.kind === change.kind && item.id === change.id)
-          if (!item) return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
-          if (change.action !== "clear" && !item.mutable)
-            return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
-          const capability =
-            change.scope === "global" ? item : inventory[change.kind].find((item) => item.id === change.id)
-          const scope = change.scope
-          const document = yield* configuration(scope).pipe(Effect.orDie)
-          const targetContainsDefinition = capability?.source === document.path
-          const definition =
-            !targetContainsDefinition && change.action === "set"
-              ? yield* rawDefinition(capability?.source, change.kind, change.id).pipe(Effect.orDie)
-              : undefined
-          if (!targetContainsDefinition && change.action === "set" && !definition)
-            return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
-          const path =
-            !targetContainsDefinition && change.action === "set"
-              ? change.kind === "agent"
-                ? ["agents", change.id]
-                : ["mcp", "servers", change.id]
-              : change.kind === "agent"
-                ? ["agents", change.id, "disabled"]
-                : ["mcp", "servers", change.id, "disabled"]
-          const value =
-            change.action === "clear"
-              ? undefined
-              : !targetContainsDefinition
-                ? { ...definition, disabled: !change.enabled }
-                : !change.enabled
-          const edits =
-            change.action === "clear" && !targetContainsDefinition
-              ? []
-              : modify(document.content, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } })
-          const saved = yield* saveConfiguration({
-            scope,
-            content: applyEdits(document.content, edits),
-            expectedRevision: document.revision,
-          }).pipe(Effect.orDie)
-          if (saved.type === "conflict") {
-            return yield* Effect.fail(
-              call.error("conflict", "boc.controls.conflict", { revision: policy.policy.revision }),
-            )
-          }
-          if (saved.type === "invalid") {
-            return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
-          }
-          const overrides = { ...policy.policy.settings[change.kind] }
-          if (change.scope === "global" && change.action === "set" && !change.enabled) overrides[change.id] = false
-          if (change.action === "clear" || change.scope === "project" || change.enabled) delete overrides[change.id]
-          const settings = { ...policy.policy.settings, [change.kind]: overrides }
-          const next = { revision: policy.policy.revision + 1, settings }
-          if (change.scope === "global") yield* policies.saveGlobal(policy, next)
-          if (change.scope === "project") yield* policies.save(ctx.location.project.id, policy, next)
-          if (change.scope === "global") yield* Effect.forEach(policy.members, (member) => member.apply(change.kind))
-          yield* Effect.forEach(policy.members, (member) => member.changed())
-          return yield* state(change.scope).pipe(Effect.orDie)
-        }).pipe(Effect.uninterruptible),
-      )
+      Effect.gen(function* () {
+        const scope = change.scope
+        const document = yield* configuration(scope).pipe(Effect.orDie)
+        const targetContainsDefinition = item.source === document.path
+        const definition =
+          !targetContainsDefinition && change.action === "set"
+            ? yield* rawDefinition(item.source, change.kind, change.id).pipe(Effect.orDie)
+            : undefined
+        if (!targetContainsDefinition && change.action === "set" && !definition)
+          return yield* Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
+        const path =
+          !targetContainsDefinition && change.action === "set"
+            ? change.kind === "agent"
+              ? ["agents", change.id]
+              : ["mcp", "servers", change.id]
+            : change.kind === "agent"
+              ? ["agents", change.id, "disabled"]
+              : ["mcp", "servers", change.id, "disabled"]
+        const value =
+          change.action === "clear"
+            ? undefined
+            : !targetContainsDefinition
+              ? { ...definition, disabled: !change.enabled }
+              : !change.enabled
+        const edits =
+          change.action === "clear" && !targetContainsDefinition
+            ? []
+            : modify(document.content, path, value, { formattingOptions: { insertSpaces: true, tabSize: 2 } })
+        const saved = yield* saveConfiguration({
+          scope,
+          content: applyEdits(document.content, edits),
+          expectedRevision: document.revision,
+        }).pipe(Effect.orDie)
+        if (saved.type === "conflict") {
+          return yield* Effect.fail(
+            call.error("conflict", "boc.controls.conflict", { revision: change.expectedRevision }),
+          )
+        }
+        if (saved.type === "invalid") {
+          return yield* Effect.fail(call.error("invalid_configuration", "boc.controls.invalid_configuration", {}))
+        }
+      })
     const registration = yield* ctx.rpc.register(BocControls.Rpc, {
       info: () => Effect.succeed(info()),
       getState: ({ scope }) => policies.lock.withPermits(1)(state(scope).pipe(Effect.orDie)),
@@ -693,26 +694,8 @@ export const Definition = define({
             )
           return yield* Effect.fail(call.error("unknown_capability", "boc.controls.unknown_capability", {}))
         }),
-      setEnabled: (target, call) => {
-        const scope = target.scope ?? "project"
-        if (scope === "global" && target.kind === "tool")
-          return Effect.fail(call.error("not_supported", "boc.controls.read_only", {}))
-        if (target.kind === "agent")
-          return scope === "project" && markdownAgent(inventory.agent.find((item) => item.id === target.id))
-            ? mutate({ ...target, scope, action: "set" }, call)
-            : mutateNative({ ...target, scope, kind: "agent", action: "set" }, call)
-        if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "set" }, call)
-        return mutate({ ...target, action: "set" }, call)
-      },
-      clearOverride: (target, call) => {
-        const scope = target.scope ?? "project"
-        if (target.kind === "agent")
-          return scope === "project" && markdownAgent(inventory.agent.find((item) => item.id === target.id))
-            ? mutate({ ...target, scope, action: "clear" }, call)
-            : mutateNative({ ...target, scope, kind: "agent", action: "clear" }, call)
-        if (target.kind === "mcp") return mutateNative({ ...target, scope, kind: "mcp", action: "clear" }, call)
-        return mutate({ ...target, action: "clear" }, call)
-      },
+      setEnabled: (target, call) => mutate({ ...target, action: "set" }, call),
+      clearOverride: (target, call) => mutate({ ...target, action: "clear" }, call),
       retryApply: (target, call) => mutate({ ...target, action: "retry" }, call),
     })
     member.changed = () =>
@@ -914,20 +897,21 @@ function agentCapability(agent: {
   mode?: "primary" | "subagent" | "all"
   model?: { providerID: string; id?: string; model?: string; variant?: string }
 }): Capability {
+  const source = sourceOf(agent)
   return {
     id: agent.id,
     name: agent.name,
     description: agent.description ?? "",
     value: agent,
     defaultEnabled: true,
-    source: sourceOf(agent),
-    mutable: true,
+    source,
+    mutable: source !== undefined,
     ...(agent.mode ? { agentMode: agent.mode } : {}),
     ...(agent.model ? { model: formatModel(agent.model) } : {}),
   }
 }
 
-function markdownAgent(item: Capability | undefined) {
+function markdownAgent(item: { source?: string } | undefined) {
   return item?.source?.toLowerCase().endsWith(".md") === true
 }
 
