@@ -64,28 +64,26 @@ test("creates a clean Lane, starts setup, and moves the session", async () => {
   expect(result.output).toContain("remain only in the source checkout")
 })
 
-for (const createdStrategy of ["git", "lane"]) {
-  test(`removes a worktree created by the unexpected ${createdStrategy} strategy`, async () => {
-    const fixture = agentFixture({ createdStrategy })
+test("removes a worktree created by the fallback Git strategy", async () => {
+  const fixture = agentFixture({ createdStrategy: "git" })
 
-    await expect(
-      Effect.runPromise(
-        prepareEnvironment(
-          fixture.context,
-          fixture.environments,
-          { name: "feature", confirmed: true },
-          { sessionID: fixture.sessionID },
-        ),
+  await expect(
+    Effect.runPromise(
+      prepareEnvironment(
+        fixture.context,
+        fixture.environments,
+        { name: "feature", confirmed: true },
+        { sessionID: fixture.sessionID },
       ),
-    ).rejects.toThrow("Lane plugin is not the selected worktree strategy")
+    ),
+  ).rejects.toThrow("Lane plugin is not the selected worktree strategy")
 
-    expect(fixture.removals).toEqual([
-      { projectID: fixture.context.location.project.id, directory: fixture.lane, force: false },
-    ])
-    expect(fixture.runs).toEqual([])
-    expect(fixture.moves).toEqual([])
-  })
-}
+  expect(fixture.removals).toEqual([
+    { projectID: fixture.context.location.project.id, directory: fixture.lane, force: false },
+  ])
+  expect(fixture.runs).toEqual([])
+  expect(fixture.moves).toEqual([])
+})
 
 test("removes a new Lane when setup is rejected before it starts", async () => {
   const fixture = agentFixture({ rejection: "not-available" })
@@ -110,7 +108,7 @@ test("removes a new Lane when setup is rejected before it starts", async () => {
 test("starts a stopped environment in the current Lane without creating another one", async () => {
   const fixture = agentFixture({
     directory: "/workspace/.lane/trees/existing",
-    strategy: "lane-dirty",
+    strategy: "lane",
     environment: environment(AbsolutePath.make("/workspace/.lane/trees/existing"), {
       stack: configuredStack(AbsolutePath.make("/workspace/.lane/trees/existing")),
       containers: { status: "stopped", total: 2, running: 0 },
@@ -173,7 +171,7 @@ function agentFixture(options: {
       list: () =>
         Effect.succeed([
           { directory, ...(options.strategy === undefined ? {} : { strategy: options.strategy }) },
-          ...(created ? [{ directory: lane, strategy: options.createdStrategy ?? "lane-clean" }] : []),
+          ...(created ? [{ directory: lane, strategy: options.createdStrategy ?? "lane" }] : []),
         ]),
       create: (input) =>
         Effect.sync(() => {

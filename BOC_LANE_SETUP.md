@@ -12,10 +12,10 @@ lane --version
 
 ## Install the OpenCode plugin
 
-Install the tested plugin `0.3.0` revision globally:
+Install the tested plugin `0.3.1` version globally:
 
 ```sh
-opencode plugin add git+https://github.com/bergthorsten/opencode-plugin-lane.git#v0.3.0
+opencode plugin add git+https://github.com/bergthorsten/opencode-plugin-lane.git#v0.3.1
 ```
 
 Configure the plugin in the backend's global `opencode.jsonc`. If the command already created an entry, edit that entry instead of adding a duplicate:
@@ -25,7 +25,7 @@ Configure the plugin in the backend's global `opencode.jsonc`. If the command al
   "$schema": "https://opencode.ai/config.json",
   "plugins": [
     {
-      "package": "git+https://github.com/bergthorsten/opencode-plugin-lane.git#v0.3.0",
+      "package": "git+https://github.com/bergthorsten/opencode-plugin-lane.git#v0.3.1",
       "options": {
         "executable": "<absolute-path-to-lane>"
       }
@@ -38,9 +38,8 @@ Use an absolute executable path because a GUI-launched Desktop service may not i
 
 ## Checkout behavior
 
-- Boc does not bundle Lane. The agent preparation tool verifies that the selected plugin strategy created a `lane-clean` worktree; it attempts to remove any unexpectedly owned worktree and stops before environment setup.
-- `lane-clean` is the plugin's selected default and never copies tracked edits or ordinary untracked files. The agent asks the user to confirm that those changes will remain only in the source checkout.
-- Existing worktrees recorded under the older `lane` or `lane-dirty` owners remain supported for discovery, startup, and removal, but new dirty Lane creation is rejected.
+- Boc does not bundle Lane. The agent preparation tool verifies that the selected plugin created a `lane` worktree; it attempts to remove any unexpectedly owned worktree and stops before environment setup.
+- `lane` never copies tracked edits or ordinary untracked files. The agent asks the user to confirm that those changes will remain only in the source checkout.
 - Gitignored files are still reflinked unless excluded. Add `lane.exclude` entries for secrets such as `.env` when needed.
 - Lane worktrees live under `<primary-checkout>/.lane/trees/`. The directory returned by the backend is authoritative in Boc.
 - `lane init` is not required for worktree operation. Use it only when intentionally adopting Lane's context-memory workflow because it edits `AGENTS.md` and creates tracked files.

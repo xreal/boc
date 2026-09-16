@@ -102,7 +102,7 @@ export function prepareEnvironment(
         ),
         Effect.mapError(toolError(`Lane ${created.directory} was created, but its owner could not be verified`)),
       )
-    if (createdOwner !== "lane-clean") {
+    if (createdOwner !== "lane") {
       yield* context.worktree
         .remove({ projectID: context.location.project.id, directory: created.directory, force: false })
         .pipe(
@@ -216,7 +216,7 @@ function runEnvironment(environments: Pick<EnvironmentBackend, "run">, input: Pa
 }
 
 function isLaneStrategy(strategy: string | undefined) {
-  return strategy === "lane" || strategy === "lane-clean" || strategy === "lane-dirty"
+  return strategy === "lane"
 }
 
 function toolError(message: string) {
