@@ -52,15 +52,15 @@ export async function inspectBocService(
   headers?: HeadersInit,
   request: typeof fetch = fetch,
 ): Promise<Inspection> {
-  const health = await request(new URL("/api/health", endpoint.url), { headers })
-  if (!health.ok) throw new Error(`Background service health check failed with HTTP ${health.status}`)
-  const healthBody: unknown = await health.json()
-  if (!hasString(healthBody, "version")) throw new Error("Background service health response has no version")
+  const status = await request(new URL("/api/status", endpoint.url), { headers })
+  if (!status.ok) throw new Error(`Background service status check failed with HTTP ${status.status}`)
+  const statusBody: unknown = await status.json()
+  if (!hasString(statusBody, "version")) throw new Error("Background service status response has no version")
 
   const boc =
     (await hasBackendRpc(BocEnvironmentRpc.Rpc.id, BocEnvironmentRpc.Info, endpoint, directory, headers, request)) &&
     (await hasProjectControls(endpoint, directory, headers, request))
-  return { version: healthBody.version, boc }
+  return { version: statusBody.version, boc }
 }
 
 async function hasBackendRpc(
