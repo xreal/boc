@@ -244,7 +244,9 @@ export default function JiraScreen(props: BocScreenProps) {
       return
     }
     setView("sessionFailure", false)
-    await props.host.sessions.start(jiraBlankSession(issue, target)).catch(() => setView("sessionFailure", true))
+    await props.host.sessions
+      .start(jiraBlankSession(issue, target, t("boc.jira.sessions.newTitle", { issue: issue.key, summary: issue.summary })))
+      .catch(() => setView("sessionFailure", true))
   }
 
   const startWork = async (issue: JiraBoardIssue) => {

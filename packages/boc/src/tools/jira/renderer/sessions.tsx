@@ -49,11 +49,23 @@ export function JiraIssueSessions(props: {
   const [sessions, { refetch }] = createResource(
     () => props.issue.url,
     async (issueUrl) => {
-      if (!desktop) return { links: [], failed: false }
-      return desktop.jira.listSessionLinks({ issueUrl }).then(
-        (links) => ({ links, failed: false }),
-        () => ({ links: [], failed: true }),
-      )
+      const sessionAccess = host.sessions
+      if (!desktop || !sessionAccess) return { links: [], failed: false }
+      try {
+        const links = await desktop.jira.listSessionLinks({ issueUrl })
+        return {
+          links: await Promise.all(
+            links.map(async (link) => {
+              if (!link.sessionID) return link
+              const title = await sessionAccess.getTitle(link.server, link.sessionID).catch(() => undefined)
+              return title ? { ...link, title } : link
+            }),
+          ),
+          failed: false,
+        }
+      } catch {
+        return { links: [], failed: true }
+      }
     },
   )
 
@@ -78,7 +90,15 @@ export function JiraIssueSessions(props: {
     const project = target()
     const sessions = host.sessions
     if (newChatDisabled() || !sessions || !project) return
-    await launch(() => sessions.start(jiraBlankSession(props.issue, project)))
+    await launch(() =>
+      sessions.start(
+        jiraBlankSession(
+          props.issue,
+          project,
+          props.t("boc.jira.sessions.newTitle", { issue: props.issue.key, summary: props.issue.summary }),
+        ),
+      ),
+    )
   }
 
   return (

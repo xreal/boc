@@ -138,6 +138,7 @@ export const jiraEnglish = {
   "boc.jira.sessions.count.one": "{{count}} session",
   "boc.jira.sessions.count.other": "{{count}} sessions",
   "boc.jira.sessions.new": "New chat",
+  "boc.jira.sessions.newTitle": "{{issue}}: New chat — {{summary}}",
   "boc.jira.sessions.start": "Work on this ticket",
   "boc.jira.sessions.instructions": "Optional instructions",
   "boc.jira.sessions.before": "Before the ticket",

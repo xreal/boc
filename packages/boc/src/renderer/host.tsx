@@ -26,6 +26,7 @@ export type BocHost = {
       prompt?: string
       model?: { providerID: string; modelID: string; variant?: string }
     }): Promise<void>
+    getTitle(server: string, sessionID: string): Promise<string | undefined>
     open(server: string, sessionID: string): Promise<void>
   }
   navigate(to: string): void

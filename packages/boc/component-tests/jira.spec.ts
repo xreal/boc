@@ -183,6 +183,14 @@ story("ticket workspace starts a blank chat with the normal default model", asyn
   await expect(page.getByRole("dialog")).toHaveCount(0)
 })
 
+story("ticket sessions show their current OpenCode titles", async ({ mount, page }) => {
+  await mount("boc-jira--sessions")
+  const sessions = page.getByRole("region", { name: "Agent Sessions", exact: true })
+  await expect(sessions.getByRole("button", { name: /Actual title session-1/ })).toHaveCount(1)
+  await expect(sessions.getByRole("button", { name: /Actual title session-2/ })).toHaveCount(1)
+  await expect(sessions.getByRole("button", { name: /Implement gallery navigation/ })).toHaveCount(0)
+})
+
 story(
   "pull requests offer one review action that starts a session with the saved template",
   async ({ mount, page }) => {

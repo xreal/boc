@@ -10,9 +10,12 @@ type Inspection = {
   readonly boc: boolean
 }
 
+export type BocServicePlacement = "shared" | "isolated"
+
 export type BocServiceLifecycle = {
   readonly version: string
   readonly mode: "initial" | "reconnect"
+  readonly placement: BocServicePlacement
   readonly discoverShared: () => Promise<Endpoint | undefined>
   readonly discoverIsolated: () => Promise<Endpoint | undefined>
   readonly inspect: (endpoint: Endpoint) => Promise<Inspection>
@@ -23,27 +26,26 @@ export type BocServiceLifecycle = {
 }
 
 export async function connectBocService(lifecycle: BocServiceLifecycle) {
+  if (lifecycle.placement === "isolated") return connectIsolatedBocService(lifecycle)
+
   const shared = await lifecycle.discoverShared()
-  if (!shared) {
-    const isolated = await availableIsolated(lifecycle)
-    if (isolated) return isolated
-    return requireBocService(await lifecycle.ensureShared(), lifecycle)
-  }
+  if (!shared) return requireBocService(await lifecycle.ensureShared(), lifecycle)
 
   const inspection = await lifecycle.inspect(shared)
   if (inspection.boc && (lifecycle.mode === "reconnect" || inspection.version === lifecycle.version)) return shared
-  if (!inspection.boc) {
-    const isolated = await availableIsolated(lifecycle)
-    if (isolated) return isolated
-  }
-  if (!inspection.boc && inspection.version !== lifecycle.version) {
-    return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
-  }
 
   await lifecycle.stopShared()
-  const replacement = await lifecycle.ensureShared()
-  if ((await lifecycle.inspect(replacement)).boc) return replacement
-  return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
+  return requireBocService(await lifecycle.ensureShared(), lifecycle)
+}
+
+export function bocServicePlacement(input: {
+  readonly forcedIsolated: boolean
+  readonly packaged: boolean
+  readonly hasIsolatedDatabase: boolean
+}): BocServicePlacement {
+  if (input.forcedIsolated) return "isolated"
+  if (input.packaged && input.hasIsolatedDatabase) return "isolated"
+  return "shared"
 }
 
 export async function inspectBocService(
@@ -52,15 +54,15 @@ export async function inspectBocService(
   headers?: HeadersInit,
   request: typeof fetch = fetch,
 ): Promise<Inspection> {
-  const health = await request(new URL("/api/health", endpoint.url), { headers })
-  if (!health.ok) throw new Error(`Background service health check failed with HTTP ${health.status}`)
-  const healthBody: unknown = await health.json()
-  if (!hasString(healthBody, "version")) throw new Error("Background service health response has no version")
+  const status = await request(new URL("/api/status", endpoint.url), { headers })
+  if (!status.ok) throw new Error(`Background service status check failed with HTTP ${status.status}`)
+  const statusBody: unknown = await status.json()
+  if (!hasString(statusBody, "version")) throw new Error("Background service status response has no version")
 
   const boc =
     (await hasBackendRpc(BocEnvironmentRpc.Rpc.id, BocEnvironmentRpc.Info, endpoint, directory, headers, request)) &&
     (await hasProjectControls(endpoint, directory, headers, request))
-  return { version: healthBody.version, boc }
+  return { version: statusBody.version, boc }
 }
 
 async function hasBackendRpc(
@@ -105,15 +107,14 @@ async function requireBocService(endpoint: Endpoint, lifecycle: BocServiceLifecy
   throw new Error("Boc background service did not provide its backend capabilities")
 }
 
-async function availableIsolated(lifecycle: BocServiceLifecycle) {
+async function connectIsolatedBocService(lifecycle: BocServiceLifecycle) {
   const isolated = await lifecycle.discoverIsolated()
-  if (!isolated) return undefined
+  if (!isolated) return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
+
   const inspection = await lifecycle.inspect(isolated)
-  if (!inspection.boc) {
-    await lifecycle.stopIsolated()
-    return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
-  }
-  if (lifecycle.mode === "reconnect" || inspection.version === lifecycle.version) return isolated
+  if (inspection.boc && (lifecycle.mode === "reconnect" || inspection.version === lifecycle.version)) return isolated
+
+  await lifecycle.stopIsolated()
   return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
 }
 

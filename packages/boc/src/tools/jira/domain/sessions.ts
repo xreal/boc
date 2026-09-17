@@ -130,10 +130,11 @@ export function jiraTicketSession(
 export function jiraBlankSession(
   issue: { key: string; summary: string; url: string },
   target: { server: string; directory: string },
+  title: string,
 ) {
   return {
     issueUrl: issue.url,
-    title: `${issue.key}: ${issue.summary}`,
+    title,
     target,
   }
 }
