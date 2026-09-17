@@ -298,8 +298,6 @@ function RootSettings() {
             <Tabs.Content value="projects" class="settings-panel">
               <SettingsProjects
                 server={server}
-                active={surface.view().tab === "projects"}
-                autofocus={!surface.search.state.selected}
                 onOpenProject={(project) =>
                   surface.openProject({
                     server: ServerConnection.key(server),
@@ -391,7 +389,6 @@ function ServerSettings(props: { entry: SettingsServer }) {
             <Tabs.Content value="projects" class="settings-panel">
               <SettingsProjects
                 server={server}
-                active={surface.view().tab === "projects"}
                 onOpenProject={(project) =>
                   surface.openProject({
                     server: props.entry.key,
