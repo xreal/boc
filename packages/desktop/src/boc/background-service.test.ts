@@ -119,7 +119,7 @@ describe("Boc background service", () => {
 
   test("recognizes only an enabled Boc backend", async () => {
     const responses = [
-      new Response(JSON.stringify({ healthy: true, version: "1.2.3", pid: 1 })),
+      Response.json({ version: "1.2.3", pid: 1, urls: ["http://official"] }),
       Response.json({ output: { protocol: 2 } }),
       new Response(
         JSON.stringify({
@@ -187,7 +187,8 @@ describe("Boc background service", () => {
         return responseFrom(responses)
       }),
     ).toEqual({ version: "1.2.3", boc: false })
-    expect(requests.slice(1).map((request) => request.url.pathname)).toEqual([
+    expect(requests.map((request) => request.url.pathname)).toEqual([
+      "/api/status",
       "/api/rpc/boc.environments.v1/info",
       "/api/rpc/boc.controls.v1/info",
     ])

@@ -9,7 +9,7 @@ import {
   normalizeJiraSessionInstructions,
 } from "./sessions"
 
-test("prepares a blank default chat without a prompt or model", () => {
+test("prepares a blank chat with its supplied title and no prompt or model", () => {
   expect(
     jiraBlankSession(
       {
@@ -18,10 +18,11 @@ test("prepares a blank default chat without a prompt or model", () => {
         url: "https://example.atlassian.net/browse/APP-42",
       },
       { server: "local", directory: "/workspace" },
+      "APP-42: New chat — Fix checkout",
     ),
   ).toEqual({
     issueUrl: "https://example.atlassian.net/browse/APP-42",
-    title: "APP-42: Fix checkout",
+    title: "APP-42: New chat — Fix checkout",
     target: { server: "local", directory: "/workspace" },
   })
 })
