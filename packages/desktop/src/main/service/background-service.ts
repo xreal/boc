@@ -1,6 +1,6 @@
 import { app } from "electron"
 import { Context, Effect, FileSystem, Layer, Path } from "effect"
-import { connectBocService, inspectBocService } from "../../boc/background-service"
+import { bocServicePlacement, connectBocService, inspectBocService } from "../../boc/background-service"
 import { bocServiceFile, isBocSourceBackend } from "../../boc/development"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
@@ -31,6 +31,7 @@ export const layer = Layer.effect(
 
 const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial" | "reconnect") {
   yield* Effect.logInfo("starting v2 background service")
+  const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const desktopCli = yield* DesktopCli.Service
   const runFork = Effect.runForkWith(yield* Effect.context())
@@ -38,6 +39,13 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const cli = yield* desktopCli.resolve
   const development = isBocSourceBackend(CHANNEL)
   const boc = CHANNEL === "boc" || development
+  const bocDatabase = path.join(app.getPath("userData"), "opencode.db")
+  const hasIsolatedDatabase = boc ? yield* fs.exists(bocDatabase) : false
+  const placement = bocServicePlacement({
+    forcedIsolated: isolated,
+    packaged: app.isPackaged,
+    hasIsolatedDatabase,
+  })
   const version = mode === "initial" ? cli.version : undefined
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
@@ -49,9 +57,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
       ...(boc && isolatedService
         ? {
             XDG_STATE_HOME: app.getPath("userData"),
-            OPENCODE_DB: development
-              ? (process.env.OPENCODE_DB ?? "opencode-local.db")
-              : path.join(app.getPath("userData"), "opencode.db"),
+            OPENCODE_DB: development ? (process.env.OPENCODE_DB ?? "opencode-local.db") : bocDatabase,
           }
         : {}),
     },
@@ -63,6 +69,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     return connectBocService({
       version: cli.version,
       mode,
+      placement,
       discoverShared: () => (isolated ? Promise.resolve(undefined) : client.Service.discover()),
       discoverIsolated: () => client.Service.discover({ file: serviceFile(path, true) }),
       inspect: (endpoint) => inspectBocService(endpoint, app.getPath("home"), client.Service.headers(endpoint)),
@@ -77,6 +84,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1"
   yield* Effect.logInfo("v2 CLI background service ready", {
     version,
+    placement,
     ...endpoint(url.origin),
   })
   if (mode === "initial" && isolated && cli.binary) yield* cleanStages(cli.binary).pipe(Effect.orDie)

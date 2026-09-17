@@ -1,6 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { Endpoint } from "@opencode/client/service"
-import { connectBocService, inspectBocService, type BocServiceLifecycle } from "./background-service"
+import {
+  bocServicePlacement,
+  connectBocService,
+  inspectBocService,
+  type BocServiceLifecycle,
+} from "./background-service"
 
 const official = endpoint("official")
 const boc = endpoint("boc")
@@ -33,49 +38,60 @@ describe("Boc background service", () => {
     expect(events).toEqual([
       "discover",
       "inspect:official",
-      "discover-isolated",
       "stop-shared",
       "ensure-shared",
       "inspect:boc",
     ])
   })
 
-  test("leaves an incompatible official service running", async () => {
+  test("replaces an incompatible official service without changing storage", async () => {
     const events: string[] = []
     const lifecycle = fixture(events, {
       shared: official,
+      sharedReplacement: boc,
       inspections: {
         official: { version: "2.0.0", boc: false },
+        boc: { version: "1.2.3", boc: true },
+      },
+    })
+
+    expect(await connectBocService(lifecycle)).toBe(boc)
+    expect(events).toEqual(["discover", "inspect:official", "stop-shared", "ensure-shared", "inspect:boc"])
+  })
+
+  test("reuses the isolated service selected by its existing database", async () => {
+    const events: string[] = []
+    const lifecycle = fixture(events, {
+      shared: official,
+      isolated,
+      placement: "isolated",
+      inspections: {
         isolated: { version: "1.2.3", boc: true },
       },
     })
 
     expect(await connectBocService(lifecycle)).toBe(isolated)
-    expect(events).toEqual(["discover", "inspect:official", "discover-isolated", "ensure-isolated", "inspect:isolated"])
+    expect(events).toEqual(["discover-isolated", "inspect:isolated"])
   })
 
-  test("reuses an existing isolated fallback", async () => {
+  test("starts the selected isolated service when its previous server is incompatible", async () => {
     const events: string[] = []
     const lifecycle = fixture(events, {
-      shared: official,
-      isolated,
-      inspections: {
-        official: { version: "2.0.0", boc: false },
-        isolated: { version: "1.2.3", boc: true },
-      },
+      placement: "isolated",
+      inspections: { isolated: { version: "1.2.3", boc: true } },
     })
 
     expect(await connectBocService(lifecycle)).toBe(isolated)
-    expect(events).toEqual(["discover", "inspect:official", "discover-isolated", "inspect:isolated"])
+    expect(events).toEqual(["discover-isolated", "ensure-isolated", "inspect:isolated"])
   })
 
-  test("updates an outdated isolated fallback without touching the shared service", async () => {
+  test("updates an outdated isolated service without touching the shared service", async () => {
     const events: string[] = []
     const lifecycle = fixture(events, {
       shared: official,
       isolated,
+      placement: "isolated",
       inspections: {
-        official: { version: "2.0.0", boc: false },
         isolated: { version: "1.0.0", boc: true },
         "isolated-current": { version: "1.2.3", boc: true },
       },
@@ -84,37 +100,37 @@ describe("Boc background service", () => {
 
     expect(await connectBocService(lifecycle)).toEqual(endpoint("isolated-current"))
     expect(events).toEqual([
-      "discover",
-      "inspect:official",
       "discover-isolated",
       "inspect:isolated",
+      "stop-isolated",
       "ensure-isolated",
       "inspect:isolated-current",
     ])
   })
 
-  test("falls back when another contender wins the shared registration", async () => {
+  test("does not change storage when another contender wins the shared registration", async () => {
     const events: string[] = []
     const lifecycle = fixture(events, {
       shared: official,
       sharedReplacement: official,
       inspections: {
         official: { version: "1.2.3", boc: false },
-        isolated: { version: "1.2.3", boc: true },
       },
     })
 
-    expect(await connectBocService(lifecycle)).toBe(isolated)
-    expect(events).toEqual([
-      "discover",
-      "inspect:official",
-      "discover-isolated",
-      "stop-shared",
-      "ensure-shared",
-      "inspect:official",
-      "ensure-isolated",
-      "inspect:isolated",
-    ])
+    await expect(connectBocService(lifecycle)).rejects.toThrow(
+      "Boc background service did not provide its backend capabilities",
+    )
+    expect(events).toEqual(["discover", "inspect:official", "stop-shared", "ensure-shared", "inspect:official"])
+  })
+
+  test("keeps packaged installations with an existing Boc database isolated", () => {
+    expect(bocServicePlacement({ forcedIsolated: false, packaged: true, hasIsolatedDatabase: true })).toBe("isolated")
+    expect(bocServicePlacement({ forcedIsolated: false, packaged: true, hasIsolatedDatabase: false })).toBe("shared")
+    expect(bocServicePlacement({ forcedIsolated: false, packaged: false, hasIsolatedDatabase: true })).toBe("shared")
+    expect(bocServicePlacement({ forcedIsolated: true, packaged: false, hasIsolatedDatabase: false })).toBe(
+      "isolated",
+    )
   })
 
   test("recognizes only an enabled Boc backend", async () => {
@@ -203,6 +219,7 @@ describe("Boc background service", () => {
     const current = endpoint("isolated-current")
     const lifecycle = fixture(events, {
       isolated,
+      placement: "isolated",
       isolatedReplacement: current,
       inspections: {
         isolated: { version: "1.2.3", boc: false },
@@ -211,7 +228,6 @@ describe("Boc background service", () => {
     })
     expect(await connectBocService(lifecycle)).toEqual(current)
     expect(events).toEqual([
-      "discover",
       "discover-isolated",
       "inspect:isolated",
       "stop-isolated",
@@ -226,6 +242,7 @@ function fixture(
   options: {
     readonly shared?: Endpoint
     readonly isolated?: Endpoint
+    readonly placement?: "shared" | "isolated"
     readonly sharedReplacement?: Endpoint
     readonly isolatedReplacement?: Endpoint
     readonly inspections: Record<string, { readonly version: string; readonly boc: boolean }>
@@ -234,6 +251,7 @@ function fixture(
   return {
     version: "1.2.3",
     mode: "initial",
+    placement: options.placement ?? "shared",
     discoverShared: async () => {
       events.push("discover")
       return options.shared
