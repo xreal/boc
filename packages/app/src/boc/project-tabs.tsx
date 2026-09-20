@@ -1,6 +1,7 @@
 import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js"
 import { createStore } from "solid-js/store"
 import { Schema } from "effect"
+import type { SessionInfo } from "@opencode/client/promise"
 import { createBocTranslator } from "@boc/extensions/renderer"
 import { Icon } from "@opencode/ui/icon"
 import { IconButton } from "@opencode/ui/icon-button"
@@ -50,6 +51,45 @@ export function reverseProjectTabGroups<T>(
   return projectOrder.flatMap((key) => groups.get(key)?.toReversed() ?? [])
 }
 
+export type ProjectTabGroupSource = {
+  server: ServerConnection.Key
+  tab: Tab
+  session: SessionInfo | undefined
+  pendingDirectory: string | undefined
+  rememberedDirectory: string | undefined
+  projects: LocalProject[]
+  untitled: string
+}
+
+// Pure group resolution for one tab, kept outside the memo so the
+// draft -> session transition stays covered by unit tests: every source
+// (live session, pending draft, persisted info) must map the same
+// directory to the same group key, otherwise a new tab visibly jumps
+// between project groups while its data arrives.
+export function resolveProjectTabGroup(input: ProjectTabGroupSource): {
+  key: string
+  name: string
+  path: string
+  project: LocalProject | undefined
+  directory: string | undefined
+} {
+  const directory =
+    input.tab.type === "draft"
+      ? input.tab.directory
+      : (input.session?.location.directory ?? input.pendingDirectory ?? input.rememberedDirectory)
+  const project = input.session
+    ? projectForSession(input.session, input.projects)
+    : input.projects.find((candidate) => directory && isProjectDirectory(candidate, directory))
+  const path = project?.worktree ?? directory
+  return {
+    key: JSON.stringify([input.server, path ? pathKey(path) : null]),
+    name: path ? displayName(project ?? { worktree: path }) : input.untitled,
+    path: path ?? "",
+    project,
+    directory,
+  }
+}
+
 export function createBocProjectTabs(input: {
   tabs: () => Tab[]
   current: () => Tab | undefined
@@ -68,23 +108,26 @@ export function createBocProjectTabs(input: {
       input.tabs().map((tab) => {
         const conn = servers.find((server) => ServerConnection.key(server) === tab.server)
         const ctx = conn ? global.ensureServerCtx(conn) : undefined
-        const session = tab.type === "session" ? ctx?.data.session.get(tab.sessionId) : undefined
-        const directory =
-          tab.type === "draft"
-            ? tab.directory
-            : (session?.location.directory ??
-              tabs.pendingSession(tab.server, tab.sessionId)?.draft.directory ??
-              tabs.info[tabKey(tab)]?.directory)
-        const project = session
-          ? projectForSession(session, ctx?.projects.list() ?? [])
-          : ctx?.projects.list().find((project) => directory && isProjectDirectory(project, directory))
-        const path = project?.worktree ?? directory
+        const group = resolveProjectTabGroup({
+          server: tab.server,
+          tab,
+          session: tab.type === "session" ? ctx?.data.session.get(tab.sessionId) : undefined,
+          pendingDirectory:
+            tab.type === "session"
+              ? tabs.pendingSession(tab.server, tab.sessionId)?.draft.directory
+              : undefined,
+          rememberedDirectory: tab.type === "session" ? tabs.info[tabKey(tab)]?.directory : undefined,
+          projects: ctx?.projects.list() ?? [],
+          untitled: language.t("session.tab.session"),
+        })
+        const project = group.project
+        const directory = group.directory
         return [
           tabKey(tab),
           {
-            key: JSON.stringify([tab.server, path ? pathKey(path) : null]),
-            name: path ? displayName(project ?? { worktree: path }) : language.t("session.tab.session"),
-            path: path ?? "",
+            key: group.key,
+            name: group.name,
+            path: group.path,
             server: tab.server,
             connection: conn,
             project,

@@ -127,6 +127,9 @@ export function createHomeSessionsController(home: HomeController) {
               const directory = entry.project?.worktree ?? entry.directory
               ctx.projects.open(directory)
               ctx.projects.touch(directory)
+              // Seed the cache first so the new tab lands in the session's
+              // project group immediately instead of a fallback group.
+              if (entry.session) ctx.data.session.remember(entry.session)
               void startTransition(() => {
                 const tab = tabs.addSessionTab({ server, sessionId: sessionID })
                 tabs.select(tab)

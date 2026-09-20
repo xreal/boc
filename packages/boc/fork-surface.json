@@ -118,6 +118,10 @@
       "reason": "Notify the Boc session-link bridge after successful session creation"
     },
     {
+      "path": "packages/app/src/home/sessions/controller.tsx",
+      "reason": "Seed Boc session tab grouping before opening a session from the home screen"
+    },
+    {
       "path": "packages/app/e2e/regression/boc-environment-header.spec.ts",
       "reason": "Verify Lane environment actions remain clear of adjacent session header controls in LTR and RTL layouts"
     },
@@ -148,6 +152,10 @@
     {
       "path": "packages/app/src/shell/routes/routes.tsx",
       "reason": "Mount the generic BOC route and command bridges"
+    },
+    {
+      "path": "packages/app/src/shell/commands/palette.ts",
+      "reason": "Seed Boc session tab grouping before opening a session from the command palette"
     },
     {
       "path": "packages/app/src/settings/shell.tsx",

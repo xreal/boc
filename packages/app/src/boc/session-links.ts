@@ -58,7 +58,10 @@ export function createBocSessions(): BocHost["sessions"] {
       const conn = servers.list.find((item) => ServerConnection.key(item) === server)
       if (!conn) throw new Error(t("boc.jira.sessions.unavailable"))
       const ctx = global.ensureServerCtx(conn)
-      await ctx.sdk.api.session.get({ sessionID })
+      const session = await ctx.sdk.api.session.get({ sessionID })
+      // Remember before adding the tab so the sidebar groups it by the
+      // session's project on the first frame instead of a stale fallback.
+      ctx.data.session.remember(session)
       const tab = tabs.addSessionTab({ server: ServerConnection.key(conn), sessionId: sessionID })
       tabs.select(tab)
     },

@@ -30,6 +30,7 @@ export type CommandPaletteEntry = {
   sessionID?: string
   server?: ServerConnection.Key
   project?: LocalProject
+  session?: SessionInfo
   archived?: number
   updated?: number
 }
@@ -176,6 +177,9 @@ export function createCommandPaletteModel(props: { filesOnly?: () => boolean; on
         serverCtx.projects.open(directory)
         serverCtx.projects.touch(directory)
       }
+      // Seed the cache first so the new tab lands in the session's project
+      // group immediately instead of a fallback group.
+      if (item.session) serverCtx.data.session.remember(item.session)
       const tab = appTabs.addSessionTab({
         server: item.server,
         sessionId: item.sessionID,
@@ -283,6 +287,7 @@ export function createServerSessionEntries(props: {
             sessionID: session.id,
             server: props.server,
             project,
+            session,
             updated: session.time.updated,
           }
         }),
