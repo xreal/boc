@@ -202,10 +202,6 @@
       "reason": "Compose generic BOC desktop handlers and services"
     },
     {
-      "path": "packages/desktop/src/main/lifecycle/environment.ts",
-      "reason": "Use Boc channel runtime identity"
-    },
-    {
       "path": "packages/desktop/src/main/service/background-service.ts",
       "reason": "Negotiate the shared compatible Boc backend with PTY handoff and an isolated version-mismatch fallback"
     },
