@@ -6,6 +6,7 @@ import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages, DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
+import { sidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
 
@@ -64,20 +65,31 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     onStart: (reason: "missing" | "version-mismatch", previousVersion?: string) =>
       runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
   })
-  const service = yield* Effect.tryPromise(() => {
-    if (!boc) return client.Service.ensure(options(isolated))
-    return connectBocService({
+  const ensureShared = () => client.Service.ensure(options(false))
+  const ensureIsolated = () => client.Service.ensure(options(true))
+  const early = mode === "initial" && placement === "shared" ? yield* Effect.promise(sidecarProbe) : undefined
+  const service = yield* Effect.tryPromise(async () => {
+    if (!boc) {
+      const ensure = placement === "isolated" ? ensureIsolated : ensureShared
+      if (!early) return ensure()
+      void ensure().catch(() => undefined)
+      return early
+    }
+
+    const connected = await connectBocService({
       version: cli.version,
       mode,
       placement,
-      discoverShared: () => (isolated ? Promise.resolve(undefined) : client.Service.discover()),
+      discoverShared: () => (early ? Promise.resolve(early) : client.Service.discover()),
       discoverIsolated: () => client.Service.discover({ file: serviceFile(path, true) }),
       inspect: (endpoint) => inspectBocService(endpoint, app.getPath("home"), client.Service.headers(endpoint)),
-      ensureShared: () => client.Service.ensure(options(isolated)),
-      ensureIsolated: () => client.Service.ensure(options(true)),
+      ensureShared,
+      ensureIsolated,
       stopShared: () => client.Service.stop({ pty: "handoff" }),
       stopIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "handoff" }),
     })
+    if (connected === early) void ensureShared().catch(() => undefined)
+    return connected
   })
   if (service.auth?.type !== "basic") throw new Error("V2 CLI background service did not provide authentication")
   const url = new URL(service.url)
@@ -85,6 +97,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   yield* Effect.logInfo("v2 CLI background service ready", {
     version,
     placement,
+    probed: service === early,
     ...endpoint(url.origin),
   })
   if (mode === "initial" && isolated && cli.binary) yield* cleanStages(cli.binary).pipe(Effect.orDie)

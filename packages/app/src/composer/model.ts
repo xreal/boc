@@ -11,6 +11,7 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useLayout } from "@/shell/state/layout"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useWorkspaceLocation } from "@/workspaces/location"
+import { resolveBlobUrl } from "@/runtime/persistence/drafts"
 import { useData, useServer } from "@/runtime/server/current"
 import { createSessionTabs } from "@/session/helpers"
 import { showToast } from "@/shell/notifications/toast"
@@ -263,6 +264,7 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     editor: () => editor,
     queueScroll: () => requestAnimationFrame(() => editor?.scrollIntoView({ block: "nearest" })),
     addToHistory: (value, mode) => controller.addHistory(value, mode),
+    removeFromHistory: (value, mode, comments) => history.remove(value, mode, mode === "shell" ? [] : comments),
     resetHistory: () => controller.resetHistory(),
     setMode: (next) => controller.dispatch({ type: next === "shell" ? "mode.shell" : "mode.normal" }),
     closePopover: () => controller.dispatch({ type: "popover.close" }),
@@ -322,7 +324,9 @@ export function createComposerModel(adapter: ComposerAdapter, options?: { queue?
     },
     openAttachment: (attachment) => {
       if (attachment.type !== "image") return
-      dialog.show(() => createComponent(ImagePreview, { src: attachment.blob.url, alt: attachment.filename }))
+      void resolveBlobUrl(attachment.blob).then((src) => {
+        if (src) dialog.show(() => createComponent(ImagePreview, { src, alt: attachment.filename }))
+      })
     },
     openContext(key) {
       const item = controller.contextItem(key)

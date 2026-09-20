@@ -54,6 +54,7 @@ export const Tab = Schema.Struct({
   url: Schema.String.check(Schema.isMaxLength(16_384)),
   title: short,
   loading: Schema.Boolean,
+  loadError: optional(short),
   canGoBack: Schema.Boolean,
   canGoForward: Schema.Boolean,
   generation: count,
@@ -159,8 +160,14 @@ export const Operations = [
   ),
   operation(
     "tabs.open",
-    "Open a browser tab. Defaults to about:blank and focused. Website traffic uses the connected server's network; localhost reaches that server.",
-    { url: optional(short), focus: optional(Schema.Boolean) },
+    "Open a browser tab, show it in the Review pane, and select it. Defaults to about:blank. Website traffic uses the connected server's network; localhost reaches that server.",
+    {
+      url: optional(short),
+      focus: optional(Schema.Boolean).annotate({
+        description:
+          "Default true: open the Review pane and select the new tab so the user sees it. Pass false only when the user asked for the tab to stay in the background.",
+      }),
+    },
     Tab,
   ),
   operation(
