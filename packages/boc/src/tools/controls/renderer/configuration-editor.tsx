@@ -44,6 +44,7 @@ export function ConfigurationEditor(props: {
     saved: false,
     closing: false,
     removing: false,
+    created: false,
   })
   const abort = new AbortController()
   const connection = props.host.connect(props.selection.server)
@@ -52,14 +53,7 @@ export function ConfigurationEditor(props: {
     location: { directory: props.selection.directory },
     signal: AbortSignal.any([abort.signal, AbortSignal.timeout(15_000)]),
   })
-  const addingDefinition = () =>
-    props.add &&
-    !view.saved &&
-    (view.category === "agent" || view.category === "mcp") &&
-    !!view.id.trim() &&
-    !addExists()
-  const dirty = () =>
-    !!view.document && (view.document.content !== view.content || view.invalidCode || addingDefinition())
+  const dirty = () => !!view.document && (view.document.content !== view.content || view.invalidCode)
   const parsed = createMemo(() => {
     const errors: ParseError[] = []
     const tree = parseTree(view.content, errors, { allowTrailingComma: true })
@@ -70,7 +64,7 @@ export function ConfigurationEditor(props: {
     const found = node(path)
     if (found) return getNodeValue(found)
     const server = path[0] === "mcp" && path[1] === "servers" ? view.document?.mcp?.[String(path[2])] : undefined
-    return server && path.length === 4 ? server[path[3] as keyof typeof server] : undefined
+    return server && path.length === 4 && !node(path.slice(0, 3)) ? server[path[3] as keyof typeof server] : undefined
   }
   const text = (path: (string | number)[]) => {
     const found = value(path)
@@ -95,6 +89,7 @@ export function ConfigurationEditor(props: {
       property.children?.[0]?.value ? [String(property.children[0].value)] : [],
     ) ?? []
   const openCode = () => {
+    if (view.advanced) return
     const existing = node(definition())
     setView({
       advanced: true,
@@ -105,12 +100,17 @@ export function ConfigurationEditor(props: {
   }
   const updateCode = (content: string) => {
     if (!props.item) {
-      setView({ content, saved: false, error: "" })
+      setView({ content, saved: false, error: "", removing: false })
       return
     }
     const errors: ParseError[] = []
     const tree = parseTree(content, errors, { allowTrailingComma: true })
-    setView({ code: content, invalidCode: !tree || tree.type !== "object" || errors.length > 0, saved: false })
+    setView({
+      code: content,
+      invalidCode: !tree || tree.type !== "object" || errors.length > 0,
+      saved: false,
+      removing: false,
+    })
     if (view.invalidCode || !parsed().valid) return
     const document = node(definition())
       ? view.content
@@ -136,27 +136,19 @@ export function ConfigurationEditor(props: {
       : ids().includes(name))
   const addExists = () =>
     props.add &&
-    !!view.id.trim() &&
+    !view.created &&
+    !!view.name.trim() &&
     (view.category === "agent"
-      ? props.agents.some((agent) => agent.id === view.id.trim())
-      : view.category === "mcp" && view.document?.mcp?.[view.id.trim()] !== undefined)
-  const contentForSave = () => {
-    if (!addingDefinition()) return view.content
-    const initial =
-      view.category === "agent"
-        ? { description: "", mode: "subagent" }
-        : { type: "remote", url: "https://", disabled: true }
-    const draft = value(definition())
-    const definitionValue = typeof draft === "object" && draft !== null && !Array.isArray(draft) ? draft : {}
-    return applyEdits(
-      view.content,
-      modify(
-        view.content,
-        definition(),
-        { ...initial, ...definitionValue },
-        { formattingOptions: { insertSpaces: true, tabSize: 2 } },
-      ),
-    )
+      ? props.agents.some((agent) => agent.id === view.name.trim()) ||
+        !!findNodeAtLocation(parseTree(view.document?.content ?? "{}")!, ["agents", view.name.trim()])
+      : view.category === "mcp" &&
+        (view.document?.mcp?.[view.name.trim()] !== undefined ||
+          !!findNodeAtLocation(parseTree(view.document?.content ?? "{}")!, ["mcp", "servers", view.name.trim()])))
+  const missingConnection = () => {
+    if (view.advanced || view.category !== "mcp" || !view.id || !parsed().valid) return
+    if (text([...definition(), "type"]) === "local")
+      return lines([...definition(), "command"]).trim() ? undefined : ("commandRequired" as const)
+    return text([...definition(), "url"]).trim() ? undefined : ("urlRequired" as const)
   }
   const existingInstruction = () => {
     const directory =
@@ -185,6 +177,7 @@ export function ConfigurationEditor(props: {
       ),
       saved: false,
       error: "",
+      removing: false,
     })
   }
   const updateLines = (path: string[], content: string) =>
@@ -214,14 +207,23 @@ export function ConfigurationEditor(props: {
     }
   }
   const save = async () => {
-    if (!connection || !view.document || view.saving || !parsed().valid || view.invalidCode) return
+    if (
+      !connection ||
+      !view.document ||
+      view.saving ||
+      !parsed().valid ||
+      view.invalidCode ||
+      missingConnection() ||
+      addExists()
+    )
+      return
     if (identity !== connection.identity()) {
       setView("error", "error")
       return
     }
     setView({ saving: true, error: "" })
     try {
-      const content = contentForSave()
+      const content = view.content
       const document = await connection
         .client()
         .saveConfiguration({ scope: view.scope, content, expectedRevision: view.document.revision }, options())
@@ -230,7 +232,7 @@ export function ConfigurationEditor(props: {
         setView("error", "error")
         return
       }
-      setView({ document, content: document.content, saved: true })
+      setView({ document, content: document.content, saved: true, created: props.add, closing: false })
       props.saved()
     } catch (error) {
       const type = typeof error === "object" && error !== null && "type" in error ? error.type : undefined
@@ -247,18 +249,22 @@ export function ConfigurationEditor(props: {
       if (!abort.signal.aborted) setView("saving", false)
     }
   }
-  const removeMcp = async () => {
-    if (!connection || !view.document || view.saving || view.category !== "mcp") return
+  const removeDefinition = async () => {
+    if (!connection || !view.document || view.saving || !["agent", "mcp"].includes(view.category)) return
     if (identity !== connection.identity()) {
       setView("error", "error")
       return
     }
     setView({ saving: true, error: "" })
     try {
-      const content = applyEdits(
+      const withoutDefinition = applyEdits(
         view.content,
         modify(view.content, definition(), undefined, { formattingOptions: { insertSpaces: true, tabSize: 2 } }),
       )
+      const content =
+        view.category === "agent" && text(["default_agent"]) === view.id
+          ? applyEdits(withoutDefinition, modify(withoutDefinition, ["default_agent"], undefined, {}))
+          : withoutDefinition
       await connection
         .client()
         .saveConfiguration({ scope: view.scope, content, expectedRevision: view.document.revision }, options())
@@ -284,7 +290,7 @@ export function ConfigurationEditor(props: {
   const close = () => {
     if (view.saving) return
     if (dirty()) {
-      setView("closing", true)
+      setView({ closing: true, removing: false })
       return
     }
     props.close()
@@ -335,6 +341,13 @@ export function ConfigurationEditor(props: {
           </Button>
         </Show>
         <Show when={view.document && !view.loading}>
+          <Show
+            when={
+              props.item && view.scope === "project" && props.item.origin !== "project" && props.item.kind === "agent"
+            }
+          >
+            <p class="controls-editor-hint">{props.t("boc.controls.editor.overrideHint")}</p>
+          </Show>
           <Show when={!props.add}>
             <div class="controls-editor-tabs" role="group" aria-label={title()}>
               <Button
@@ -342,10 +355,16 @@ export function ConfigurationEditor(props: {
                 size="small"
                 onClick={() => setView("advanced", false)}
                 disabled={view.invalidCode}
+                aria-pressed={!view.advanced}
               >
                 {props.t(props.item ? "boc.controls.editor.form" : "boc.controls.editor.commonSettings")}
               </Button>
-              <Button variant={view.advanced ? "outline" : "ghost"} size="small" onClick={openCode}>
+              <Button
+                variant={view.advanced ? "outline" : "ghost"}
+                size="small"
+                onClick={openCode}
+                aria-pressed={view.advanced}
+              >
                 {props.t("boc.controls.editor.advanced")}
               </Button>
             </div>
@@ -368,7 +387,7 @@ export function ConfigurationEditor(props: {
             }
           >
             <Show when={!props.add && !props.item}>
-              <Field label={props.t("boc.controls.editor.defaultAgent")}>
+              <Field group label={props.t("boc.controls.editor.defaultAgent")}>
                 <Choice
                   label={props.t("boc.controls.editor.defaultAgent")}
                   value={text(["default_agent"])}
@@ -384,7 +403,7 @@ export function ConfigurationEditor(props: {
               </Field>
             </Show>
             <Show when={!props.item && !props.category}>
-              <Field label={props.t("boc.controls.editor.kind")}>
+              <Field group label={props.t("boc.controls.editor.kind")}>
                 <Choice
                   label={props.t("boc.controls.editor.kind")}
                   value={view.category}
@@ -394,19 +413,21 @@ export function ConfigurationEditor(props: {
                     value: kind,
                     label: props.t(`boc.bergflow.${kind}`),
                   }))}
-                  onChange={(category) => setView({ category: category as Category, id: "", name: "" })}
+                  onChange={(category) =>
+                    setView({ category: category as Category, id: "", name: "", removing: false })
+                  }
                 />
               </Field>
             </Show>
             <Show when={view.category === "agent" || view.category === "mcp"}>
               <Show when={!props.item && !props.add && ids().length}>
-                <Field label={props.t("boc.controls.editor.definition")}>
+                <Field group label={props.t("boc.controls.editor.definition")}>
                   <Choice
                     label={props.t("boc.controls.editor.definition")}
                     value={view.id}
                     disabled={view.saving}
                     options={ids().map((id) => ({ value: id, label: id }))}
-                    onChange={(id) => setView("id", id)}
+                    onChange={(id) => setView({ id, removing: false })}
                   />
                 </Field>
               </Show>
@@ -414,12 +435,24 @@ export function ConfigurationEditor(props: {
                 <div class="controls-editor-create">
                   <Field label={props.t("boc.controls.editor.name")}>
                     <input
-                      value={props.add ? view.id : view.name}
+                      value={view.name}
                       placeholder={props.t("boc.controls.editor.nameHint")}
-                      disabled={view.saving || (props.add && view.document?.content !== view.content)}
+                      disabled={view.saving || (props.add && view.created)}
                       onInput={(event) => {
                         if (props.add) {
-                          setView({ id: event.currentTarget.value, saved: false })
+                          const name = event.currentTarget.value
+                          setView({ name, saved: false })
+                          if (!name.trim() || addExists()) return
+                          const draft = value(definition())
+                          if (view.id && view.id !== name.trim()) update(definition(), undefined)
+                          setView("id", name.trim())
+                          update(
+                            definition(),
+                            draft ??
+                              (view.category === "agent"
+                                ? { description: "", mode: "subagent" }
+                                : { type: "remote", disabled: true }),
+                          )
                           return
                         }
                         setView("name", event.currentTarget.value)
@@ -453,27 +486,7 @@ export function ConfigurationEditor(props: {
                   <p class="controls-editor-hint">{props.t("boc.controls.editor.alreadyAvailable")}</p>
                 </Show>
               </Show>
-              <Show when={view.id}>
-                <Field label={props.t("boc.controls.editor.activation")}>
-                  <Choice
-                    label={props.t("boc.controls.editor.activation")}
-                    value={
-                      !node([...definition(), "disabled"])
-                        ? "inherit"
-                        : value([...definition(), "disabled"]) === true
-                          ? "disabled"
-                          : "enabled"
-                    }
-                    disabled={view.saving}
-                    options={(["inherit", "enabled", "disabled"] as const).map((state) => ({
-                      value: state,
-                      label: props.t(`boc.controls.editor.${state}`),
-                    }))}
-                    onChange={(state) =>
-                      update([...definition(), "disabled"], state === "inherit" ? undefined : state === "disabled")
-                    }
-                  />
-                </Field>
+              <Show when={view.id && (!props.add || (!!view.name.trim() && !addExists()))}>
                 <Show when={view.category === "agent"}>
                   <Field label={props.t("boc.controls.editor.description")}>
                     <input
@@ -484,7 +497,7 @@ export function ConfigurationEditor(props: {
                       }
                     />
                   </Field>
-                  <Field label={props.t("boc.controls.editor.model")}>
+                  <Field group label={props.t("boc.controls.editor.model")}>
                     <ModelPicker
                       host={props.host}
                       selection={props.selection}
@@ -496,22 +509,6 @@ export function ConfigurationEditor(props: {
                       onChange={(model) => update([...definition(), "model"], model || undefined)}
                     />
                   </Field>
-                  <Field label={props.t("boc.controls.editor.mode")}>
-                    <Choice
-                      label={props.t("boc.controls.editor.mode")}
-                      value={text([...definition(), "mode"])}
-                      disabled={view.saving}
-                      inline
-                      options={[
-                        { value: "", label: props.t("boc.controls.editor.inherit") },
-                        ...(["primary", "subagent", "all"] as const).map((mode) => ({
-                          value: mode,
-                          label: props.t(`boc.controls.editor.${mode}`),
-                        })),
-                      ]}
-                      onChange={(mode) => update([...definition(), "mode"], mode || undefined)}
-                    />
-                  </Field>
                   <Field label={props.t("boc.controls.editor.system")}>
                     <textarea
                       value={text([...definition(), "system"])}
@@ -519,22 +516,9 @@ export function ConfigurationEditor(props: {
                       onInput={(event) => update([...definition(), "system"], event.currentTarget.value || undefined)}
                     />
                   </Field>
-                  <Show when={text([...definition(), "mode"]) !== "subagent"}>
-                    <Button
-                      variant="outline"
-                      disabled={
-                        view.saving ||
-                        value([...definition(), "disabled"]) === true ||
-                        text(["default_agent"]) === view.id
-                      }
-                      onClick={() => update(["default_agent"], view.id)}
-                    >
-                      {props.t("boc.controls.editor.makeDefault")}
-                    </Button>
-                  </Show>
                 </Show>
                 <Show when={view.category === "mcp"}>
-                  <Field label={props.t("boc.controls.editor.transport")}>
+                  <Field group label={props.t("boc.controls.editor.transport")}>
                     <Choice
                       label={props.t("boc.controls.editor.transport")}
                       value={text([...definition(), "type"]) || "remote"}
@@ -545,8 +529,8 @@ export function ConfigurationEditor(props: {
                       }))}
                       onChange={(type) => {
                         update([...definition(), "type"], type)
-                        ;(type === "local" ? ["url", "headers", "oauth"] : ["command", "env"]).forEach((key) =>
-                          update([...definition(), key], undefined),
+                        ;(type === "local" ? ["url", "headers", "oauth"] : ["command", "environment", "cwd"]).forEach(
+                          (key) => update([...definition(), key], undefined),
                         )
                       }}
                     />
@@ -578,20 +562,60 @@ export function ConfigurationEditor(props: {
                     </Field>
                   </Show>
                 </Show>
-                <Show when={!props.add && view.category === "agent" && definitions().includes(view.id)}>
-                  <Button
-                    variant="ghost"
-                    disabled={view.saving}
-                    onClick={() => {
-                      if (text(["default_agent"]) === view.id && view.category === "agent")
-                        update(["default_agent"], undefined)
-                      update(definition(), undefined)
-                      setView("id", "")
-                    }}
-                  >
-                    {props.t("boc.controls.editor.remove")}
-                  </Button>
-                </Show>
+                <details class="controls-editor-options" open={view.category === "mcp"}>
+                  <summary>{props.t("boc.controls.editor.moreOptions")}</summary>
+                  <Field group label={props.t("boc.controls.editor.activation")}>
+                    <Choice
+                      label={props.t("boc.controls.editor.activation")}
+                      value={
+                        !node([...definition(), "disabled"])
+                          ? "inherit"
+                          : value([...definition(), "disabled"]) === true
+                            ? "disabled"
+                            : "enabled"
+                      }
+                      disabled={view.saving}
+                      options={(["inherit", "enabled", "disabled"] as const).map((state) => ({
+                        value: state,
+                        label: props.t(`boc.controls.editor.${state}`),
+                      }))}
+                      onChange={(state) =>
+                        update([...definition(), "disabled"], state === "inherit" ? undefined : state === "disabled")
+                      }
+                    />
+                  </Field>
+                  <Show when={view.category === "agent"}>
+                    <Field group label={props.t("boc.controls.editor.mode")}>
+                      <Choice
+                        label={props.t("boc.controls.editor.mode")}
+                        value={text([...definition(), "mode"])}
+                        disabled={view.saving}
+                        inline
+                        options={[
+                          { value: "", label: props.t("boc.controls.editor.inherit") },
+                          ...(["primary", "subagent", "all"] as const).map((mode) => ({
+                            value: mode,
+                            label: props.t(`boc.controls.editor.${mode}`),
+                          })),
+                        ]}
+                        onChange={(mode) => update([...definition(), "mode"], mode || undefined)}
+                      />
+                    </Field>
+                    <Show when={text([...definition(), "mode"]) !== "subagent"}>
+                      <Button
+                        variant="outline"
+                        disabled={
+                          view.saving ||
+                          value([...definition(), "disabled"]) === true ||
+                          text(["default_agent"]) === view.id
+                        }
+                        onClick={() => update(["default_agent"], view.id)}
+                      >
+                        {props.t("boc.controls.editor.makeDefault")}
+                      </Button>
+                    </Show>
+                  </Show>
+                </details>
               </Show>
             </Show>
             <Show when={view.category === "skill"}>
@@ -717,12 +741,18 @@ export function ConfigurationEditor(props: {
           <Show when={view.document && (!parsed().valid || view.invalidCode)}>
             <p class="controls-editor-error">{props.t("boc.controls.editor.invalid")}</p>
           </Show>
+          <Show when={missingConnection()}>
+            {(message) => <p class="controls-editor-hint">{props.t(`boc.controls.editor.${message()}`)}</p>}
+          </Show>
           <Show when={view.saved}>
             <p class="controls-editor-success">{props.t("boc.controls.editor.saved")}</p>
           </Show>
           <Show when={view.removing}>
             <p class="controls-editor-danger">
-              {props.t("boc.controls.editor.removeMcpHint", { name: props.item?.name ?? view.id })}
+              {props.t(
+                view.category === "agent" ? "boc.controls.editor.removeAgentHint" : "boc.controls.editor.removeMcpHint",
+                { name: props.item?.name ?? view.id },
+              )}
             </p>
           </Show>
           <Show when={view.closing && dirty()}>
@@ -730,33 +760,69 @@ export function ConfigurationEditor(props: {
           </Show>
         </div>
         <div class="controls-editor-buttons">
-          <Show when={!props.add && view.category === "mcp" && definitions().includes(view.id)}>
+          <Show
+            when={
+              !props.add && ["agent", "mcp"].includes(view.category) && definitions().includes(view.id) && !view.closing
+            }
+          >
             <Button
               variant={view.removing ? "danger" : "ghost"}
               disabled={view.saving || dirty()}
               onClick={() => {
                 if (view.removing) {
-                  void removeMcp()
+                  void removeDefinition()
                   return
                 }
                 setView({ removing: true, saved: false })
               }}
             >
-              {props.t(view.removing ? "boc.controls.editor.confirmRemoveMcp" : "boc.controls.editor.removeMcp")}
+              {props.t(
+                view.category === "agent"
+                  ? view.removing
+                    ? "boc.controls.editor.confirmRemoveAgent"
+                    : "boc.controls.editor.removeAgent"
+                  : view.removing
+                    ? "boc.controls.editor.confirmRemoveMcp"
+                    : "boc.controls.editor.removeMcp",
+              )}
             </Button>
             <Show when={view.removing}>
               <Button variant="outline" disabled={view.saving} onClick={() => setView("removing", false)}>
-                {props.t("boc.controls.editor.keepMcp")}
+                {props.t(view.category === "agent" ? "boc.controls.editor.keepAgent" : "boc.controls.editor.keepMcp")}
               </Button>
             </Show>
           </Show>
           <Show when={view.closing && dirty()}>
-            <Button variant="outline" disabled={view.saving} onClick={props.close}>
+            <Button
+              variant="outline"
+              disabled={view.saving}
+              onClick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+                const field = event.currentTarget
+                  .closest('[role="dialog"]')
+                  ?.querySelector<HTMLElement>(
+                    ".controls-editor-body textarea:not(:disabled), .controls-editor-body input:not(:disabled)",
+                  )
+                setView("closing", false)
+                field?.focus()
+              }}
+            >
+              {props.t("boc.controls.editor.keepEditing")}
+            </Button>
+            <Button variant="ghost" disabled={view.saving} onClick={props.close}>
               {props.t("boc.controls.editor.discard")}
             </Button>
           </Show>
           <Button
-            disabled={!dirty() || !parsed().valid || view.invalidCode || view.saving || view.loading || addExists()}
+            disabled={
+              !dirty() ||
+              !parsed().valid ||
+              view.invalidCode ||
+              view.saving ||
+              view.loading ||
+              addExists() ||
+              !!missingConnection() ||
+              (props.add && ["agent", "mcp"].includes(view.category) && !view.name.trim())
+            }
             onClick={() => void save()}
           >
             {props.t(view.saving ? "boc.controls.editor.saving" : "boc.controls.editor.save")}
@@ -767,11 +833,21 @@ export function ConfigurationEditor(props: {
   )
 }
 
-function Field(props: { label: string; children: JSX.Element }) {
+function Field(props: { label: string; group?: boolean; children: JSX.Element }) {
   return (
-    <label class="controls-editor-field">
-      <span>{props.label}</span>
-      {props.children}
-    </label>
+    <Show
+      when={props.group}
+      fallback={
+        <label class="controls-editor-field">
+          <span>{props.label}</span>
+          {props.children}
+        </label>
+      }
+    >
+      <div class="controls-editor-field">
+        <span>{props.label}</span>
+        {props.children}
+      </div>
+    </Show>
   )
 }

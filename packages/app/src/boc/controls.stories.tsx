@@ -245,6 +245,30 @@ function ControlsPreview() {
       }
       return structuredClone(state())
     },
+    clearOverride: async (input: {
+      id: string
+      kind: ControlState["items"][number]["kind"]
+      expectedRevision: number
+      scope?: "project" | "global"
+    }) => {
+      if (input.scope === "global") {
+        if (input.expectedRevision !== globalRevision) throw { type: "conflict" }
+        globalSettings.delete(`${input.kind}:${input.id}`)
+        globalRevision++
+        return structuredClone(state("global"))
+      }
+      if (input.expectedRevision !== snapshot.revision) throw { type: "conflict" }
+      snapshot = {
+        ...snapshot,
+        revision: snapshot.revision + 1,
+        items: snapshot.items.map((item) =>
+          item.kind === input.kind && item.id === input.id
+            ? { ...item, override: null, effective: item.defaultEnabled ? "enabled" : "disabled" }
+            : item,
+        ),
+      }
+      return structuredClone(state())
+    },
     getConfiguration: async (input: { scope: "project" | "global" }) => document(documents[input.scope]),
     saveConfiguration: async (input: { scope: "project" | "global"; content: string; expectedRevision: string }) => {
       const current = documents[input.scope]

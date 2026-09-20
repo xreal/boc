@@ -122,7 +122,9 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       })),
     ),
   )
-  const edit = (scope: "project" | "global", item?: ControlItem, add = false, category?: (typeof kinds)[number]) =>
+  let editorTrigger: HTMLElement | undefined
+  const edit = (scope: "project" | "global", item?: ControlItem, add = false, category?: (typeof kinds)[number]) => {
+    if (!editor.open && document.activeElement instanceof HTMLElement) editorTrigger = document.activeElement
     setEditor({
       open: true,
       scope,
@@ -131,6 +133,13 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
       category,
       source: item?.kind === "skill" || item?.kind === "instruction" ? item.kind : undefined,
     })
+  }
+  const closeEditor = () => {
+    setEditor("open", false)
+    queueMicrotask(() => {
+      if (editorTrigger?.isConnected) editorTrigger.focus({ preventScroll: true })
+    })
+  }
   const disabled = () => view.stale || !!view.pending
   const headerDisabled = () => !view.selection || !view.snapshot || view.stale
   const clearFilters = () => {
@@ -154,9 +163,9 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
             variant="outline"
             size="small"
             onClick={() => void preserveFocus(control.refresh)}
-            disabled={!view.selection}
+            disabled={!view.selection || view.loading || !!view.pending}
           >
-            {t("boc.bergflow.refresh")}
+            {t(view.loading ? "boc.bergflow.refreshing" : "boc.bergflow.refresh")}
           </Button>
         </div>
       </header>
@@ -186,6 +195,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                   {t("boc.bergflow.project")}
                   <Choice
                     label={t("boc.bergflow.project")}
+                    inline={false}
                     value={view.selection ? JSON.stringify([view.selection.server, view.selection.project]) : ""}
                     disabled={!!view.pending}
                     options={projects().map((project) => ({
@@ -210,6 +220,9 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
                 {t("boc.bergflow.contextLocked")}
               </p>
             </Show>
+            <p class="controls-context-hint">
+              {t(view.scope === "project" ? "boc.controls.projectHelp" : "boc.controls.globalHelp")}
+            </p>
           </div>
           <div role="status" aria-live="polite" aria-atomic="true" class="controls-feedback text-13-regular">
             <Show when={view.error}>{(error) => <p>{t(`boc.bergflow.error.${error()}`)}</p>}</Show>
@@ -429,7 +442,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
               add={editor.add}
               category={editor.category}
               t={t}
-              close={() => setEditor("open", false)}
+              close={closeEditor}
               saved={() => void control.refresh()}
               agents={view.snapshot?.items.filter((item) => item.kind === "agent") ?? []}
               instructions={view.snapshot?.items.filter((item) => item.kind === "instruction") ?? []}
@@ -452,7 +465,7 @@ export default function ProjectControlsScreen(props: BocScreenProps) {
               t={t}
               canDelete={view.snapshot?.info.operations.includes("deleteSource") ?? false}
               skills={view.snapshot?.items.filter((item) => item.kind === "skill") ?? []}
-              close={() => setEditor("open", false)}
+              close={closeEditor}
               saved={() => void control.refresh()}
             />
           )}
@@ -470,7 +483,7 @@ function TableHeader(props: { kind: ControlItem["kind"]; t: BocTranslator }) {
       <Show when={props.kind === "agent"}>
         <span class="controls-cell-model">{props.t("boc.controls.editor.model")}</span>
       </Show>
-      <span class="controls-column-actions">{props.t("boc.controls.column.actions")}</span>
+      <span class="controls-column-actions sr-only">{props.t("boc.controls.column.actions")}</span>
       <span>{props.t("boc.controls.column.enabled")}</span>
     </div>
   )
@@ -553,19 +566,6 @@ function ControlRow(props: {
               {props.t(props.item.availability === "needs_auth" ? "boc.controls.signIn" : "boc.controls.connect")}
             </Button>
           </Show>
-          <Show when={props.item.override !== null && props.operations.includes("clearOverride")}>
-            <Tooltip value={props.t("boc.bergflow.reset")}>
-              <Button
-                variant="ghost"
-                size="small"
-                aria-label={props.t("boc.bergflow.reset")}
-                disabled={props.disabled}
-                onClick={() => props.change("clear")}
-              >
-                <Icon name="reset" size="small" />
-              </Button>
-            </Tooltip>
-          </Show>
           <Show
             when={
               props.operations.includes("getConfiguration") &&
@@ -581,11 +581,11 @@ function ControlRow(props: {
               <Button
                 variant="ghost"
                 size="small"
-                aria-label={props.t(overridesProject() ? "boc.controls.overrideForProject" : "boc.controls.edit")}
+                aria-label={props.t("boc.controls.edit")}
                 disabled={props.disabled}
                 onClick={props.edit}
               >
-                {props.t(overridesProject() ? "boc.controls.override" : "boc.controls.edit")}
+                {props.t("boc.controls.edit")}
               </Button>
             </Tooltip>
           </Show>
@@ -668,6 +668,11 @@ function ControlRow(props: {
           <Show when={props.item.reason}>{(reason) => <p>{props.t(`boc.bergflow.reason.${reason()}`)}</p>}</Show>
           <p>{props.t(`boc.bergflow.effect.${props.item.effect}`)}</p>
           <div class="flex flex-wrap gap-2">
+            <Show when={props.item.override !== null && props.operations.includes("clearOverride")}>
+              <Button variant="outline" size="small" disabled={props.disabled} onClick={() => props.change("clear")}>
+                {props.t("boc.bergflow.reset")}
+              </Button>
+            </Show>
             <Show
               when={
                 props.item.mutable && props.item.application === "failed" && props.operations.includes("retryApply")

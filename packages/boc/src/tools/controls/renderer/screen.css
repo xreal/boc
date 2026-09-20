@@ -21,10 +21,14 @@
   }
   .controls-context {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .controls-context-hint {
+    color: var(--v2-text-text-muted);
+    font-size: 12px;
+    line-height: var(--line-height-base);
   }
   .controls-project-select [data-component="select-v2"] {
     max-inline-size: 300px;
@@ -104,7 +108,7 @@
   .controls-table-head,
   .controls-table-row {
     display: grid;
-    grid-template-columns: minmax(140px, 1fr) 100px minmax(100px, 0.8fr) 160px 44px;
+    grid-template-columns: minmax(140px, 1fr) 100px minmax(100px, 0.8fr) 110px 44px;
     align-items: center;
     gap: 14px;
     padding-inline: 14px;
@@ -188,8 +192,9 @@
     gap: 2px;
     white-space: nowrap;
   }
-  .controls-column-actions {
-    text-align: end;
+  .controls-table-head > span:last-child {
+    grid-column: 5;
+    text-align: center;
   }
   .controls-cell-toggle {
     display: flex;
@@ -300,33 +305,61 @@
 
 @media (max-width: 700px) {
   [data-boc-controls] {
-    .controls-table-head,
-    .controls-table-row,
-    .controls-table-head[data-kind="agent"],
-    .controls-card[data-kind="agent"] .controls-table-row {
-      grid-template-columns: minmax(80px, 1fr) 64px 90px 32px;
-      gap: 6px;
-      padding-inline: 8px;
+    .controls-table-head {
+      display: none;
+    }
+    .controls-table-row {
+      grid-template-columns: minmax(0, 1fr) auto 32px;
+      gap: 2px 8px;
+      padding: 10px 12px;
+    }
+    .controls-card:first-child {
+      border-block-start: 0;
+    }
+    .controls-cell-name {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .controls-name-button {
+      padding-block: 2px;
+    }
+    .controls-card .controls-cell-origin,
+    .controls-card:not([data-kind="agent"]) .controls-cell-origin {
+      grid-column: 1;
+      grid-row: 2;
+      font-size: 11px;
     }
     .controls-cell-model {
-      display: none;
-    }
-    .controls-table-head:not([data-kind="agent"]) > span:nth-child(2),
-    .controls-card:not([data-kind="agent"]) .controls-cell-origin {
-      grid-column: auto;
-    }
-    .controls-cell-name h3 {
-      gap: 4px;
-    }
-    .controls-origin,
-    .controls-default-mark {
-      display: none;
-    }
-    .controls-cell-origin {
+      grid-column: 1;
+      grid-row: 3;
       font-size: 11px;
+    }
+    .controls-row-actions {
+      grid-column: 2;
+      grid-row: 1 / span 3;
+      flex-wrap: wrap;
+      max-inline-size: 100px;
+    }
+    .controls-cell-toggle {
+      grid-column: 3;
+      grid-row: 1 / span 3;
+    }
+    .controls-origin {
+      display: none;
     }
     .controls-project-line {
       align-items: start;
+    }
+    .controls-project-select [data-component="select-v2"] {
+      max-inline-size: min(260px, 60vw);
+    }
+    .controls-system-copy {
+      flex-direction: column;
+      align-items: start;
+      gap: 4px;
+    }
+    .controls-system-hint {
+      white-space: normal;
     }
   }
 }

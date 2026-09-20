@@ -52,7 +52,7 @@ export function SourceEditor(props: {
   const close = () => {
     if (view.saving) return
     if (dirty()) {
-      setView("closing", true)
+      setView({ closing: true, deleting: false })
       return
     }
     props.close()
@@ -71,7 +71,11 @@ export function SourceEditor(props: {
     )
   }
   const load = async () => {
-    if (!connection || !props.item) return
+    if (!props.item) return
+    if (!connection) {
+      setView({ loading: false, error: "error" })
+      return
+    }
     setView({ loading: true, error: "" })
     try {
       const source = await connection.client().getSource({ kind: props.kind, id: props.item.id }, options())
@@ -113,7 +117,7 @@ export function SourceEditor(props: {
           )
       if (abort.signal.aborted) return
       if (identity !== connection.identity()) throw new Error("boc.controls.connection_changed")
-      setView({ source, content: source.content, saved: true })
+      setView({ source, content: source.content, saved: true, closing: false, deleting: false })
       props.saved()
     } catch (error) {
       if (!abort.signal.aborted) failure(error)
@@ -123,6 +127,10 @@ export function SourceEditor(props: {
   }
   const remove = async () => {
     if (!connection || !view.source || view.saving) return
+    if (identity !== connection.identity()) {
+      setView("error", "error")
+      return
+    }
     setView({ saving: true, error: "" })
     try {
       await connection
@@ -168,6 +176,11 @@ export function SourceEditor(props: {
         <Show when={view.loading}>
           <p role="status">{props.t("boc.controls.editor.loading")}</p>
         </Show>
+        <Show when={!view.loading && props.item && !view.source && view.error}>
+          <Button variant="outline" onClick={() => void load()}>
+            {props.t("boc.controls.editor.retryLoad")}
+          </Button>
+        </Show>
         <Show when={!view.loading && (!props.item || view.source)}>
           <Show when={view.source}>
             <p class="controls-editor-path">
@@ -200,7 +213,9 @@ export function SourceEditor(props: {
               spellcheck={false}
               value={view.content}
               disabled={view.saving}
-              onInput={(event) => setView({ content: event.currentTarget.value, saved: false })}
+              onInput={(event) =>
+                setView({ content: event.currentTarget.value, saved: false, deleting: false, error: "" })
+              }
             />
           </label>
         </Show>
@@ -224,7 +239,7 @@ export function SourceEditor(props: {
           </Show>
         </div>
         <div class="controls-editor-buttons">
-          <Show when={props.canDelete && view.source}>
+          <Show when={props.canDelete && view.source && !view.closing}>
             <Button
               variant={view.deleting ? "danger" : "ghost"}
               disabled={view.saving || dirty()}
@@ -245,7 +260,22 @@ export function SourceEditor(props: {
             </Show>
           </Show>
           <Show when={view.closing && dirty()}>
-            <Button variant="outline" disabled={view.saving} onClick={props.close}>
+            <Button
+              variant="outline"
+              disabled={view.saving}
+              onClick={(event: MouseEvent & { currentTarget: HTMLButtonElement }) => {
+                const field = event.currentTarget
+                  .closest('[role="dialog"]')
+                  ?.querySelector<HTMLElement>(
+                    ".controls-editor-body textarea:not(:disabled), .controls-editor-body input:not(:disabled)",
+                  )
+                setView("closing", false)
+                field?.focus()
+              }}
+            >
+              {props.t("boc.controls.editor.keepEditing")}
+            </Button>
+            <Button variant="ghost" disabled={view.saving} onClick={props.close}>
               {props.t("boc.controls.editor.discard")}
             </Button>
           </Show>
