@@ -23,19 +23,22 @@ export type BocServiceLifecycle = {
   readonly ensureIsolated: () => Promise<Endpoint>
   readonly stopShared: () => Promise<void>
   readonly stopIsolated: () => Promise<void>
+  readonly resetShared: () => Promise<void>
+  readonly resetIsolated: () => Promise<void>
 }
 
 export async function connectBocService(lifecycle: BocServiceLifecycle) {
   if (lifecycle.placement === "isolated") return connectIsolatedBocService(lifecycle)
 
   const shared = await lifecycle.discoverShared()
-  if (!shared) return requireBocService(await lifecycle.ensureShared(), lifecycle)
+  if (!shared)
+    return requireBocService(await ensureBocService(lifecycle.ensureShared, lifecycle.resetShared), lifecycle)
 
   const inspection = await lifecycle.inspect(shared)
   if (inspection.boc && (lifecycle.mode === "reconnect" || inspection.version === lifecycle.version)) return shared
 
   await lifecycle.stopShared()
-  return requireBocService(await lifecycle.ensureShared(), lifecycle)
+  return requireBocService(await ensureBocService(lifecycle.ensureShared, lifecycle.resetShared), lifecycle)
 }
 
 export function bocServicePlacement(input: {
@@ -109,13 +112,24 @@ async function requireBocService(endpoint: Endpoint, lifecycle: BocServiceLifecy
 
 async function connectIsolatedBocService(lifecycle: BocServiceLifecycle) {
   const isolated = await lifecycle.discoverIsolated()
-  if (!isolated) return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
+  if (!isolated)
+    return requireBocService(await ensureBocService(lifecycle.ensureIsolated, lifecycle.resetIsolated), lifecycle)
 
   const inspection = await lifecycle.inspect(isolated)
   if (inspection.boc && (lifecycle.mode === "reconnect" || inspection.version === lifecycle.version)) return isolated
 
   await lifecycle.stopIsolated()
-  return requireBocService(await lifecycle.ensureIsolated(), lifecycle)
+  return requireBocService(await ensureBocService(lifecycle.ensureIsolated, lifecycle.resetIsolated), lifecycle)
+}
+
+async function ensureBocService(ensure: () => Promise<Endpoint>, reset: () => Promise<void>) {
+  try {
+    return await ensure()
+  } catch (error) {
+    if (!(error instanceof Error) || error.message !== "Background service failed to start") throw error
+    await reset()
+    return ensure()
+  }
 }
 
 function hasString<T extends string>(value: unknown, key: T): value is Record<T, string> {

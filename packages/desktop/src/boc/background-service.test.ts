@@ -85,6 +85,17 @@ describe("Boc background service", () => {
     expect(events).toEqual(["discover-isolated", "ensure-isolated", "inspect:isolated"])
   })
 
+  test("recovers a failed service without restoring a stale terminal handoff", async () => {
+    const events: string[] = []
+    const lifecycle = fixture(events, {
+      inspections: { boc: { version: "1.2.3", boc: true } },
+      sharedEnsureFailures: 1,
+    })
+
+    expect(await connectBocService(lifecycle)).toBe(boc)
+    expect(events).toEqual(["discover", "ensure-shared", "reset-shared", "ensure-shared", "inspect:boc"])
+  })
+
   test("updates an outdated isolated service without touching the shared service", async () => {
     const events: string[] = []
     const lifecycle = fixture(events, {
@@ -245,9 +256,11 @@ function fixture(
     readonly placement?: "shared" | "isolated"
     readonly sharedReplacement?: Endpoint
     readonly isolatedReplacement?: Endpoint
+    readonly sharedEnsureFailures?: number
     readonly inspections: Record<string, { readonly version: string; readonly boc: boolean }>
   },
 ): BocServiceLifecycle {
+  let sharedEnsureFailures = options.sharedEnsureFailures ?? 0
   return {
     version: "1.2.3",
     mode: "initial",
@@ -269,6 +282,10 @@ function fixture(
     },
     ensureShared: async () => {
       events.push("ensure-shared")
+      if (sharedEnsureFailures > 0) {
+        sharedEnsureFailures--
+        throw new Error("Background service failed to start")
+      }
       return options.sharedReplacement ?? boc
     },
     ensureIsolated: async () => {
@@ -280,6 +297,12 @@ function fixture(
     },
     stopIsolated: async () => {
       events.push("stop-isolated")
+    },
+    resetShared: async () => {
+      events.push("reset-shared")
+    },
+    resetIsolated: async () => {
+      events.push("reset-isolated")
     },
   }
 }
