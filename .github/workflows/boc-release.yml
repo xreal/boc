@@ -176,6 +176,17 @@ jobs:
         working-directory: packages/desktop
         run: bun run prepare:boc
 
+      - name: Validate desktop resources
+        working-directory: packages/desktop
+        shell: bash
+        run: |
+          test -s "resources/opencode-cli.version"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            test -s "resources/opencode-cli.exe"
+          else
+            test -s "resources/opencode-cli"
+          fi
+
       - name: Build desktop application
         working-directory: packages/desktop
         run: bun run build:boc

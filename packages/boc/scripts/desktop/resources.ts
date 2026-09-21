@@ -10,12 +10,20 @@ export async function prepareBocIcons(local: boolean) {
   await cp(path.join(desktopDirectory, "icons", local ? "boc-dev" : "boc"), destination, { recursive: true })
 }
 
-export async function stageBocCli(root: string) {
-  const cli = getCurrentCli()
+export async function stageBocCli(
+  root: string,
+  target?: string,
+  resources = path.join(desktopDirectory, "resources"),
+) {
+  const cli = getCurrentCli(target)
   const filename = cli.os === "win32" ? "opencode.exe" : "opencode"
-  const destination = path.join(desktopDirectory, "resources", cli.os === "win32" ? "opencode-cli.exe" : "opencode-cli")
-  await mkdir(path.dirname(destination), { recursive: true })
-  await copyFile(path.join(root, cli.package.replace("@opencode/", ""), "bin", filename), destination)
+  const packageDirectory = path.join(root, cli.package.replace("@opencode/", ""))
+  const destination = path.join(resources, cli.os === "win32" ? "opencode-cli.exe" : "opencode-cli")
+  await mkdir(resources, { recursive: true })
+  await copyFile(path.join(packageDirectory, "bin", filename), destination)
+  const manifest = (await Bun.file(path.join(packageDirectory, "package.json")).json()) as { version?: string }
+  if (!manifest.version) throw new Error(`Bundled CLI package has no version: ${packageDirectory}`)
+  await Bun.write(path.join(resources, "opencode-cli.version"), manifest.version)
   if (cli.os !== "win32") await chmod(destination, 0o755)
   if (
     cli.os === "win32" &&
