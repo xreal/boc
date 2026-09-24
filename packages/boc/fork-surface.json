@@ -162,10 +162,6 @@
       "reason": "Register the Boc section in upstream's server-aware settings navigation"
     },
     {
-      "path": "packages/app/src/settings/surface.tsx",
-      "reason": "Recognize Boc as a server-aware settings destination"
-    },
-    {
       "path": "packages/app/src/settings/route.ts",
       "reason": "Preserve the Boc settings destination in persistent settings URLs"
     },

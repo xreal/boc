@@ -89,6 +89,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
       stopIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "handoff" }),
       resetShared: () => client.Service.stop({ pty: "clear" }),
       resetIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "clear" }),
+    })
     if (connected === early) void ensureShared().catch(() => undefined)
     return connected
   })
