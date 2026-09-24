@@ -23,6 +23,14 @@ Keep `v2` close to `upstream/v2` while preserving the smallest supported Boc int
 5. Give TUI-only changes lower priority, but follow any shared core, protocol, schema, client, UI, or server impact.
 6. Look for new upstream extension points or APIs that can replace a Boc override, copied assumption, or brittle internal import.
 
+## Triage conflicts and shrink the fork surface
+
+- Count *actual* merge conflicts by cause before proposing hook removal: package versions, lockfile, workflows, and source integrations. A remerge diff's changed-file list includes cleanly merged files too; use its `remerge CONFLICT` entries or the merge's unmerged paths for the count.
+- Check the merge base and ancestry of release tags. The v2.0.16 sync had 43 conflicts: 37 `package.json` version fields, `bun.lock`, a workflow, and four source files. Its base was v2.0.10 while Boc had v2.0.11 and the incoming tag had v2.0.16; v2.0.11 was not an ancestor of v2.0.16. Removing Boc hooks would not have prevented those version conflicts. Resolve versions to the compatible incoming upstream release, review dependency and lockfile changes separately, and do not use a blanket ours/theirs merge driver that could hide upstream changes.
+- Compare the finished fork against the exact incoming upstream ref, not just the conflicted paths. Remove stale approvals from `packages/boc/fork-surface.json` when an upstream file no longer differs. For example, the Boc changes to `packages/app/src/settings/surface.tsx` were retired during the v2.0.16 sync after upstream moved route parsing into `settings/route.ts`.
+- Prioritize large, repeatedly conflicted edits such as `packages/desktop/src/main/service/background-service.ts`. Look for a narrow delegation to Boc-owned startup policy while preserving upstream service discovery, early probe, PTY handoff, authentication, and reconnect behavior. Do not copy the entire upstream service into Boc merely to remove one touched file; that creates a harder-to-maintain fork.
+- Keep small additive app route and layout registrations when they are required for `/boc/*` to be recognized. Moving Boc settings out of native settings navigation is a product/UX decision, not a conflict-resolution shortcut. Keep provenance and instruction-selection hooks while native Project Controls depend on their exact behavior; replace them only when a tested upstream seam provides the same contract.
+
 ## Merge and adapt
 
 - Follow the repository workflow: merge `upstream/v2` into `v2`; do not squash or rewrite upstream history.
