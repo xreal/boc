@@ -1,5 +1,7 @@
 export { JiraIssueInspector, JiraIssueDialog } from "./renderer/inspector"
 export { JiraIssueCard } from "./renderer/card"
+export { default as JiraScreen } from "./renderer/screen"
+export type { JiraPreferences } from "./domain/board"
 export { deploymentSystemFixtures } from "../deployments/fixtures/systems"
 export { createJiraAssignments } from "./renderer/assignments"
 export { createJiraFixtureApi, jiraIssueFixture } from "./fixtures/issue"

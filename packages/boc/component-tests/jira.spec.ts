@@ -1,5 +1,23 @@
 import { expect, story } from "../../storybook/playwright/story"
 
+story("new Jira connection saves its default board and opens it", async ({ mount, page }) => {
+  await mount("boc-jira--connection")
+  await page.getByRole("status").getByRole("button", { name: "Settings" }).click()
+  const settings = page.getByRole("dialog", { name: "Settings" })
+  await settings.getByRole("textbox", { name: "Site" }).fill("example.atlassian.net")
+  await settings.getByRole("textbox", { name: "Email" }).fill("team@example.invalid")
+  await settings.getByLabel("API token").fill("fixture-token")
+  await settings.getByRole("button", { name: "Save" }).click()
+
+  const picker = page.getByRole("dialog", { name: "Default board" })
+  await picker.getByRole("option", { name: "Product board" }).click()
+  await expect(picker.getByRole("option", { name: "Product board" })).toHaveAttribute("aria-selected", "true")
+  await picker.getByRole("button", { name: "Save" }).click()
+  await expect(picker).not.toBeVisible()
+  await expect(page.getByRole("button", { name: "Switch board" })).toContainText("Product board")
+  await expect(page.getByText("No issues in this view.")).toBeVisible()
+})
+
 story("board cards offer new chat and ticket work from a context menu", async ({ mount, page }) => {
   await mount("boc-jira--card-menu")
   const card = page.locator('[data-boc-issue-card="SHOP-617"]')

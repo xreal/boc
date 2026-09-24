@@ -81,7 +81,7 @@ export function JiraPickBoardDialog(props: {
     const current = await props.api.getPreferences()
     const savedBoards = current.savedBoards.some((entry) => entry.id === board.id)
       ? current.savedBoards
-      : [...current.savedBoards, board]
+      : [...current.savedBoards, { ...board }]
     const defaultBoardId = adding() ? current.defaultBoardId : board.id
     const preferences = await props.api.savePreferences(
       normalizeSavedBoards(savedBoards, defaultBoardId ?? board.id, current.projectTargets),

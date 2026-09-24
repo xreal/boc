@@ -10,6 +10,7 @@ import {
   JiraIssueInspector,
   JiraIssueDialog,
   JiraIssueCard,
+  JiraScreen,
   deploymentSystemFixtures,
   createBocTranslator,
   createBocDesktopAPI,
@@ -18,6 +19,7 @@ import {
   createJiraFixtureApi,
   jiraIssueFixture,
   type JiraFixtureScenario,
+  type JiraPreferences,
 } from "@boc/extensions/jira/preview"
 
 function JiraCardMenuPreview() {
@@ -41,6 +43,72 @@ function JiraCardMenuPreview() {
         <p aria-label="Started card action">{view.action}</p>
       </div>
     </div>
+  )
+}
+
+function JiraConnectionPreview() {
+  const language = useLanguage()
+  const desktop = createBocDesktopAPI(async () => {
+    throw new Error("Unexpected fixture RPC")
+  })
+  const board = { id: 84, name: "Product board", type: "kanban" as const }
+  let connected = false
+  let preferences: JiraPreferences = { savedBoards: [] }
+  const host = {
+    locale: language.locale,
+    platform: "web" as const,
+    route: () => ({ type: "boc" as const, id: "jira" }),
+    location: () => ({ pathname: "/boc/jira", search: "" }),
+    navigate: () => undefined,
+    openExternal: () => undefined,
+  }
+
+  return (
+    <BocHostProvider value={host}>
+      <BocDesktopProvider
+        value={{
+          ...desktop,
+          deployments: {
+            ...desktop.deployments,
+            listSystems: async () => ({
+              ok: true,
+              systems: [],
+              readiness: { fleetReady: false, deploymentReady: false, capabilities: [] },
+            }),
+          },
+          jira: {
+            ...desktop.jira,
+            getConnectionStatus: async () =>
+              connected
+                ? { status: "connected", encryptionAvailable: true, site: "example", email: "team@example.invalid", displayName: "Team" }
+                : { status: "not-configured", encryptionAvailable: true },
+            saveConnection: async (input) => {
+              connected = true
+              return { ok: true, status: "connected", site: input.site, email: input.email, displayName: "Team" }
+            },
+            getPreferences: async () => preferences,
+            savePreferences: async (value) => {
+              // Desktop IPC sends this payload through MessagePort's structured clone.
+              preferences = structuredClone(value)
+              return preferences
+            },
+            listBoards: async () => ({ ok: true, boards: [board, { id: 85, name: "Another board", type: "scrum" }] }),
+            getBoard: async () => ({
+              ok: true,
+              board: { ...board, filterId: "1001", columns: [], sprints: [] },
+            }),
+            listIssues: async () => ({ ok: true, issues: [] }),
+            listSessionCounts: async () => [],
+            cancelBoardRead: async () => undefined,
+            cancelIssueRead: async () => undefined,
+          },
+        }}
+      >
+        <div class="flex h-screen bg-v2-background-bg-base">
+          <JiraScreen host={host} />
+        </div>
+      </BocDesktopProvider>
+    </BocHostProvider>
   )
 }
 
@@ -269,3 +337,4 @@ export const Stale = { args: { scenario: "stale" } }
 export const Switching = { args: { scenario: "switching" } }
 export const NarrowRtl = { globals: { direction: "rtl", locale: "en", theme: "dark" } }
 export const CardMenu = { render: () => <JiraCardMenuPreview /> }
+export const Connection = { render: () => <JiraConnectionPreview /> }
