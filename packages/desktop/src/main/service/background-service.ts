@@ -53,7 +53,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const options = (isolatedService: boolean) => ({
     file: serviceFile(path, isolatedService),
     version,
-    command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--port", "0"] : [])],
+    command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--hostname", "0.0.0.0", "--port", "0"] : [])],
     env: {
       ...(boc && isolatedService
         ? {
@@ -89,7 +89,6 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
       stopIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "handoff" }),
       resetShared: () => client.Service.stop({ pty: "clear" }),
       resetIsolated: () => client.Service.stop({ file: serviceFile(path, true), pty: "clear" }),
-    })
     if (connected === early) void ensureShared().catch(() => undefined)
     return connected
   })

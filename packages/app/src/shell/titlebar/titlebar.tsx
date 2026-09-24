@@ -305,6 +305,7 @@ export function Titlebar(props: {
                   return
                 }
                 case "settings":
+                case "connect":
                 case "home": {
                   const selection = layout.home.selection()
                   const conn =

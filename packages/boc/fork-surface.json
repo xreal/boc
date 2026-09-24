@@ -166,6 +166,10 @@
       "reason": "Recognize Boc as a server-aware settings destination"
     },
     {
+      "path": "packages/app/src/settings/route.ts",
+      "reason": "Preserve the Boc settings destination in persistent settings URLs"
+    },
+    {
       "path": "packages/app/src/settings/pages.ts",
       "reason": "Assign the Boc settings destination its existing semantic icon"
     },
