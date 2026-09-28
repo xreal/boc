@@ -1,7 +1,7 @@
 import { DiffChanges } from "@opencode/ui/diff-changes"
 import { Icon } from "@opencode/ui/icon"
 import { getFilename } from "@opencode/util/path"
-import { createMemo, Show, type JSX } from "solid-js"
+import { createMemo, Show } from "solid-js"
 import { BocWorktreeDetails } from "@/boc/worktrees/base-branch"
 import { useLanguage } from "@/runtime/i18n/language"
 import type { Project } from "@/runtime/server/types"
@@ -17,7 +17,6 @@ export function SessionSummaryPanel(props: {
   shown?: boolean
   mobile?: boolean
   project: Project
-  avatar?: JSX.Element
   directory: string
   local: boolean
   branch?: string
@@ -45,7 +44,7 @@ export function SessionSummaryPanel(props: {
   return (
     <div data-component="session-summary-panel" data-mobile={props.mobile || undefined}>
       <div>
-        <ProjectSummaryCard project={props.project} avatar={props.avatar}>
+        <ProjectSummaryCard project={props.project}>
           <SessionWorkspaceMenu
             eligible={props.moveEligible}
             sessionID={props.sessionID}

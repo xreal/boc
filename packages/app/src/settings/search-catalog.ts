@@ -12,7 +12,7 @@ type Entry<Tab> = {
   description?: Label
   section?: Label
   subtab?: "mcps" | "plugins" | "skills" | "lsps"
-  available?: "desktop" | "browser" | "dev" | "mobile-dev"
+  available?: "desktop" | "browser" | "mobile"
 }
 
 export const clientSettings: Entry<SettingsRootTab>[] = [
@@ -90,7 +90,7 @@ export const clientSettings: Entry<SettingsRootTab>[] = [
     tab: "general",
     label: "settings.general.row.mobileTitlebarBottom.title",
     target: "settings-mobile-titlebar-bottom",
-    available: "mobile-dev",
+    available: "mobile",
   },
   {
     tab: "general",
