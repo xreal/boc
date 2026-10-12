@@ -1,4 +1,5 @@
 import { defineConfig } from "electron-vite"
+import type { Plugin } from "vite"
 import { pickerPlugin } from "./scripts/picker"
 import { bocBranding } from "./src/boc/branding-vite"
 import { bocProductConfig } from "../app/src/boc/product-vite"
@@ -6,13 +7,16 @@ import { bocProductConfig } from "../app/src/boc/product-vite"
 const channel = (() => {
   const raw = process.env.OPENCODE_CHANNEL
   if (raw === "local" || raw === "dev" || raw === "beta" || raw === "boc" || raw === "prod") return raw
+
   if (process.env.OPENCODE_CHANNEL === "latest") return "prod"
+
   return "dev"
 })()
 
 const nodePtyPkg = `@lydell/node-pty-${process.platform}-${process.arch}`
 
 const appPlugin = (await import("@opencode/app/vite")).default
+
 const sentry =
   process.env.SENTRY_AUTH_TOKEN && process.env.SENTRY_ORG && process.env.SENTRY_PROJECT
     ? (await import("@sentry/vite-plugin")).sentryVitePlugin({
@@ -33,24 +37,19 @@ const sentry =
 // Every module the entry reaches through static imports lands in one chunk. Automatic splitting
 // otherwise fragments the initial graph into ~50 files shared with lazy routes, and each file costs
 // the renderer a main-thread request round trip through the main process before first paint.
-type ChunkingContext = { getModuleInfo(id: string): { isEntry: boolean; importers: readonly string[] } | null }
-const initialGraph = new WeakMap<ChunkingContext, Map<string, boolean>>()
-function inInitialGraph(id: string, ctx: ChunkingContext) {
-  const memo = initialGraph.get(ctx) ?? new Map<string, boolean>()
-  initialGraph.set(ctx, memo)
-  const visit = (id: string, path: Set<string>): boolean => {
-    const known = memo.get(id)
-    if (known !== undefined) return known
-    if (path.has(id)) return false
-    const info = ctx.getModuleInfo(id)
-    if (!info) return false
-    path.add(id)
-    const result = info.isEntry || info.importers.some((importer) => visit(importer, path))
-    path.delete(id)
-    memo.set(id, result)
-    return result
-  }
-  return visit(id, new Set())
+// Rolldown hands every chunk-name call a fresh context, so the graph is walked once per output.
+const initialGraph = new Set<string>()
+
+const initialChunk: Plugin = {
+  name: "opencode-desktop:initial-chunk",
+  renderStart() {
+    const entries = [...this.getModuleIds()].filter((id) => this.getModuleInfo(id)?.isEntry)
+    initialGraph.clear()
+    entries.forEach((id) => initialGraph.add(id))
+
+    // A Set's iterator also visits members added while iterating, so this reaches every static import.
+    for (const id of initialGraph) this.getModuleInfo(id)?.importedIds.forEach((imported) => initialGraph.add(imported))
+  },
 }
 
 export default defineConfig(({ command }) => ({
@@ -94,6 +93,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         enforce: "pre",
         resolveId(s) {
           if (s === "@lydell/node-pty") return nodePtyPkg
+
           return undefined
         },
       },
@@ -125,7 +125,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         command === "serve" && process.env.OPENCODE_TEST_ONBOARDING === "1",
       ),
     },
-    plugins: [pickerPlugin(), bocBranding(channel), appPlugin, bocProductConfig(channel), sentry],
+    plugins: [pickerPlugin(), bocBranding(channel), appPlugin, bocProductConfig(channel), initialChunk, sentry],
     publicDir: "../../../app/public",
     root: "src/renderer",
     build: {
@@ -137,7 +137,7 @@ const require = __cjs_mod__.createRequire(import.meta.url);
         },
         output: {
           codeSplitting: {
-            groups: [{ name: (id, ctx) => (inInitialGraph(id, ctx) ? "app" : null), priority: 10 }],
+            groups: [{ name: (id) => (initialGraph.has(id) ? "app" : null), priority: 10 }],
           },
         },
       },

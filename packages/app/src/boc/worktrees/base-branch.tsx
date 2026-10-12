@@ -6,11 +6,12 @@ import { useLanguage } from "@/runtime/i18n/language"
 import { useData, useServer } from "@/runtime/server/current"
 import { useSessionLayout } from "@/session/session-layout"
 import { projectForSession } from "@/shell/layout/helpers"
-import { isWorkspaceDirectory, sameDirectory } from "@/workspaces/paths"
+import { isWorkspaceDirectory } from "@/workspaces/paths"
+import { sameDirectory } from "@opencode/util/path"
 
-export function BocWorktreeBaseBranch() {
+export function BocWorktreeBaseBranch(props: { sessionID?: string } = {}) {
   const language = useLanguage()
-  const branch = useWorktreeOriginBranch()
+  const branch = useWorktreeOriginBranch(() => props.sessionID)
   const label = createMemo(() => {
     const name = branch()
     if (!name) return
@@ -85,11 +86,14 @@ export function BocWorktreeDetails(props: { branch?: string; baseBranch?: string
   )
 }
 
-function useWorktreeOriginBranch() {
+function useWorktreeOriginBranch(sessionID: () => string | undefined = () => undefined) {
   const server = useServer()
   const data = useData()
   const layout = useSessionLayout()
-  const session = createMemo(() => (layout.params.id ? data.session.get(layout.params.id) : undefined))
+  const session = createMemo(() => {
+    const id = sessionID() ?? layout.params.id
+    return id ? data.session.get(id) : undefined
+  })
   const project = createMemo(() => {
     const current = session()
     if (!current) return

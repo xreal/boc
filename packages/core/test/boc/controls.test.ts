@@ -645,7 +645,7 @@ live.live("controls apply native configuration through real config plugins and f
             })
             expect((yield* client.getConfiguration({ scope: "project" })).instructionExists).toBe(true)
 
-            const created = yield* client.createSource({
+            yield* client.createSource({
               kind: "skill",
               scope: "project",
               name: "draft",

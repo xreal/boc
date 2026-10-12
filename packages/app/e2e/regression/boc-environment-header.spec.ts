@@ -1,15 +1,14 @@
-import { base64Encode } from "@opencode/util/encode"
 import { expect, test } from "@playwright/test"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import { seed, sessionHref } from "../utils/app"
+import { mockBocServer } from "../utils/boc/mock-server"
 import { expectSessionTitle } from "../utils/waits"
 
 const projectDirectory = "C:/OpenCode/LaneHeader"
 const directory = `${projectDirectory}/.lane/trees/header-layout`
 const sessionID = "ses_boc_environment_header"
-const server = `http://${process.env.PLAYWRIGHT_SERVER_HOST ?? "127.0.0.1"}:${process.env.PLAYWRIGHT_SERVER_PORT ?? "4096"}`
 
 test.beforeEach(async ({ page }) => {
-  await mockOpenCodeServer(page, {
+  await mockBocServer(page, {
     directory: projectDirectory,
     project: {
       id: "proj_boc_environment_header",
@@ -39,19 +38,8 @@ for (const width of [1000, 1440]) {
   for (const direction of ["ltr", "rtl"] as const) {
     test(`keeps Lane actions clear of session details (${width}px, ${direction})`, async ({ page }) => {
       await page.setViewportSize({ width, height: 900 })
-      await page.addInitScript((worktree) => {
-        localStorage.setItem(
-          "opencode.global.dat:server",
-          JSON.stringify({
-            list: [],
-            hidden: {},
-            projects: { local: [{ worktree, expanded: true }] },
-            lastProject: {},
-            recentlyClosed: {},
-          }),
-        )
-      }, projectDirectory)
-      await page.goto(`/server/${base64Encode(server)}/session/${sessionID}`)
+      await seed(page, { projects: { local: [{ worktree: projectDirectory, expanded: true }] } })
+      await page.goto(sessionHref(sessionID))
       await expectSessionTitle(page, "Lane header layout")
       await page.locator("html").evaluate((element, dir) => element.setAttribute("dir", dir), direction)
 

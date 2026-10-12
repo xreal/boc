@@ -5,12 +5,15 @@ import { usePlatform } from "@/runtime/platform/platform"
 import { createMemo, Show } from "solid-js"
 import { EnvironmentTitlebarControl, environmentTarget } from "./view"
 
-export function BocEnvironmentSessionControl(props: { compact?: boolean }) {
+export function BocEnvironmentSessionControl(props: { compact?: boolean; sessionID?: string }) {
   const server = useServer()
   const data = useData()
   const platform = usePlatform()
   const layout = useSessionLayout()
-  const session = createMemo(() => (layout.params.id ? data.session.get(layout.params.id) : undefined))
+  const session = createMemo(() => {
+    const id = props.sessionID ?? layout.params.id
+    return id ? data.session.get(id) : undefined
+  })
   const project = createMemo(() => {
     const current = session()
     return current ? projectForSession(current, server.ctx.projects.list()) : undefined

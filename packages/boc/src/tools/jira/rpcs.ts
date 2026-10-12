@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { JiraSessionLink, JiraSessionInstructions } from "./domain/sessions"
-import { Rpc, RpcGroup } from "effect/unstable/rpc"
+import { Rpc, RpcGroup } from "effect/rpc"
 import { JiraBoardIssue, JiraBoardSummary, JiraBoardView, JiraPreferences } from "./domain/board"
 import {
   JiraIssueDetail,

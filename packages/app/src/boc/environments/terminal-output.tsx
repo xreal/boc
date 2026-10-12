@@ -7,7 +7,7 @@ import { createEffect, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
-import { terminalWriter } from "@/session/terminal/writer"
+import { terminalWriter } from "@opencode/gui-extensions/boc/terminal-writer"
 import { showToast } from "@/shell/notifications/toast"
 import { createEnvironmentOutputCursor } from "./output"
 

@@ -1,6 +1,6 @@
 import { expect, test } from "bun:test"
 import { Effect, Layer, Schema } from "effect"
-import { RpcTest } from "effect/unstable/rpc"
+import { RpcTest } from "effect/rpc"
 import { createBocDesktopAPI, type BocDesktopInvoke } from "./renderer/api"
 import { BocDesktopRpcs } from "./shared/rpcs"
 import { exampleHandlers, ExampleRpcs } from "../tools/__fixtures__/example/rpcs"

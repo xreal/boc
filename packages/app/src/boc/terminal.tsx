@@ -9,8 +9,9 @@ import { ServerProvider } from "@/runtime/server/current"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useSettings } from "@/settings/model"
-import type { LocalPTY } from "@/session/terminal/context"
-import { Terminal } from "@/session/terminal/terminal"
+import { BocTerminalView, type LocalPTY } from "@opencode/gui-extensions/boc/terminal"
+import type { SessionRef } from "@opencode/gui-extensions/sdk"
+import { useExtensionHost } from "@/runtime/extension/host"
 import { useCurrentRoute } from "@/shell/state/layout"
 import { showToast } from "@/shell/notifications/toast"
 import { findSessionTab, tabKey, type SessionTab, type Tab, useTabs } from "@/shell/tabs/tabs"
@@ -20,6 +21,7 @@ type TerminalRequest = {
   input: BocTerminalInput
   server: ServerConnection.Any
   directory: string
+  session: SessionRef
 }
 
 let lastLocalSession: SessionTab | undefined
@@ -30,6 +32,9 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
   const settings = useSettings()
   const tabs = useTabs()
   const servers = useServers()
+  const extensions = useExtensionHost()
+  const terminalContext = () =>
+    extensions.state.status.terminal === "active" ? extensions.context("terminal") : undefined
   const t = createBocTranslator(useLanguage().locale)
   const [state, setState] = createStore<{ request?: TerminalRequest }>({})
 
@@ -49,7 +54,11 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
           {(request) => (
             <ServerProvider conn={request.server}>
               <LocationProvider directory={request.directory}>
-                <BocTerminalPanel input={request.input} close={() => setState("request", undefined)} />
+                <BocTerminalPanel
+                  input={request.input}
+                  session={request.session}
+                  close={() => setState("request", undefined)}
+                />
               </LocationProvider>
             </ServerProvider>
           )}
@@ -66,11 +75,14 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
           ? (tabs.info[tabKey(target)]?.directory ??
             global.ensureServerCtx(server).data.session.get(target.sessionId)?.location.directory)
           : undefined
-      if (!server || !directory) {
+      const session = terminalContext()
+        ?.sessions.list()
+        .find((session) => session.tab === (target && tabKey(target)))
+      if (!server || !directory || !session) {
         showToast({ title: t("boc.terminal.sessionRequired") })
         return
       }
-      setState("request", { input, server, directory })
+      setState("request", { input, server, directory, session })
     },
     close() {
       setState("request", undefined)
@@ -82,11 +94,14 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
   }
 }
 
-function BocTerminalPanel(props: { input: BocTerminalInput; close: () => void }) {
+function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef; close: () => void }) {
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const server = useServerSDK()
   const workspace = useWorkspaceLocation()
+  const extensions = useExtensionHost()
+  const terminalContext = () =>
+    extensions.state.status.terminal === "active" ? extensions.context("terminal") : undefined
   const [state, setState] = createStore({
     pty: undefined as LocalPTY | undefined,
     connected: false,
@@ -181,13 +196,18 @@ function BocTerminalPanel(props: { input: BocTerminalInput; close: () => void })
           }
         >
           {(pty) => (
-            <Terminal
-              pty={pty()}
-              autoFocus
-              class="!px-[14px]"
-              onConnect={() => setState("connected", true)}
-              onConnectError={() => setState(state.connected ? "exited" : "failed", true)}
-            />
+            <Show when={terminalContext()} keyed fallback={t("boc.terminal.connectFailed")}>
+              {(context) => (
+                <BocTerminalView
+                  context={context}
+                  session={props.session}
+                  directory={workspace().directory}
+                  pty={pty()}
+                  onConnect={() => setState("connected", true)}
+                  onConnectError={() => setState(state.connected ? "exited" : "failed", true)}
+                />
+              )}
+            </Show>
           )}
         </Show>
       </div>

@@ -1,10 +1,10 @@
 import { expect, test } from "@playwright/test"
-import { mockOpenCodeServer } from "../utils/mock-server"
+import { mockBocServer } from "../utils/boc/mock-server"
 
 const directory = "C:/OpenCode/BocSettings"
 
 test("opens settings from a Boc dashboard", async ({ page }) => {
-  await mockOpenCodeServer(page, {
+  await mockBocServer(page, {
     directory,
     project: {
       id: "proj_boc_settings",
@@ -21,7 +21,10 @@ test("opens settings from a Boc dashboard", async ({ page }) => {
   await page.goto("/boc/controls")
   await expect(page.getByRole("heading", { name: "Project setup", exact: true })).toBeVisible()
 
-  await page.keyboard.press("Control+,")
+  const shortcut = await page.evaluate(() =>
+    /(Mac|iPod|iPhone|iPad)/.test(navigator.platform) ? "Meta+," : "Control+,",
+  )
+  await page.keyboard.press(shortcut)
 
   await expect(page).toHaveURL("/settings")
   const settings = page.getByTestId("settings-screen")

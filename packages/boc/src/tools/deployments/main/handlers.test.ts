@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { Effect } from "effect"
-import { RpcTest } from "effect/unstable/rpc"
+import { RpcTest } from "effect/rpc"
 import { DeploymentRpcs } from "../rpcs"
 import type { DeploymentCommandRunner } from "./command-runner"
 import { createDeploymentService } from "./deployment-service"

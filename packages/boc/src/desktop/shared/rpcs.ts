@@ -1,4 +1,4 @@
-import { RpcClient, RpcClientError } from "effect/unstable/rpc"
+import { RpcClient, RpcClientError } from "effect/rpc"
 import { DeploymentRpcs } from "../../tools/deployments/rpcs"
 import { JiraRpcs } from "../../tools/jira/rpcs"
 

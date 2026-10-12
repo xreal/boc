@@ -4,7 +4,8 @@ import { bocServicePlacement, connectBocService, inspectBocService } from "../..
 import { bocServiceFile, isBocSourceBackend } from "../../boc/development"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
-import { cleanStages, DesktopCli } from "./desktop-cli"
+import { cleanStages } from "./cli-stages"
+import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { sidecarProbe } from "./sidecar-probe"
 
@@ -21,6 +22,7 @@ export const layer = Layer.effect(
   Service,
   Effect.gen(function* () {
     const context = yield* Effect.context<FileSystem.FileSystem | Path.Path | DesktopCli.Service>()
+
     return Service.of(
       yield* BackgroundServiceState.make({
         initial: connect("initial").pipe(Effect.provide(context)),
@@ -35,7 +37,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const fs = yield* FileSystem.FileSystem
   const path = yield* Path.Path
   const desktopCli = yield* DesktopCli.Service
-  const runFork = Effect.runForkWith(yield* Effect.context())
+  const runFork = Effect.runForkWith(yield* Effect.context<FileSystem.FileSystem | Path.Path>())
   const isolated = !app.isPackaged && process.env.OPENCODE_DESKTOP_ISOLATED_SERVER === "1"
   const cli = yield* desktopCli.resolve
   const development = isBocSourceBackend(CHANNEL)
@@ -48,12 +50,19 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     hasIsolatedDatabase,
   })
   const version = mode === "initial" ? cli.version : undefined
+
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
   const options = (isolatedService: boolean) => ({
     file: serviceFile(path, isolatedService),
     version,
-    command: [...cli.command, "serve", "--service", ...(isolatedService ? ["--hostname", "0.0.0.0", "--port", "0"] : [])],
+    // A fixed port lets competing starters back off instead of sharing one database.
+    command: [
+      ...cli.command,
+      "serve",
+      "--service",
+      ...(isolatedService ? ["--hostname", "0.0.0.0", "--port", String(0x0c0c)] : []),
+    ],
     env: {
       ...(boc && isolatedService
         ? {
@@ -95,6 +104,7 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   })
   if (service.auth?.type !== "basic") throw new Error("V2 CLI background service did not provide authentication")
   const url = new URL(service.url)
+
   if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1"
   yield* Effect.logInfo("v2 CLI background service ready", {
     version,
@@ -102,9 +112,18 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     probed: service === early,
     ...endpoint(url.origin),
   })
-  if (mode === "initial" && isolated && cli.binary) yield* cleanStages(cli.binary).pipe(Effect.orDie)
+
+  // Only packaged and isolated builds run a staged copy; any other binary sits in the source tree.
+  // The service now runs the current version, so an older copy at most belongs to a process still exiting.
+  if (mode === "initial" && (app.isPackaged || isolated) && cli.binary)
+    runFork(
+      cleanStages(cli.binary).pipe(
+        Effect.catch((error) => Effect.logError("failed to clean staged v2 CLIs", { error })),
+      ),
+    )
   const ready = { url: url.origin, password: service.auth.password } satisfies SidecarCredentials.Data
   SidecarCredentials.set(ready)
+
   return ready
 })
 
@@ -120,5 +139,6 @@ function serviceFile(path: Path.Path, isolated: boolean) {
 function endpoint(url: string | undefined) {
   if (!url || !URL.canParse(url)) return {}
   const parsed = new URL(url)
+
   return { url, hostname: parsed.hostname, port: parsed.port }
 }

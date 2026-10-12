@@ -1,0 +1,1 @@
+export { terminalWriter } from "../writer"

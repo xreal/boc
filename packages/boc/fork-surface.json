@@ -5,10 +5,12 @@
     "packages/core/test/boc/**",
     "packages/plugin/src/boc/**",
     "packages/app/src/boc/**",
+    "packages/app/e2e/utils/boc/**",
     "packages/schema/src/boc/**",
     "packages/protocol/src/boc/**",
     "packages/server/src/boc/**",
     "packages/desktop/src/boc/**",
+    "packages/gui-extensions/src/*/boc/**",
     "packages/desktop/icons/boc/**",
     "packages/desktop/icons/boc-dev/**",
     ".opencode/skills/boc-*/**",
@@ -130,24 +132,28 @@
       "reason": "Verify the standard settings command opens settings and returns to a Boc dashboard"
     },
     {
-      "path": "packages/app/src/session/header/session-header.tsx",
-      "reason": "Place Boc worktree context and the Lane environment control in the session header flow before reserving the fixed review toggle"
+      "path": "packages/app/src/runtime/extension/root.tsx",
+      "reason": "Register the Boc session extension through upstream's existing header and panel slots"
     },
     {
-      "path": "packages/app/src/session/summary/panel.tsx",
-      "reason": "Render explicit Boc branch and reliable worktree origin details in the session summary"
+      "path": "packages/app/src/runtime/extension/side-region.tsx",
+      "reason": "Render the channel-aware Boc brand mark in the native side-panel header"
     },
     {
-      "path": "packages/app/src/session/terminal/panel.tsx",
-      "reason": "Place the compact Lane environment control in the terminal header when it owns the side panel"
+      "path": "packages/gui-extensions/package.json",
+      "reason": "Export narrow Boc bridges to the native terminal implementation and writer"
     },
     {
-      "path": "packages/app/src/session/timeline/message-timeline.tsx",
-      "reason": "Render the session header end actions that own the Lane environment control"
+      "path": "packages/gui-extensions/src/details/panel.tsx",
+      "reason": "Render explicit branch and reliable worktree origin details through the native details extension"
     },
     {
-      "path": "packages/app/src/session/files/session-side-panel.tsx",
-      "reason": "Render the channel-aware Boc brand mark and place the compact environment action in the open side-panel header"
+      "path": "packages/gui-extensions/README.md",
+      "reason": "Document the fork's native build channel and separate updater policy"
+    },
+    {
+      "path": "packages/gui-extensions/src/sdk/core.ts",
+      "reason": "Preserve the Boc release channel so native extensions never migrate Boc to the official stable installer"
     },
     {
       "path": "packages/app/src/shell/routes/routes.tsx",
