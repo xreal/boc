@@ -10,7 +10,7 @@ on:
         type: string
 
 env:
-  BOC_SERVER_VERSION: 2.0.27
+  BOC_SERVER_VERSION: 2.2.5
 
 concurrency:
   group: boc-release
@@ -93,12 +93,12 @@ jobs:
 
       - uses: ./.github/actions/setup-bun
         with:
-          bun-version: 1.4.2
+          bun-version: 1.4.4
 
       - name: Build bundled CLI binaries
         run: bun ./packages/cli/script/build.ts
         env:
-          BUN_COMPILE_RELEASE: bun-v1.4.2
+          BUN_COMPILE_RELEASE: bun-v1.4.4
           GITHUB_TOKEN: ${{ github.token }}
           OPENCODE_CHANNEL: boc
           OPENCODE_VERSION: ${{ env.BOC_SERVER_VERSION }}
@@ -121,22 +121,22 @@ jobs:
       matrix:
         settings:
           - runner: macos-15
-            target: aarch64-apple-darwin
+            target: darwin-arm64
             platform_flags: --mac --arm64
             install_flags: --os=darwin --cpu=arm64
           - runner: windows-2025
-            target: x86_64-pc-windows-msvc
+            target: windows-x64
             platform_flags: --win --x64
             install_flags: ""
           - runner: ubuntu-24.04
-            target: x86_64-unknown-linux-gnu
+            target: linux-x64
             platform_flags: --linux --x64
             install_flags: ""
     runs-on: ${{ matrix.settings.runner }}
     env:
       OPENCODE_CHANNEL: boc
       OPENCODE_CLI_DIST: ${{ github.workspace }}/packages/cli/dist
-      OPENCODE_CLI_TARGET: ${{ matrix.settings.target }}
+      OPENCODE_TARGET: ${{ matrix.settings.target }}
       OPENCODE_VERSION: ${{ inputs.version }}
       OPENCODE_WINDOWS_SIGNING: "false"
     steps:

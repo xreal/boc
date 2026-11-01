@@ -6,7 +6,7 @@ import { Loader } from "@opencode/ui/loader"
 import { Popover } from "@opencode/ui/popover"
 import { TextInput } from "@opencode/ui/text-input"
 import { showToast } from "@opencode/ui/toast"
-import { createEffect, createMemo, onCleanup, Show, untrack } from "solid-js"
+import { createEffect, createMemo, onCleanup, onMount, Show, untrack } from "solid-js"
 import { createStore } from "solid-js/store"
 import type { BocTranslator } from "../../../renderer/i18n"
 import type { JiraIssueDetail, JiraIssueUser } from "../domain/issue"
@@ -41,6 +41,12 @@ export function JiraAssignee(props: {
   let list: ListRef | undefined
   let container: HTMLDivElement | undefined
   let focusFrame: number | undefined
+  const restoreFocus = () => {
+    if (focusFrame !== undefined) cancelAnimationFrame(focusFrame)
+    focusFrame = requestAnimationFrame(() => {
+      container?.querySelector<HTMLElement>('[data-slot="popover-trigger"]')?.focus({ preventScroll: true })
+    })
+  }
   onCleanup(() => {
     if (focusFrame !== undefined) cancelAnimationFrame(focusFrame)
   })
@@ -69,6 +75,13 @@ export function JiraAssignee(props: {
     const timer = setTimeout(() => void load(), query ? 225 : 0)
     onCleanup(() => clearTimeout(timer))
   })
+  onMount(() => {
+    const onEscape = (event: KeyboardEvent) => {
+      if (picker.open && event.key === "Escape") restoreFocus()
+    }
+    window.addEventListener("keydown", onEscape, true)
+    onCleanup(() => window.removeEventListener("keydown", onEscape, true))
+  })
 
   return (
     <div ref={container} class="flex min-w-0 flex-col gap-1.5">
@@ -80,8 +93,8 @@ export function JiraAssignee(props: {
         onOpenChange={(open) => {
           if (open && (!props.online || mutation()?.pending)) return
           setPicker({ open, query: "" })
-          if (focusFrame !== undefined) cancelAnimationFrame(focusFrame)
           if (!open) return
+          if (focusFrame !== undefined) cancelAnimationFrame(focusFrame)
           // Inline popovers can create their focus scope before their content is attached.
           focusFrame = requestAnimationFrame(() => {
             container?.querySelector("input")?.focus({ preventScroll: true })
@@ -156,6 +169,7 @@ export function JiraAssignee(props: {
                 const issueKey = props.issue.key
                 const issue = props.issue
                 setPicker("open", false)
+                restoreFocus()
                 void props.assignments.assign(issue, user.accountId === null ? null : user).then((result) => {
                   if (result?.ok) showToast({ title: props.t("boc.jira.assignee.success", { issue: issueKey }) })
                 })

@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("selects a branch with the keyboard and closes its popup", async ({ mount, page }) => {
   await mount("boc-deployments--default")
@@ -17,7 +17,7 @@ story("selects a branch with the keyboard and closes its popup", async ({ mount,
   await expect(dialog.getByRole("button", { name: "Deploy to dev-01" })).toBeEnabled()
   await dialog.locator(".deployment-branch-trigger").click()
   await expect(popup).toBeVisible()
-  await popup.getByRole("option", { name: "SHOP-617-product-gallery" }).click()
+  await page.getByRole("option", { name: "SHOP-617-product-gallery" }).click()
   await expect(popup).not.toBeVisible()
   await dialog.locator(".deployment-branch-trigger").click()
   await expect(popup).toBeVisible()

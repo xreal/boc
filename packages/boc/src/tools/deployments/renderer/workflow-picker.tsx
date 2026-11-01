@@ -18,6 +18,7 @@ import {
 import "./workflow-picker.css"
 
 export function DeploymentWorkflowPicker(props: {
+  portalMount?: HTMLElement
   targets: readonly DeploymentWorkflowTarget[]
   selected: readonly string[]
   inputs: Record<string, Record<string, DeploymentWorkflowInputValue>>
@@ -173,6 +174,7 @@ export function DeploymentWorkflowPicker(props: {
                                     when={definition().type === "boolean"}
                                     fallback={
                                       <Select
+                                        portalMount={props.portalMount}
                                         aria-label={label()}
                                         options={[...(definition().options ?? [])]}
                                         current={definition().options?.find((option) => option === value())}

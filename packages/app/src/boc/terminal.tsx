@@ -9,9 +9,9 @@ import { ServerProvider } from "@/runtime/server/current"
 import { ServerConnection, useServers } from "@/runtime/server/registry"
 import { useGlobal } from "@/runtime/server/runtime"
 import { useSettings } from "@/settings/model"
-import { BocTerminalView, type LocalPTY } from "@opencode/gui-extensions/boc/terminal"
-import type { SessionRef } from "@opencode/gui-extensions/sdk"
-import { useExtensionHost } from "@/runtime/extension/host"
+import { BocTerminalView } from "@opencode/gui-plugins/boc/terminal"
+import type { SessionRef } from "@opencode/plugin/gui"
+import { usePluginHost } from "@/runtime/plugin/host"
 import { useCurrentRoute } from "@/shell/state/layout"
 import { showToast } from "@/shell/notifications/toast"
 import { findSessionTab, tabKey, type SessionTab, type Tab, useTabs } from "@/shell/tabs/tabs"
@@ -32,7 +32,7 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
   const settings = useSettings()
   const tabs = useTabs()
   const servers = useServers()
-  const extensions = useExtensionHost()
+  const extensions = usePluginHost()
   const terminalContext = () =>
     extensions.state.status.terminal === "active" ? extensions.context("terminal") : undefined
   const t = createBocTranslator(useLanguage().locale)
@@ -42,7 +42,7 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
     const current = route()
     if (current.type !== "session") return
     const server = servers.list.find((connection) => ServerConnection.key(connection) === current.server)
-    if (!server || !ServerConnection.local(server)) return
+    if (!server || !servers.local(server)) return
     const tab = findSessionTab(tabs.store, current.server, current.sessionId)
     if (tab?.type === "session") lastLocalSession = tab
   })
@@ -66,7 +66,7 @@ export function createBocTerminal(): NonNullable<BocHost["terminal"]> {
       )
     },
     open(input) {
-      const target = findBocTerminalTarget(tabs.store, servers.list, lastLocalSession)
+      const target = findBocTerminalTarget(tabs.store, servers.list, lastLocalSession, servers.ownUrl())
       const server = target
         ? servers.list.find((connection) => ServerConnection.key(connection) === target.server)
         : undefined
@@ -99,12 +99,11 @@ function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef;
   const t = createBocTranslator(language.locale)
   const server = useServerSDK()
   const workspace = useWorkspaceLocation()
-  const extensions = useExtensionHost()
+  const extensions = usePluginHost()
   const terminalContext = () =>
     extensions.state.status.terminal === "active" ? extensions.context("terminal") : undefined
   const [state, setState] = createStore({
-    pty: undefined as LocalPTY | undefined,
-    connected: false,
+    pty: undefined as string | undefined,
     exited: false,
     failed: false,
   })
@@ -112,22 +111,24 @@ function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef;
   let ptyID: string | undefined
 
   const remove = (id: string) =>
-    server.api.pty.remove({ ptyID: id, location: { directory: workspace().directory } }).catch(() => undefined)
+    server.api.experimental.persistentPty.remove({ ptyID: id }).catch(() => undefined)
 
   onMount(() => {
     const sdk = workspace()
-    const unsubscribe = sdk.event.on("pty.exited", (event) => {
-      if (event.data.id === ptyID) setState("exited", true)
+    const unsubscribe = props.session.server.data.on("persistent-pty.updated", (event) => {
+      if (event.data.terminal.id === ptyID) setState("exited", event.data.terminal.status === "exited")
     })
-    void server.api.pty
+    void server.api.experimental.persistentPty
       .create({
+        sessionID: props.session.id,
         command: props.input.command,
         args: [...props.input.args],
+        cwd: sdk.directory,
+        env: {},
         title: props.input.title,
-        location: { directory: sdk.directory },
       })
       .then((result) => {
-        const pty = result.data
+        const pty = result
         if (!pty?.id) {
           if (!disposed) setState("failed", true)
           return
@@ -138,7 +139,7 @@ function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef;
         }
         ptyID = pty.id
         setState({
-          pty: { id: pty.id, title: pty.title, titleNumber: 0 },
+          pty: pty.id,
           exited: pty.status === "exited",
         })
       })
@@ -154,7 +155,7 @@ function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef;
     if (ptyID) void remove(ptyID)
   })
 
-  const connectionFailed = () => state.failed && !state.connected
+  const connectionFailed = () => state.failed && !state.exited
   const status = () => {
     if (connectionFailed()) return t("boc.terminal.connectFailed")
     if (state.exited) return t("boc.terminal.ended")
@@ -201,10 +202,8 @@ function BocTerminalPanel(props: { input: BocTerminalInput; session: SessionRef;
                 <BocTerminalView
                   context={context}
                   session={props.session}
-                  directory={workspace().directory}
-                  pty={pty()}
-                  onConnect={() => setState("connected", true)}
-                  onConnectError={() => setState(state.connected ? "exited" : "failed", true)}
+                  ptyID={pty()}
+                  onFailure={() => setState("failed", true)}
                 />
               )}
             </Show>
@@ -219,8 +218,9 @@ export function findBocTerminalTarget(
   tabs: readonly Tab[],
   servers: readonly ServerConnection.Any[],
   preferred?: SessionTab,
+  ownUrl?: string,
 ) {
-  const localServers = new Set(servers.filter(ServerConnection.local).map(ServerConnection.key))
+  const localServers = new Set(servers.filter((server) => ServerConnection.local(server, ownUrl)).map(ServerConnection.key))
   const available = tabs.filter((tab): tab is SessionTab => tab.type === "session" && localServers.has(tab.server))
   if (preferred) {
     const current = available.find((tab) => sameSession(tab, preferred))

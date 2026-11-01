@@ -11,7 +11,7 @@ import { BocControlSource } from "../../boc/control-source.js"
 export const Plugin = define({
   id: "opencode.config.mcp",
   effect: Effect.fn(function* (ctx) {
-    yield* register(ctx.event.subscribe())
+    yield* register(ctx.event.subscribe({ types: ["config.updated"] }))
   }),
 })
 

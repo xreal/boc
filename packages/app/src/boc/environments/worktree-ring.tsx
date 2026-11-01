@@ -5,7 +5,7 @@ import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useGlobal } from "@/runtime/server/runtime"
-import { ServerConnection } from "@/runtime/server/registry"
+import { ServerConnection, useServers } from "@/runtime/server/registry"
 import type { LocalProject } from "@/shell/state/layout"
 import { environmentApi } from "./api"
 import { useEnvironmentProjectSettings } from "./settings-store"
@@ -33,6 +33,7 @@ export function BocWorktreeRing(
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const platform = usePlatform()
+  const servers = useServers()
   const [view, setView] = createStore<{
     state: ReturnType<typeof worktreeRing> | "worktree"
     running: number
@@ -42,7 +43,7 @@ export function BocWorktreeRing(
     props.worktree &&
     props.visible &&
     props.server &&
-    ServerConnection.local(props.server) &&
+    servers.local(props.server) &&
     props.project?.id &&
     props.directory &&
     platform.os !== "windows"

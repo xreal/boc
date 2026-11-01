@@ -17,8 +17,8 @@
   "scripts": {
     "test:components": "playwright test --config playwright.components.config.ts",
     "test:service": "bun test ./service-tests",
-    "typecheck": "tsgo --noEmit",
-    "test": "bun test --conditions=browser --conditions=solid --preload ./happydom.ts ./src ./scripts"
+    "typecheck": "bun check --no-script --noEmit",
+    "test": "bun test --conditions=browser --conditions=solid --preload ../ui/test/solid-jsx.ts --preload ./happydom.ts ./src ./scripts"
   },
   "dependencies": {
     "@opencode/core": "workspace:*",
@@ -43,9 +43,10 @@
     "@tsconfig/node22": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
-    "@typescript/native-preview": "catalog:",
-    "electron": "44.4.5",
+    "@typescript/native": "catalog:",
+    "electron": "44.9.1",
     "electron-builder": "26.15.7",
-    "happy-dom": "20.11.1"
+    "happy-dom": "20.11.1",
+    "vite": "catalog:"
   }
 }

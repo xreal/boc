@@ -13,6 +13,6 @@
     "noEmit": true,
     "lib": ["esnext", "dom", "dom.iterable"],
     "strict": true,
-    "types": ["bun", "node", "electron"]
+    "types": ["bun", "node", "electron", "vite/client"]
   }
 }

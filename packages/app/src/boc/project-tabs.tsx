@@ -8,7 +8,7 @@ import { IconButton } from "@opencode/ui/icon-button"
 import { Menu } from "@opencode/ui/menu"
 import { SessionTransfer } from "@opencode/schema/session-transfer"
 import { useGlobal } from "@/runtime/server/runtime"
-import { ServerConnection, serverName } from "@/runtime/server/registry"
+import { ServerConnection, serverName, useServers } from "@/runtime/server/registry"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { type LocalProject } from "@/shell/state/layout"
@@ -100,6 +100,7 @@ export function createBocProjectTabs(input: {
   const tabs = useTabs()
   const language = useLanguage()
   const platform = usePlatform()
+  const servers = useServers()
   const settings = useSettingsSurface()
   const [state, setState] = persisted(Persist.window("boc.project-tabs"), preferences, { order: [], collapsed: {} })
   const projects = createMemo(() => {
@@ -171,7 +172,7 @@ export function createBocProjectTabs(input: {
     !!group.connection &&
     platform.platform === "desktop" &&
     !!platform.openPath &&
-    ServerConnection.local(group.connection)
+    servers.local(group.connection)
 
   const importSession = (group: ProjectGroup) => {
     const server = group.connection
@@ -199,7 +200,6 @@ export function createBocProjectTabs(input: {
           const tab = tabs.addSessionTab({ server: ServerConnection.key(server), sessionId: imported.id })
           tabs.select(tab)
           ctx.data.session.remember(imported)
-          ctx.projects.open(project.worktree)
           ctx.projects.touch(project.worktree)
         },
       )
@@ -234,17 +234,14 @@ export function createBocProjectTabs(input: {
   const unseenCount = (group: ProjectGroup) => {
     if (!group.connection || !group.project) return 0
     const notification = global.ensureServerCtx(group.connection).notification
-    return projectDirectories(group.project).reduce(
-      (total, directory) => total + notification.project.unseenCount(directory),
-      0,
-    )
+    return projectDirectories(group.project).filter((directory) => notification.project.hasUnread(directory)).length
   }
 
   const clearNotifications = (group: ProjectGroup) => {
     if (!group.connection || !group.project) return
     const notification = global.ensureServerCtx(group.connection).notification
     projectDirectories(group.project)
-      .filter((directory) => notification.project.unseenCount(directory) > 0)
+      .filter((directory) => notification.project.hasUnread(directory))
       .forEach((directory) => notification.project.markViewed(directory))
   }
 
@@ -292,15 +289,15 @@ export function createBocProjectTabs(input: {
     unseenCount,
     clearNotifications,
     closeProject: (project: ProjectGroup) => {
-      if (!project.connection || !project.path) return
-      global.ensureServerCtx(project.connection).projects.close(project.path)
+      if (!project.connection || !project.project) return
+      global.ensureServerCtx(project.connection).projects.hide(project.project)
     },
-    adjacent: (visible: string[], current: string | undefined, offset: -1 | 1) => {
-      if (!input.enabled() || !current || visible.includes(current)) return adjacentTabKey(visible, current, offset)
+    adjacent: (visible: string[], current: string | undefined, offset: -1 | 1, include?: (key: string) => boolean) => {
+      if (!input.enabled() || !current || visible.includes(current)) return adjacentTabKey(visible, current, offset, include)
       const all = ordered().map(tabKey)
       const index = all.indexOf(current)
       const next = [...all.slice(index + 1), ...all.slice(0, index)]
-      return (offset === 1 ? next : next.reverse()).find((key) => visible.includes(key))
+      return (offset === 1 ? next : next.reverse()).find((key) => visible.includes(key) && (!include || include(key)))
     },
   }
 }

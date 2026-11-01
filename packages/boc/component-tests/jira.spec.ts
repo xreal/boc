@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("new Jira connection saves its default board and opens it", async ({ mount, page }) => {
   await mount("boc-jira--connection")
@@ -29,6 +29,7 @@ story("board cards offer new chat and ticket work from a context menu", async ({
   await expect(page.getByLabel("Started card action")).toHaveText("new")
 
   await card.focus()
+  await expect(card).toBeFocused()
   await page.keyboard.press("Shift+F10")
   await page.getByRole("menuitem", { name: "Work on this ticket", exact: true }).click()
   await expect(page.getByLabel("Started card action")).toHaveText("work")
@@ -82,7 +83,7 @@ story("modal keeps the working rail visible while reading a long ticket", async 
   const start = modal.getByRole("button", { name: "Work on this ticket", exact: true })
   await expect(start).toBeInViewport()
   await expect(
-    modal.getByRole("region", { name: "Agent Sessions" }).getByRole("button", { name: /Implement gallery navigation/ }),
+    modal.getByRole("region", { name: "Agent Sessions" }).getByRole("button", { name: /Actual title session-1/ }),
   ).toBeVisible()
   await expect(modal.getByLabel("2 sessions", { exact: true })).toBeVisible()
   const before = await start.boundingBox()
@@ -171,7 +172,7 @@ story("workspace opens branches, returns from deployment and reopens a linked Bo
   await expect(page.locator('[data-slot="dialog-content"]').filter({ hasText: "Fixture deployment" })).toHaveCount(0)
   await page
     .getByRole("region", { name: "Agent Sessions" })
-    .getByRole("button", { name: /Implement gallery navigation/ })
+    .getByRole("button", { name: /Actual title session-1/ })
     .click()
   await expect(page.getByLabel("Opened session")).toHaveText("session-1")
   await expect(page.getByRole("dialog")).toHaveCount(0)
@@ -325,6 +326,7 @@ story("assigns a duplicate-name account by keyboard and restores trigger focus",
   const search = page.getByRole("textbox", { name: "Search assignable people" })
   await expect(search).toBeFocused()
   await search.fill("reviewer")
+  await expect(page.locator(".jira-assignee-options")).toHaveAttribute("aria-busy", "false")
   await expect(page.getByRole("button", { name: /Platform developer reviewer@example.invalid/ })).toBeVisible()
   await expect(page.getByRole("dialog").getByRole("status", { includeHidden: true })).toBeEmpty()
   await search.press("ArrowDown")

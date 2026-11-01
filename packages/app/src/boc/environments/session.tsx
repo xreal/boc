@@ -2,6 +2,7 @@ import { projectForSession } from "@/shell/layout/helpers"
 import { useSessionLayout } from "@/session/session-layout"
 import { useData, useServer } from "@/runtime/server/current"
 import { usePlatform } from "@/runtime/platform/platform"
+import { useServers } from "@/runtime/server/registry"
 import { createMemo, Show } from "solid-js"
 import { EnvironmentTitlebarControl, environmentTarget } from "./view"
 
@@ -9,6 +10,7 @@ export function BocEnvironmentSessionControl(props: { compact?: boolean; session
   const server = useServer()
   const data = useData()
   const platform = usePlatform()
+  const servers = useServers()
   const layout = useSessionLayout()
   const session = createMemo(() => {
     const id = props.sessionID ?? layout.params.id
@@ -25,6 +27,7 @@ export function BocEnvironmentSessionControl(props: { compact?: boolean; session
       project: project(),
       session: session(),
       os: platform.os,
+      ownUrl: servers.ownUrl(),
     }),
   )
   return (

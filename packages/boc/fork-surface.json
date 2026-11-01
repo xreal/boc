@@ -10,7 +10,7 @@
     "packages/protocol/src/boc/**",
     "packages/server/src/boc/**",
     "packages/desktop/src/boc/**",
-    "packages/gui-extensions/src/*/boc/**",
+    "packages/gui-plugins/src/*/boc/**",
     "packages/desktop/icons/boc/**",
     "packages/desktop/icons/boc-dev/**",
     ".opencode/skills/boc-*/**",
@@ -24,8 +24,16 @@
       "reason": "Expose the optional Kobalte autofocus hook for the Jira assignee search field"
     },
     {
-      "path": "packages/storybook/.storybook/mocks/app/context/layout.ts",
+      "path": "packages/ui/src/forms/select/select.tsx",
+      "reason": "Allow select menus inside Boc's modal to remain accessible"
+    },
+    {
+      "path": "packages/stories/mocks/app/context/layout.ts",
       "reason": "Supply the current route to the real settings-surface provider used by Boc environment stories"
+    },
+    {
+      "path": "packages/stories/vite.config.ts",
+      "reason": "Provide the Boc environment story with its local settings-navigation fixture"
     },
     {
       "path": "packages/desktop/src/main/service/desktop-cli.ts",
@@ -52,7 +60,7 @@
       "reason": "Append-only Boc fork guidance above the upstream boundary"
     },
     {
-      "path": ".github/workflows/test.yml",
+      "path": ".github/workflows/check-test.yml",
       "reason": "Run fork validation for v2 pull requests and release calls, cancel stale runs, and avoid allocating runners for disabled v2 E2E jobs"
     },
     {
@@ -132,27 +140,23 @@
       "reason": "Verify the standard settings command opens settings and returns to a Boc dashboard"
     },
     {
-      "path": "packages/app/src/runtime/extension/root.tsx",
+      "path": "packages/app/src/runtime/plugin/root.tsx",
       "reason": "Register the Boc session extension through upstream's existing header and panel slots"
     },
     {
-      "path": "packages/app/src/runtime/extension/side-region.tsx",
+      "path": "packages/app/src/runtime/plugin/side-region.tsx",
       "reason": "Render the channel-aware Boc brand mark in the native side-panel header"
     },
     {
-      "path": "packages/gui-extensions/package.json",
+      "path": "packages/gui-plugins/package.json",
       "reason": "Export narrow Boc bridges to the native terminal implementation and writer"
     },
     {
-      "path": "packages/gui-extensions/src/details/panel.tsx",
+      "path": "packages/gui-plugins/src/details/panel.tsx",
       "reason": "Render explicit branch and reliable worktree origin details through the native details extension"
     },
     {
-      "path": "packages/gui-extensions/README.md",
-      "reason": "Document the fork's native build channel and separate updater policy"
-    },
-    {
-      "path": "packages/gui-extensions/src/sdk/core.ts",
+      "path": "packages/plugin/src/gui/core.ts",
       "reason": "Preserve the Boc release channel so native extensions never migrate Boc to the official stable installer"
     },
     {
@@ -214,6 +218,18 @@
     {
       "path": "packages/desktop/src/main/ipc.ts",
       "reason": "Compose generic BOC desktop handlers and services"
+    },
+    {
+      "path": "packages/desktop/script/beta-visual.ts",
+      "reason": "Keep upstream SVG sanitization typed when Boc brings Bun's types into the desktop build"
+    },
+    {
+      "path": "packages/desktop/src/main/plugin/host.ts",
+      "reason": "Preserve the callable fetch contract when Boc introduces Bun's fetch type"
+    },
+    {
+      "path": "packages/desktop/src/renderer/platform/index.ts",
+      "reason": "Preserve the callable fetch contract when Boc introduces Bun's fetch type"
     },
     {
       "path": "packages/desktop/src/main/service/background-service.ts",

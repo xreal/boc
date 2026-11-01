@@ -8,7 +8,7 @@ import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useServerSDK } from "@/runtime/server/client"
-import { ServerConnection } from "@/runtime/server/registry"
+import { useServers, type ServerConnection } from "@/runtime/server/registry"
 import type { LocalProject } from "@/shell/state/layout"
 import { SettingsList } from "@/settings/list"
 import { SettingsRow } from "@/settings/row"
@@ -19,6 +19,7 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
   const language = useLanguage()
   const t = createBocTranslator(language.locale)
   const platform = usePlatform()
+  const servers = useServers()
   const sdk = useServerSDK()
   const settings = useEnvironmentProjectSettings({
     scope: sdk.scope,
@@ -51,7 +52,7 @@ export function BocEnvironmentProjectSetting(props: { project: LocalProject; ser
     settings.update({ enabled, domain: draft.domain.trim() })
     setDraft({ domain: draft.domain.trim(), saved: true })
   }
-  const supported = () => ServerConnection.local(props.server) && platform.os !== "windows"
+  const supported = () => servers.local(props.server) && platform.os !== "windows"
 
   return (
     <Show when={props.project.id && props.project.id !== "global" && supported()}>

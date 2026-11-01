@@ -1,7 +1,7 @@
 import type { SessionInfo } from "@opencode/client/promise"
 import { usePlatform } from "@/runtime/platform/platform"
 import { useGlobal } from "@/runtime/server/runtime"
-import type { ServerConnection } from "@/runtime/server/registry"
+import { useServers, type ServerConnection } from "@/runtime/server/registry"
 import type { LocalProject } from "@/shell/state/layout"
 import { Show } from "solid-js"
 import { EnvironmentContextMenuItems, environmentTarget } from "./view"
@@ -14,6 +14,7 @@ export function BocEnvironmentTabMenu(props: {
 }) {
   const global = useGlobal()
   const platform = usePlatform()
+  const servers = useServers()
   const target = () =>
     environmentTarget({
       server: props.server,
@@ -21,6 +22,7 @@ export function BocEnvironmentTabMenu(props: {
       project: props.project,
       session: props.session,
       os: platform.os,
+      ownUrl: servers.ownUrl(),
     })
   return <Show when={target()} keyed>{(value) => <EnvironmentContextMenuItems target={value} returnFocus={props.returnFocus} />}</Show>
 }

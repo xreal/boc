@@ -7,7 +7,7 @@ import { createEffect, onCleanup, onMount, Show } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useLanguage } from "@/runtime/i18n/language"
 import { usePlatform } from "@/runtime/platform/platform"
-import { terminalWriter } from "@opencode/gui-extensions/boc/terminal-writer"
+import { terminalWriter } from "@opencode/gui-plugins/boc/terminal-writer"
 import { showToast } from "@/shell/notifications/toast"
 import { createEnvironmentOutputCursor } from "./output"
 
@@ -115,10 +115,10 @@ export function EnvironmentTerminalOutput(props: {
     if (!view.ready || !props.run) return
     const next = consume(props.run)
     if (next.reset) {
-      writer.push("\x1bc")
+      writer.push(new TextEncoder().encode("\x1bc"))
       setView("following", true)
     }
-    writer.push(next.data)
+    writer.push(new TextEncoder().encode(next.data))
     resize()
   })
   createEffect(() => {

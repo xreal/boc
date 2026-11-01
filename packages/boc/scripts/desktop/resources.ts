@@ -1,7 +1,7 @@
 import { $ } from "bun"
 import { chmod, copyFile, cp, mkdir, rm } from "node:fs/promises"
 import path from "node:path"
-import { getCurrentCli } from "../../../desktop/scripts/utils"
+import { getCurrentCli } from "../../../desktop/script/utils"
 import { desktopDirectory } from "./paths"
 
 export async function prepareBocIcons(local: boolean) {
@@ -31,9 +31,7 @@ export async function stageBocCli(
     process.env.GITHUB_ACTIONS === "true" &&
     process.env.OPENCODE_WINDOWS_SIGNING !== "false"
   ) {
-    await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ../../script/sign-windows.ps1 ${destination}`.cwd(
-      desktopDirectory,
-    )
+    await $`pwsh -NoLogo -NoProfile -ExecutionPolicy Bypass -File ${path.join(import.meta.dir, "sign-windows.ps1")} ${destination}`
   }
   if (cli.os === "darwin" && process.platform === "darwin") await $`codesign --force --sign - ${destination}`
 }

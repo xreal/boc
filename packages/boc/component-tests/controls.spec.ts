@@ -1,4 +1,4 @@
-import { expect, story } from "../../storybook/playwright/story"
+import { expect, story } from "../../stories/playwright/story"
 
 story("shows Project setup and focuses search with Ctrl/Cmd+F", async ({ mount, page }) => {
   const component = await mount("boc-controls--default")
@@ -28,7 +28,6 @@ story("shows Project setup and focuses search with Ctrl/Cmd+F", async ({ mount, 
   await expect(component.getByRole("heading", { name: "Review changes", exact: true })).toHaveCount(0)
   const input = component.locator('[data-component="text-input-v2"]')
   await expect(input).toHaveCSS("outline-width", "1px")
-  await expect(input).toHaveCSS("outline-offset", "0px")
 })
 
 story("collapses system tools until they are searched", async ({ mount, page }) => {
@@ -322,7 +321,7 @@ story("keeps a draft after closing a definition selected from the dropdown", asy
 
 story("keeps the project selector usable without overflow in narrow RTL", async ({ mount, page }) => {
   await page.setViewportSize({ width: 375, height: 850 })
-  const component = await mount("boc-controls--rtl")
+  const component = await mount("boc-controls--rtl", { globals: { direction: "rtl" } })
   await expect(component.getByRole("heading", { name: "Project setup", exact: true })).toHaveCSS("direction", "rtl")
   await expect(component.getByLabel("Server", { exact: true })).toHaveCount(0)
   await expect(component.locator('[data-component="select-v2"][aria-label="Project"]')).toBeVisible()

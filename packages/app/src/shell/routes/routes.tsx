@@ -11,7 +11,7 @@ import Shell from "@/shell/shell"
 import { BocCommandBridge } from "@/boc/commands"
 import { BocRouteBridge, preloadBocRoute } from "@/boc/route"
 import { requireServerKey } from "./session"
-import { ExtensionAttachment } from "@/runtime/extension/root"
+import { PluginAttachment } from "@/runtime/plugin/root"
 
 export const File = lazy(() => import("@opencode/session-ui/file").then((module) => ({ default: module.File })))
 
@@ -24,6 +24,13 @@ const SettingsScreen = lazy(() => import("@/settings/shell").then((module) => ({
 const ConnectServerScreen = lazy(() =>
   import("@/servers/connect/screen").then((module) => ({ default: module.ConnectServerScreen })),
 )
+
+// The dev server and Beta only. Both are fixed at build time, so other builds, prod included, drop the import and never
+// contain the lab, its stories or knobs. Beta loads it as its own chunk, only when /components opens.
+const ComponentsLab =
+  import.meta.env.DEV || import.meta.env.VITE_OPENCODE_CHANNEL === "beta"
+    ? lazy(() => import("@/components-lab/lab"))
+    : undefined
 
 const TargetSessionRouteContent = lazy(() =>
   loadSessionRoute().then((module) => ({ default: module.TargetSessionRouteContent })),
@@ -68,6 +75,7 @@ export function AppRoutes() {
         )}
       />
       <Route path="/new-session" component={DraftRoute} />
+      {ComponentsLab && <Route path="/components" component={ComponentsLab} />}
     </Route>
   )
 }
@@ -104,10 +112,10 @@ function AppLayout(props: ParentProps) {
     <Show when={servers.list.length > 0 && !signedOut()} fallback={<ConnectServerScreen url={signedOut()?.http.url} />}>
       <LayoutProvider>
         <SettingsSurfaceProvider>
-          <ExtensionAttachment>
+          <PluginAttachment>
             <BocCommandBridge />
             <Shell>{props.children}</Shell>
-          </ExtensionAttachment>
+          </PluginAttachment>
         </SettingsSurfaceProvider>
       </LayoutProvider>
     </Show>

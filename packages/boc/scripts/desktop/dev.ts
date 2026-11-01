@@ -2,7 +2,7 @@ import { $ } from "bun"
 import path from "node:path"
 import { createRequire } from "node:module"
 import { parseArgs } from "node:util"
-import { downloadCliToResources, windowsify } from "../../../desktop/scripts/utils"
+import { downloadCliToResources, windowsify } from "../../../desktop/script/utils"
 import { desktopDirectory } from "./paths"
 import { prepareBocIcons } from "./resources"
 

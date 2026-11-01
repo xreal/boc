@@ -39,9 +39,10 @@ export function environmentTarget(input: {
   project?: LocalProject
   session?: SessionInfo
   os?: "macos" | "windows" | "linux"
+  ownUrl?: string
 }): EnvironmentTarget | undefined {
   if (!input.server || !input.sdk || !input.project || !input.session) return
-  if (!ServerConnection.local(input.server) || input.os === "windows") return
+  if (!ServerConnection.local(input.server, input.ownUrl) || input.os === "windows") return
   if (!input.project.id || input.project.id === "global") return
   if (pathKey(input.project.worktree) === pathKey(input.session.location.directory)) return
   return { server: input.server, sdk: input.sdk, project: input.project, session: input.session }
@@ -495,7 +496,7 @@ function createEnvironmentActions(input: {
   }
   const settings = () => {
     dialog.close()
-    settingsSurface.openServer(ServerConnection.key(input.target.server), "boc")
+    settingsSurface.replace({ type: "root", tab: "boc", server: ServerConnection.key(input.target.server) })
   }
   const retry = async (action: NonNullable<ReturnType<typeof retryableEnvironmentAction>>) => {
     if (action === "remove") return remove()

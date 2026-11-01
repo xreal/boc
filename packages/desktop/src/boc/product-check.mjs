@@ -6,7 +6,7 @@ import config from "../../electron.vite.config.ts"
 // Run in a fresh process: upstream reads OPENCODE_CHANNEL at module load time.
 const channel = process.env.OPENCODE_CHANNEL ?? "dev"
 const command = process.argv[2] === "serve" ? "serve" : "build"
-const desktop = config({ command, mode: command === "build" ? "production" : "development" })
+const desktop = await config({ command, mode: command === "build" ? "production" : "development" })
 const renderer = await new RendererConfigFactory(desktop.renderer, { configFile: false }, {}).build()
 const resolved = await resolveConfig({ ...renderer, configFile: false }, command)
 const expected = channel === "boc" ? "beta" : channel === "latest" ? "prod" : channel

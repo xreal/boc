@@ -3,7 +3,7 @@ import { ServerConnection } from "@/runtime/server/registry"
 import type { SessionTab } from "@/shell/tabs/tabs"
 import { findBocTerminalTarget } from "./terminal"
 
-const local = { type: "http", http: { url: "http://localhost:4096" } } as const
+const local = { type: "sidecar", variant: "base", http: { url: "http://localhost:4096" } } as const
 const remote = { type: "http", http: { url: "https://opencode.example.com" } } as const
 const first = session(local, "ses_first")
 const latest = session(local, "ses_latest")

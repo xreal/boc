@@ -4,7 +4,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import type { Configuration } from "electron-builder"
 import upstream from "../../../desktop/electron-builder.config"
-import { CLI_BINARIES } from "../../../desktop/scripts/utils"
+import { CLI_BINARIES } from "../../../desktop/script/utils"
 import { bocBuilderConfig } from "./electron-builder.config"
 import { desktopDirectory } from "./paths"
 import { developmentEnvironment, developmentOptions } from "./dev"
@@ -20,7 +20,7 @@ test("stages the bundled CLI and its version for desktop packaging", async () =>
     await Bun.write(path.join(cli, "bin", "opencode"), "bundled cli")
     await Bun.write(path.join(cli, "package.json"), JSON.stringify({ version: "2.0.11" }))
 
-    await stageBocCli(path.join(directory, "dist"), "x86_64-unknown-linux-gnu", resources)
+    await stageBocCli(path.join(directory, "dist"), "linux-x64", resources)
 
     expect(await Bun.file(path.join(resources, "opencode-cli")).text()).toBe("bundled cli")
     expect(await Bun.file(path.join(resources, "opencode-cli.version")).text()).toBe("2.0.11")

@@ -8,7 +8,7 @@ import { EnvironmentControl, EnvironmentContextMenu, type EnvironmentActionTarge
 
 const target = {
   server: { type: "sidecar", variant: "base", http: { url: "http://storybook.local" } },
-  project: { id: "project_fixture", worktree: "/workspace", expanded: true },
+  project: { id: "project_fixture", worktree: "/workspace" },
   session: {
     id: "session_fixture",
     projectID: "project_fixture",

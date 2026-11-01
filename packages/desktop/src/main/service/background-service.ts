@@ -1,15 +1,18 @@
 import { app } from "electron"
-import { Context, Effect, FileSystem, Layer, Path } from "effect"
+import { Context, Effect, FileSystem, Layer, Option, Path, Schema } from "effect"
 import { bocServicePlacement, connectBocService, inspectBocService } from "../../boc/background-service"
 import { bocServiceFile, isBocSourceBackend } from "../../boc/development"
 import { CHANNEL } from "../constants"
 import { BackgroundServiceState } from "./background-service-state"
 import { cleanStages } from "./cli-stages"
+import { keptStages, serviceVersion, shouldRetryEnsure } from "./cli-version"
 import { DesktopCli } from "./desktop-cli"
 import { SidecarCredentials } from "./sidecar-credentials"
 import { sidecarProbe } from "./sidecar-probe"
 
 export * as BackgroundService from "./background-service"
+
+const RegisteredService = Schema.Struct({ version: Schema.optional(Schema.String) })
 
 export interface Interface {
   readonly connection: Effect.Effect<SidecarCredentials.Data>
@@ -49,7 +52,9 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     packaged: app.isPackaged,
     hasIsolatedDatabase,
   })
-  const version = mode === "initial" ? cli.version : undefined
+  const version = boc
+    ? mode === "initial" ? cli.version : undefined
+    : serviceVersion({ channel: CHANNEL === "boc" ? "beta" : CHANNEL, isolated, mode, version: cli.version })
 
   if (isolated) process.env.XDG_STATE_HOME = app.getPath("userData")
   const client = yield* Effect.promise(() => import("@opencode/client/service"))
@@ -74,8 +79,13 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
     onStart: (reason: "missing" | "version-mismatch", previousVersion?: string) =>
       runFork(Effect.logInfo("v2 CLI background service starting", { reason, previousVersion })),
   })
-  const ensureShared = () => client.Service.ensure(options(false))
-  const ensureIsolated = () => client.Service.ensure(options(true))
+  const ensure = (isolatedService: boolean) =>
+    client.Service.ensure(options(isolatedService)).catch((error) => {
+      if (boc || !shouldRetryEnsure(version, error instanceof Error ? error.message : String(error))) throw error
+      return client.Service.ensure({ ...options(isolatedService), version: cli.version })
+    })
+  const ensureShared = () => ensure(false)
+  const ensureIsolated = () => ensure(true)
   const early = mode === "initial" && placement === "shared" ? yield* Effect.promise(sidecarProbe) : undefined
   const service = yield* Effect.tryPromise(async () => {
     if (!boc) {
@@ -106,21 +116,32 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
   const url = new URL(service.url)
 
   if (url.hostname === "0.0.0.0") url.hostname = "127.0.0.1"
+
+  const runningVersion = yield* fs.readFileString(serviceFile(path, placement === "isolated") ?? client.fallback()).pipe(
+    Effect.map(
+      (text) =>
+        Option.getOrUndefined(Schema.decodeUnknownOption(Schema.fromJsonString(RegisteredService))(text))?.version,
+    ),
+    Effect.orElseSucceed(() => undefined),
+  )
+
   yield* Effect.logInfo("v2 CLI background service ready", {
     version,
     placement,
     probed: service === early,
+    runningVersion,
     ...endpoint(url.origin),
   })
 
   // Only packaged and isolated builds run a staged copy; any other binary sits in the source tree.
-  // The service now runs the current version, so an older copy at most belongs to a process still exiting.
-  if (mode === "initial" && (app.isPackaged || isolated) && cli.binary)
+  // Keep both the bundled stage and any adopted server's stage so its executable stays on disk.
+  if (!boc && mode === "initial" && (app.isPackaged || isolated) && cli.binary && runningVersion)
     runFork(
-      cleanStages(cli.binary).pipe(
+      cleanStages(cli.binary, { keep: keptStages(cli.version, runningVersion) }).pipe(
         Effect.catch((error) => Effect.logError("failed to clean staged v2 CLIs", { error })),
       ),
     )
+
   const ready = { url: url.origin, password: service.auth.password } satisfies SidecarCredentials.Data
   SidecarCredentials.set(ready)
 
@@ -130,8 +151,8 @@ const connect = Effect.fn("BackgroundService.connect")(function* (mode: "initial
 function serviceFile(path: Path.Path, isolated: boolean) {
   const boc = isolated ? bocServiceFile(CHANNEL, app.getPath("userData")) : undefined
   if (boc) return boc
-  if (isolated && process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
-    return path.join(app.getPath("userData"), "opencode", "service-local.json")
+  if (process.env.OPENCODE_DESKTOP_SERVER_CHANNEL === "local") {
+    return path.join(process.env.XDG_STATE_HOME ?? path.join(app.getPath("home"), ".local", "state"), "opencode", "service-local.json")
   }
   return undefined
 }

@@ -1,11 +1,11 @@
-import { Extension, Slot, type Setup } from "@opencode/gui-extensions/sdk"
+import { Plugin, Slot } from "@opencode/plugin/gui"
 import { Show } from "solid-js"
 import { BocEnvironmentSessionControl } from "./environments/session"
 import { BocWorktreeBaseBranch } from "./worktrees/base-branch"
 
-const definition = Extension.define({ id: "boc-session" })
+const definition = Plugin.define({})
 
-const setup: Setup<typeof definition> = (ctx) => {
+const setup: Plugin.Setup<typeof definition> = (ctx) => {
   ctx.add(Slot, {
     at: "session.header",
     order: 30,
@@ -24,4 +24,4 @@ const setup: Setup<typeof definition> = (ctx) => {
   })
 }
 
-export const bocSessionExtension = { ...definition, renderer: async () => ({ default: setup }) }
+export const bocSessionPlugin = { ...definition, id: "boc-session", windowEntry: async () => ({ default: setup }) }

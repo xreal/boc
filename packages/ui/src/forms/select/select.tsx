@@ -73,6 +73,7 @@ export type SelectProps<T> = Omit<
   children?: (item: T) => JSX.Element
   valueClass?: string
   contentClass?: string
+  portalMount?: HTMLElement
 }
 
 export function Select<T>(props: SelectProps<T>) {
@@ -94,6 +95,7 @@ export function Select<T>(props: SelectProps<T>) {
     "disabled",
     "valueClass",
     "contentClass",
+    "portalMount",
     "placement",
     "gutter",
     "sameWidth",
@@ -220,7 +222,7 @@ export function Select<T>(props: SelectProps<T>) {
           <ChevronDown />
         </span>
       </Trigger>
-      <Portal>
+      <Portal mount={local.portalMount}>
         <Content class={local.contentClass} data-component="menu-v2-content" data-slot="select-v2-content">
           <Listbox data-slot="select-v2-listbox" />
         </Content>

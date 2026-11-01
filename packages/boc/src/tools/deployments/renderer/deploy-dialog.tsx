@@ -27,7 +27,7 @@ export function DeploymentDialog(props: {
   const t = createBocTranslator(props.locale)
   const preflight = createDeploymentPreflight(props)
   const state = preflight.state
-  const [view, setView] = createStore({ branchOpen: false })
+  const [view, setView] = createStore({ branchOpen: false, portal: undefined as HTMLDivElement | undefined })
   let disposed = false
 
   const submitting = () => state.status === "submitting"
@@ -83,6 +83,7 @@ export function DeploymentDialog(props: {
 
   return (
     <Dialog size="large" fit class="deployment-preflight" containerClass="deployment-preflight-container">
+      <div ref={(element) => setView("portal", element)} />
       <DialogHeader closeLabel={t("boc.deployments.deploy.close")}>
         <DialogTitleGroup
           title={t(
@@ -185,7 +186,7 @@ export function DeploymentDialog(props: {
             <Show when={branchFailure()}>
               <Combobox.ErrorMessage class="deployment-preflight-error">{failureMessage()}</Combobox.ErrorMessage>
             </Show>
-            <Combobox.Portal>
+            <Combobox.Portal mount={view.portal}>
               <Combobox.Content class="deployment-branch-menu">
                 <Combobox.Listbox class="deployment-branch-list" />
                 <Show when={state.searching}>
@@ -251,6 +252,7 @@ export function DeploymentDialog(props: {
               }
             >
               <DeploymentWorkflowPicker
+                portalMount={view.portal}
                 targets={state.targets}
                 selected={state.selected}
                 inputs={state.inputs}

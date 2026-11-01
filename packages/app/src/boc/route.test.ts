@@ -17,11 +17,11 @@ describe("BOC routes", () => {
 
   test("restores Boc settings from a shared URL", () => {
     const root = settingsViewUrl({ type: "root", tab: "boc" })
-    const server = settingsViewUrl({ type: "server", server: "ssh:staging", tab: "boc" })
+    const server = settingsViewUrl({ type: "root", server: "ssh:staging", tab: "boc" })
 
-    expect(parseSettingsView(new URL(root, "http://localhost").search, false).tab).toBe("boc")
-    expect(parseSettingsView(new URL(server, "http://localhost").search, true)).toMatchObject({
-      type: "server",
+    expect(parseSettingsView(new URL(root, "http://localhost").search).tab).toBe("boc")
+    expect(parseSettingsView(new URL(server, "http://localhost").search)).toMatchObject({
+      type: "root",
       server: "ssh:staging",
       tab: "boc",
     })

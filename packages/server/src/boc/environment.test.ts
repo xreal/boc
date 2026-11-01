@@ -9,6 +9,7 @@ import { BocEnvironmentRpc } from "@opencode/schema/boc/environment-rpc"
 import { AbsolutePath } from "@opencode/schema/schema"
 import { Project } from "@opencode/schema/project"
 import { Session } from "@opencode/schema/session"
+import { Worktree } from "@opencode/schema/worktree"
 import { BocEnvironments } from "@boc/extensions/environments/server"
 import { Global } from "@opencode/util/global"
 import path from "node:path"
@@ -67,7 +68,7 @@ it.live("serves environment RPC and accepts registered Lane linked worktrees", (
     const database = Context.get(boc.context, Database.Service)
     yield* database.db
       .update(WorktreeTable)
-      .set({ strategy: "lane" })
+      .set({ strategy: Worktree.StrategyID.make("lane") })
       .where(and(eq(WorktreeTable.project_id, projectID), eq(WorktreeTable.directory, AbsolutePath.make(linked))))
     expect(
       yield* Effect.promise(() => environments.inspect({ ...checkout, directory: linked }, options)),
@@ -84,7 +85,7 @@ it.live("serves environment RPC and accepts registered Lane linked worktrees", (
     yield* database.db.insert(WorktreeTable).values({
       project_id: projectID,
       directory: AbsolutePath.make(standalone),
-      strategy: "lane",
+      strategy: Worktree.StrategyID.make("lane"),
     })
     expect(
       yield* Effect.promise(() => environments.inspect({ ...checkout, directory: standalone }, options)),

@@ -36,8 +36,8 @@ describe("reverseProjectTabGroups", () => {
 
 describe("resolveProjectTabGroup", () => {
   const server = "local\nhttp://localhost:4096" as ServerConnection.Key
-  const boc: LocalProject = { id: "boc", worktree: "/repo/boc", expanded: false }
-  const defaults: LocalProject = { id: "default", worktree: "/docs/Default Project", expanded: false }
+  const boc: LocalProject = { id: "boc", worktree: "/repo/boc" }
+  const defaults: LocalProject = { id: "default", worktree: "/docs/Default Project" }
   const projects = [defaults, boc]
 
   const draft = (directory: string): Tab => ({ type: "draft", draftID: "draft", server, directory })
